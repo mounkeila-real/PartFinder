@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Model for locally caching WMI identifiers to limit API calls
+model WmiCode {
+  id        Int      @id @default(autoincrement())
+  wmi       String   @unique @db.VarChar(3)
+  make      String
+  country   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Local cache/catalog of frequently searched parts to augment eBay returns
+model PartCatalog {
+  id          Int      @id @default(autoincrement())
+  oem         String   @unique
+  name        String
+  description String?
+  basePrice   Float?   // Cached reference price before margin
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// User purchase intents
+model Order {
+  id          Int         @id @default(autoincrement())
+  status      OrderStatus @default(PENDING)
+  totalAmount Float
+  contactInfo String?     // e.g email or phone
+  items       OrderItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model OrderItem {
+  id        Int    @id @default(autoincrement())
+  orderId   Int
+  order     Order  @relation(fields: [orderId], references: [id])
+  partOem   String
+  partName  String
+  quantity  Int    @default(1)
+  priceSold Float  // Price with margin applied
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  CANCELLED
+}

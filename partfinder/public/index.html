@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PartFinder Pro</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="app-header">
+        <div class="logo">
+            <span class="logo-icon">🔧</span>
+            <h1>PART<span class="highlight">FINDER</span></h1>
+        </div>
+        <div class="cart-badge" id="cartBadge">🛒 0 demande(s)</div>
+    </header>
+
+    <main class="container">
+        <!-- Panneau Gauche : Formulaire Intelligent -->
+        <section class="panel left-panel">
+            <div class="panel-header">
+                <h2>IDENTIFICATION</h2>
+                <span class="status-dot"></span>
+            </div>
+
+            <div class="form-container">
+                <!-- Zone Carte Grise / Photo -->
+                <div class="upload-zones">
+                    <div class="upload-box" id="cg-upload-box">
+                        <label for="cg-file">
+                            <span class="icon">📄</span>
+                            <span>Scanner Carte Grise</span>
+                            <small>(Auto-remplissage)</small>
+                        </label>
+                        <input type="file" id="cg-file" accept="image/*">
+                    </div>
+                </div>
+
+                <!-- Véhicule Info -->
+                <div class="field-group vehicle-info">
+                    <div class="input-row">
+                        <div class="input-field">
+                            <label>VIN (17 caractères)</label>
+                            <input type="text" id="vin" placeholder="Ex: WAUZZZ..." maxlength="17" class="mono">
+                        </div>
+                        <button class="btn-action" id="btn-decode-vin">DÉCODER</button>
+                    </div>
+                    
+                    <div class="auto-filled-grid">
+                        <div class="input-field">
+                            <label>Marque</label>
+                            <input type="text" id="marque" readonly>
+                        </div>
+                        <div class="input-field">
+                            <label>Modèle</label>
+                            <input type="text" id="modele" readonly>
+                        </div>
+                        <div class="input-field">
+                            <label>Année</label>
+                            <input type="text" id="annee" readonly>
+                        </div>
+                        <div class="input-field">
+                            <label>Motorisation</label>
+                            <input type="text" id="moteur" readonly>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pièce Info -->
+                <div class="field-group part-info">
+                    <div class="input-field">
+                        <label>Référence OEM / Part Number</label>
+                        <input type="text" id="part-number" placeholder="Ex: 8X0941044" class="mono">
+                    </div>
+                    <div class="input-field">
+                        <label>Description précise de la pièce</label>
+                        <textarea id="description" rows="2" placeholder="Ex: Ballast Xénon D1S..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Assistant IA Chat -->
+                <div class="chat-assistant">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="message system">Bonjour, je peux vous aider à préciser votre recherche. Que cherchez-vous ?</div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" id="chat-input" placeholder="Décrivez votre besoin...">
+                        <button id="btn-chat-send">▶</button>
+                    </div>
+                </div>
+
+                <button class="btn-primary" id="btn-search">LANCER LA RECHERCHE</button>
+            </div>
+        </section>
+
+        <!-- Panneau Droit : Résultats -->
+        <section class="panel right-panel">
+            <div class="panel-header">
+                <h2>OFFRES DISPONIBLES</h2>
+                <div class="loader hidden" id="search-loader"></div>
+            </div>
+
+            <div class="results-grid" id="results-grid">
+                <!-- Les tuiles de résultats apparaîtront ici -->
+                <div class="empty-state">
+                    <span class="icon">🔍</span>
+                    <p>En attente de recherche...</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modale Détail -->
+    <div class="modal-overlay hidden" id="detail-modal">
+        <div class="modal-content">
+            <button class="modal-close" id="modal-close">×</button>
+            <div class="modal-layout">
+                <div class="modal-gallery">
+                    <div class="carousel" id="carousel-track"></div>
+                    <button class="nav-btn prev" id="carousel-prev">‹</button>
+                    <button class="nav-btn next" id="carousel-next">›</button>
+                    <div class="carousel-dots" id="carousel-dots"></div>
+                </div>
+                <div class="modal-info">
+                    <div class="badge-etat" id="modal-etat">Neuf</div>
+                    <h3 id="modal-nom">Nom de la pièce</h3>
+                    <p class="ref" id="modal-ref">REF: ---</p>
+                    <p class="desc" id="modal-desc">Description de la pièce détaillée.</p>
+                    <div class="price-block">
+                        <span class="price-ttc" id="modal-prix">0.00 €</span>
+                        <span class="price-label">TTC</span>
+                    </div>
+                    <button class="btn-order" id="btn-add-cart">
+                        <span class="icon">➕</span> COMMANDER
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de compression canvas -->
+    <script src="js/app.js"></script>
+</body>
+</html>
