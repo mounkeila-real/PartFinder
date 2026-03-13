@@ -136,9 +136,13 @@ const vinYearMap = {
 };
 function decodeVinYear(vin) {
     if (!vin || vin.length < 10) return null;
+    // Position 10 model year encoding is a North American (SAE/NHTSA) standard ONLY.
+    // European VINs (W=Germany, V=France/Spain, S=UK, Z=Italy, Y=Scandinavia, etc.)
+    // do NOT use this field as model year — return null to avoid showing wrong year.
+    const northAmericanPrefixes = ['1','2','3','4','5','6','7'];
+    if (!northAmericanPrefixes.includes(vin[0])) return null;
+
     const code = vin[9].toUpperCase();
-    // Position 10 is model year; for ambiguous letters (pre/post 2010)
-    // we pick the most recent plausible year based on current date
     const yearCandidates = {
         'A':[1980,2010],'B':[1981,2011],'C':[1982,2012],'D':[1983,2013],'E':[1984,2014],
         'F':[1985,2015],'G':[1986,2016],'H':[1987,2017],'J':[1988,2018],'K':[1989,2019],
@@ -150,7 +154,6 @@ function decodeVinYear(vin) {
     const candidates = yearCandidates[code];
     if (!candidates) return null;
     const now = new Date().getFullYear();
-    // Pick the most recent year that is <= current year
     return candidates.filter(y => y <= now + 1).pop() || candidates[0];
 }
 
