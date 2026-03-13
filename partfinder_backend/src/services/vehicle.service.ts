@@ -47,7 +47,8 @@ export class VehicleService {
     }
 
     /**
-     * Decodes a VIN using the vin-decoder19 API.
+     * Decodes a VIN using the vin-decoder19 API (European coverage via RapidAPI).
+     * Returns a normalized object: { make, model, modelYear, engine }
      */
     static async getInfoByVin(vin: string) {
         const options = {
@@ -62,9 +63,26 @@ export class VehicleService {
 
         try {
             const response = await axios.request(options);
-            return response.data;
+            const raw = response.data;
+
+            // vin-decoder19 returns an object with varied field names — normalize here
+            const get = (...keys: string[]) => {
+                for (const k of keys) {
+                    const val = raw[k] || raw[k.toLowerCase()] || raw[k.toUpperCase()];
+                    if (val && val !== 'Not Applicable' && val !== '0' && val !== 'null') return val;
+                }
+                return null;
+            };
+
+            return {
+                make:      get('make', 'Make', 'MAKE', 'manufacturer'),
+                model:     get('model', 'Model', 'MODEL', 'model_name'),
+                modelYear: get('modelYear', 'model_year', 'year', 'Year', 'MODEL_YEAR'),
+                engine:    get('engine', 'Engine', 'engine_displacement', 'displacementL', 'Displacement (L)',
+                               'engineDisplacement', 'displacement'),
+            };
         } catch (error: any) {
-            console.error('Error fetching by VIN:', error.message);
+            console.error('Error decoding VIN via vin-decoder19:', error.message);
             throw new Error('Failed to decode VIN.');
         }
     }
