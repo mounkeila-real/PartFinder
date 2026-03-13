@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
+const axios = require('axios');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const path = require('path');
 const fs = require('fs');
