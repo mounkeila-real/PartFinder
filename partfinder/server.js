@@ -105,20 +105,54 @@ app.post('/api/chat', async (req, res) => {
     }
 });
 
-// WMI local decoding fallback
+// WMI → Marque (ISO 3780)
 const wmiMap = {
-    'WDD': 'Mercedes-Benz',
-    'WBA': 'BMW',
-    'WAU': 'Audi',
-    'VF7': 'Citroën',
-    'VF3': 'Peugeot',
-    'VF1': 'Renault',
-    'YZV': 'Porsche',
-    'WP0': 'Porsche',
-    'ZFA': 'Fiat',
-    'YV1': 'Volvo',
-    'WVW': 'Volkswagen'
+    'WDD': 'Mercedes-Benz', 'WDB': 'Mercedes-Benz', 'WDC': 'Mercedes-Benz',
+    'WBA': 'BMW', 'WBS': 'BMW', 'WBY': 'BMW',
+    'WAU': 'Audi', 'WA1': 'Audi',
+    'VF7': 'Citroën', 'VF8': 'Citroën',
+    'VF3': 'Peugeot', 'VF6': 'Peugeot',
+    'VF1': 'Renault', 'VF2': 'Renault',
+    'WP0': 'Porsche', 'WP1': 'Porsche',
+    'ZFA': 'Fiat', 'ZFF': 'Ferrari',
+    'YV1': 'Volvo', 'YV2': 'Volvo',
+    'WVW': 'Volkswagen', 'WV1': 'Volkswagen', 'WV2': 'Volkswagen',
+    'TRU': 'Audi', 'VSS': 'SEAT', 'VSK': 'SEAT',
+    'VNK': 'Toyota (Europe)', 'SB1': 'Toyota (UK)',
+    'SAJ': 'Jaguar', 'SAL': 'Land Rover', 'SCC': 'Lotus',
+    'BYD': 'BYD', '1HG': 'Honda', '1FA': 'Ford',
+    'JHM': 'Honda', 'JN1': 'Nissan', 'JT2': 'Toyota',
 };
+
+// Decode model year from VIN position 10 (ISO 3779 standard — no API needed)
+const vinYearMap = {
+    'A':1980,'B':1981,'C':1982,'D':1983,'E':1984,'F':1985,'G':1986,'H':1987,
+    'J':1988,'K':1989,'L':1990,'M':1991,'N':1992,'P':1993,'R':1994,'S':1995,
+    'T':1996,'V':1997,'W':1998,'X':1999,'Y':2000,'1':2001,'2':2002,'3':2003,
+    '4':2004,'5':2005,'6':2006,'7':2007,'8':2008,'9':2009,
+    // Second cycle (2010+)
+    'A':2010,'B':2011,'C':2012,'D':2013,'E':2014,'F':2015,'G':2016,'H':2017,
+    'J':2018,'K':2019,'L':2020,'M':2021,'N':2022,'P':2023,'R':2024,'S':2025,'T':2026
+};
+function decodeVinYear(vin) {
+    if (!vin || vin.length < 10) return null;
+    const code = vin[9].toUpperCase();
+    // Position 10 is model year; for ambiguous letters (pre/post 2010)
+    // we pick the most recent plausible year based on current date
+    const yearCandidates = {
+        'A':[1980,2010],'B':[1981,2011],'C':[1982,2012],'D':[1983,2013],'E':[1984,2014],
+        'F':[1985,2015],'G':[1986,2016],'H':[1987,2017],'J':[1988,2018],'K':[1989,2019],
+        'L':[1990,2020],'M':[1991,2021],'N':[1992,2022],'P':[1993,2023],'R':[1994,2024],
+        'S':[1995,2025],'T':[1996,2026],'V':[1997],'W':[1998],'X':[1999],'Y':[2000],
+        '1':[2001],'2':[2002],'3':[2003],'4':[2004],'5':[2005],
+        '6':[2006],'7':[2007],'8':[2008],'9':[2009],
+    };
+    const candidates = yearCandidates[code];
+    if (!candidates) return null;
+    const now = new Date().getFullYear();
+    // Pick the most recent year that is <= current year
+    return candidates.filter(y => y <= now + 1).pop() || candidates[0];
+}
 
 app.get('/api/decode-vin/:vin', async (req, res) => {
     try {
@@ -128,21 +162,25 @@ app.get('/api/decode-vin/:vin', async (req, res) => {
         const wmi = vin.substring(0, 3);
         const localBrand = wmiMap[wmi] || null;
 
+        // Decode year locally from VIN position 10 (always works, no API)
+        const localYear = decodeVinYear(vin);
+
         // Call the TypeScript backend (vin-decoder19 via RapidAPI — European coverage)
         const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
         try {
-            const response = await axios.get(`${backendUrl}/api/vehicle/vin/${vin}`);
+            const response = await axios.get(`${backendUrl}/api/vehicle/vin/${vin}`, { timeout: 5000 });
             const d = response.data;
 
             res.json({
                 marque: d.make || d.Make || localBrand || 'Inconnu',
                 modele: d.model || d.Model || null,
-                annee:  d.modelYear || d.model_year || d['Model Year'] || null,
+                annee:  d.modelYear || d.model_year || d['Model Year'] || localYear,
                 moteur: d.engineDisplacement || d.engine || d.Engine || null
             });
         } catch (apiError) {
-            console.warn("Backend VIN API failed, using local WMI only:", apiError.message);
-            res.json({ marque: localBrand || 'Inconnu', modele: null, annee: null, moteur: null });
+            console.warn("Backend VIN API failed, using local WMI+year:", apiError.message);
+            // Fallback: brand from WMI + year from position 10 — always available
+            res.json({ marque: localBrand || 'Inconnu', modele: null, annee: localYear, moteur: null });
         }
     } catch (error) {
         res.status(500).json({ error: "Erreur de décodage VIN" });
