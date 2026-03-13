@@ -3,14 +3,14 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // Model for locally caching WMI identifiers to limit API calls
 model WmiCode {
   id        Int      @id @default(autoincrement())
-  wmi       String   @unique @db.VarChar(3)
+  wmi       String   @unique
   make      String
   country   String
   createdAt DateTime @default(now())
@@ -32,9 +32,9 @@ model PartCatalog {
 // User purchase intents
 model Order {
   id          Int         @id @default(autoincrement())
-  status      OrderStatus @default(PENDING)
+  status      String      @default("PENDING")
   totalAmount Float
-  contactInfo String?     // e.g email or phone
+  contactInfo String?
   items       OrderItem[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -50,9 +50,3 @@ model OrderItem {
   priceSold Float  // Price with margin applied
 }
 
-enum OrderStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  CANCELLED
-}
