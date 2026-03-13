@@ -126,32 +126,23 @@ app.get('/api/decode-vin/:vin', async (req, res) => {
         if (vin.length < 3) return res.status(400).json({ error: "VIN trop court" });
 
         const wmi = vin.substring(0, 3);
-        const localBrand = wmiMap[wmi] || "Inconnu";
+        const localBrand = wmiMap[wmi] || null;
 
-        // Call NHTSA API as fallback/enrichment
+        // Call the TypeScript backend (vin-decoder19 via RapidAPI — European coverage)
+        const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
         try {
-            const response = await axios.get(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/${vin}?format=json`);
-            const results = response.data.Results;
-
-            const extractValue = (variable) => {
-                const item = results.find(r => r.Variable === variable);
-                return item ? item.Value : null;
-            };
+            const response = await axios.get(`${backendUrl}/api/vehicle/vin/${vin}`);
+            const d = response.data;
 
             res.json({
-                marque: extractValue('Make') || localBrand,
-                modele: extractValue('Model'),
-                annee: extractValue('Model Year'),
-                moteur: extractValue('Displacement (L)') ? extractValue('Displacement (L)') + 'L' : null
+                marque: d.make || d.Make || localBrand || 'Inconnu',
+                modele: d.model || d.Model || null,
+                annee:  d.modelYear || d.model_year || d['Model Year'] || null,
+                moteur: d.engineDisplacement || d.engine || d.Engine || null
             });
         } catch (apiError) {
-            console.warn("NHTSA API failed, using local WMI only", apiError.message);
-            res.json({
-                marque: localBrand,
-                modele: null,
-                annee: null,
-                moteur: null
-            });
+            console.warn("Backend VIN API failed, using local WMI only:", apiError.message);
+            res.json({ marque: localBrand || 'Inconnu', modele: null, annee: null, moteur: null });
         }
     } catch (error) {
         res.status(500).json({ error: "Erreur de décodage VIN" });
