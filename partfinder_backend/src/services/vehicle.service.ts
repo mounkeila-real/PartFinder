@@ -86,4 +86,66 @@ export class VehicleService {
             throw new Error('Failed to decode VIN.');
         }
     }
+
+    // --- NEW CATALOG ENDPOINTS ---
+
+    /** Helper for standard GET requests to the global-vehicle-list API */
+    private static async _fetchCatalog(endpoint: string) {
+        const options = {
+            method: 'GET',
+            url: `https://global-vehicle-list-k-type-hsn-tsn-data-api-for-car-pats.p.rapidapi.com${endpoint}`,
+            headers: {
+                'x-rapidapi-host': 'global-vehicle-list-k-type-hsn-tsn-data-api-for-car-pats.p.rapidapi.com',
+                'x-rapidapi-key': RAPID_API_KEY
+            }
+        };
+
+        try {
+            const response = await axios.request(options);
+            return response.data;
+        } catch (error: any) {
+            console.error(`Error fetching ${endpoint}:`, error.message);
+            throw new Error(`Failed to fetch data from catalog API: ${endpoint}`);
+        }
+    }
+
+    static async getVehicles() {
+        return this._fetchCatalog('/vehicles');
+    }
+
+    static async getMakes() {
+        return this._fetchCatalog('/vehicles/makes');
+    }
+
+    static async getModels(make: string) {
+        return this._fetchCatalog(`/vehicles/models/${encodeURIComponent(make)}`);
+    }
+
+    static async getTypes(make: string, model: string) {
+        return this._fetchCatalog(`/vehicles/types/${encodeURIComponent(make)}/${encodeURIComponent(model)}`);
+    }
+
+    static async getPlatforms(make: string, model: string, type: string) {
+        return this._fetchCatalog(`/vehicles/platforms/${encodeURIComponent(make)}/${encodeURIComponent(model)}/${encodeURIComponent(type)}`);
+    }
+
+    static async getYears(make: string, model: string, type: string, platform: string) {
+        return this._fetchCatalog(`/vehicles/years/${encodeURIComponent(make)}/${encodeURIComponent(model)}/${encodeURIComponent(type)}/${encodeURIComponent(platform)}`);
+    }
+
+    static async getEngines(make: string, model: string, type: string, platform: string, production_period: string) {
+        return this._fetchCatalog(`/vehicles/engines/${encodeURIComponent(make)}/${encodeURIComponent(model)}/${encodeURIComponent(type)}/${encodeURIComponent(platform)}/${encodeURIComponent(production_period)}`);
+    }
+
+    static async getDetails(make: string, model: string, type: string, platform: string, production_period: string, engine: string) {
+        return this._fetchCatalog(`/vehicles/details/${encodeURIComponent(make)}/${encodeURIComponent(model)}/${encodeURIComponent(type)}/${encodeURIComponent(platform)}/${encodeURIComponent(production_period)}/${encodeURIComponent(engine)}`);
+    }
+
+    static async getHsnTsn(hsn: string, tsn: string) {
+        return this._fetchCatalog(`/vehicles/hsntsn/${encodeURIComponent(hsn)}/${encodeURIComponent(tsn)}`);
+    }
+
+    static async getKtype(id: string) {
+        return this._fetchCatalog(`/vehicles/ktype/${encodeURIComponent(id)}`);
+    }
 }
