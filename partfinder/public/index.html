@@ -1,145 +1,275 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PartFinder Pro</title>
+    <title>PartFinder - Moteur de recherche de pièces</title>
+    <!-- Google Fonts for Modern Typography -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700&display=swap"
+        rel="stylesheet">
+    <!-- Phosphor Icons for Industrial/Premium look -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link rel="stylesheet" href="css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 </head>
+
 <body>
-    <header class="app-header">
-        <div class="logo">
-            <span class="logo-icon">🔧</span>
-            <h1>PART<span class="highlight">FINDER</span></h1>
-        </div>
-        <div class="cart-badge" id="cartBadge">🛒 0 demande(s)</div>
-    </header>
-
-    <main class="container">
-        <!-- Panneau Gauche : Formulaire Intelligent -->
-        <section class="panel left-panel">
-            <div class="panel-header">
-                <h2>IDENTIFICATION</h2>
-                <span class="status-dot"></span>
+    <div class="app-container">
+        <!-- Sidebar / Navigation -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="ph-fill ph-engine"></i>
+                <span>PartFinder</span>
             </div>
-
-            <div class="form-container">
-                <!-- Zone Carte Grise / Photo -->
-                <div class="upload-zones">
-                    <div class="upload-box" id="cg-upload-box">
-                        <label for="cg-file">
-                            <span class="icon">📄</span>
-                            <span>Scanner Carte Grise</span>
-                            <small>(Auto-remplissage)</small>
-                        </label>
-                        <input type="file" id="cg-file" accept="image/*">
+            <nav>
+                <a href="#" class="nav-item active">
+                    <i class="ph ph-magnifying-glass"></i>
+                    <span>Recherche</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="ph ph-shopping-cart"></i>
+                    <span>Commandes</span>
+                    <span class="badge display-none" id="cart-badge">0</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="ph ph-list-dashes"></i>
+                    <span>Catalogue Historique</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="avatar">OM</div>
+                    <div class="user-info">
+                        <span class="name">Opérateur M.</span>
+                        <span class="role">Back-office</span>
                     </div>
-                </div>
-
-                <!-- Véhicule Info -->
-                <div class="field-group vehicle-info">
-                    <div class="input-row">
-                        <div class="input-field">
-                            <label>VIN (17 caractères)</label>
-                            <input type="text" id="vin" placeholder="Ex: WAUZZZ..." maxlength="17" class="mono">
-                        </div>
-                        <button class="btn-action" id="btn-decode-vin">DÉCODER</button>
-                    </div>
-                    
-                    <div class="auto-filled-grid">
-                        <div class="input-field">
-                            <label>Marque</label>
-                            <input type="text" id="marque" readonly>
-                        </div>
-                        <div class="input-field">
-                            <label>Modèle</label>
-                            <input type="text" id="modele" readonly>
-                        </div>
-                        <div class="input-field">
-                            <label>Année</label>
-                            <input type="text" id="annee" readonly>
-                        </div>
-                        <div class="input-field">
-                            <label>Motorisation</label>
-                            <input type="text" id="moteur" readonly>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Pièce Info -->
-                <div class="field-group part-info">
-                    <div class="input-field">
-                        <label>Référence OEM / Part Number</label>
-                        <input type="text" id="part-number" placeholder="Ex: 8X0941044" class="mono">
-                    </div>
-                    <div class="input-field">
-                        <label>Description précise de la pièce</label>
-                        <textarea id="description" rows="2" placeholder="Ex: Ballast Xénon D1S..."></textarea>
-                    </div>
-                </div>
-
-                <!-- Assistant IA Chat -->
-                <div class="chat-assistant">
-                    <div class="chat-messages" id="chat-messages">
-                        <div class="message system">Bonjour, je peux vous aider à préciser votre recherche. Que cherchez-vous ?</div>
-                    </div>
-                    <div class="chat-input-area">
-                        <input type="text" id="chat-input" placeholder="Décrivez votre besoin...">
-                        <button id="btn-chat-send">▶</button>
-                    </div>
-                </div>
-
-                <button class="btn-primary" id="btn-search">LANCER LA RECHERCHE</button>
-            </div>
-        </section>
-
-        <!-- Panneau Droit : Résultats -->
-        <section class="panel right-panel">
-            <div class="panel-header">
-                <h2>OFFRES DISPONIBLES</h2>
-                <div class="loader hidden" id="search-loader"></div>
-            </div>
-
-            <div class="results-grid" id="results-grid">
-                <!-- Les tuiles de résultats apparaîtront ici -->
-                <div class="empty-state">
-                    <span class="icon">🔍</span>
-                    <p>En attente de recherche...</p>
                 </div>
             </div>
-        </section>
-    </main>
+        </aside>
 
-    <!-- Modale Détail -->
-    <div class="modal-overlay hidden" id="detail-modal">
-        <div class="modal-content">
-            <button class="modal-close" id="modal-close">×</button>
-            <div class="modal-layout">
-                <div class="modal-gallery">
-                    <div class="carousel" id="carousel-track"></div>
-                    <button class="nav-btn prev" id="carousel-prev">‹</button>
-                    <button class="nav-btn next" id="carousel-next">›</button>
-                    <div class="carousel-dots" id="carousel-dots"></div>
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="topbar">
+                <h1>Nouvelle Recherche de Pièce</h1>
+                <div class="actions">
+                    <button class="btn-icon"><i class="ph ph-bell"></i></button>
+                    <button class="btn-icon"><i class="ph ph-gear"></i></button>
                 </div>
-                <div class="modal-info">
-                    <div class="badge-etat" id="modal-etat">Neuf</div>
-                    <h3 id="modal-nom">Nom de la pièce</h3>
-                    <p class="ref" id="modal-ref">REF: ---</p>
-                    <p class="desc" id="modal-desc">Description de la pièce détaillée.</p>
-                    <div class="price-block">
-                        <span class="price-ttc" id="modal-prix">0.00 €</span>
-                        <span class="price-label">TTC</span>
+            </header>
+
+            <div class="search-layout">
+                <!-- Search Form Column -->
+                <div class="search-panel">
+                    <form id="search-form" class="adaptive-form">
+
+                        <!-- Section 1: Vehicle Identification -->
+                        <section class="form-section" id="section-vehicle">
+                            <div class="section-header">
+                                <span class="step-num">1</span>
+                                <h2>Identification Véhicule</h2>
+                            </div>
+
+                            <div class="input-group">
+                                <label for="vin">N° de Châssis (VIN)</label>
+                                <div class="input-wrapper">
+                                    <i class="ph ph-barcode"></i>
+                                    <input type="text" id="vin" placeholder="Ex: VF1XXXXXXXXXXXXXX" maxlength="17">
+                                    <button type="button" class="btn-scan" id="btn-scan-cg" title="Scanner la carte grise">
+                                        <i class="ph ph-scan"></i>
+                                    </button>
+                                    <input type="file" id="cg-image" accept="image/*" class="display-none">
+                                </div>
+                                <div class="field-feedback" id="vin-feedback"></div>
+                            </div>
+
+                            <div class="divider-text"><span>OU MANUELLEMENT</span></div>
+
+                            <div class="manual-vehicle" id="manual-vehicle-fields">
+                                <div class="input-group">
+                                    <label for="make">Marque</label>
+                                    <select id="make">
+                                        <option value="">Sélectionner...</option>
+                                        <option value="renault">Renault</option>
+                                        <option value="peugeot">Peugeot</option>
+                                        <option value="citroen">Citroën</option>
+                                        <option value="audi">Audi</option>
+                                        <option value="bmw">BMW</option>
+                                    </select>
+                                </div>
+                                <div class="input-row">
+                                    <div class="input-group">
+                                        <label for="model">Modèle</label>
+                                        <select id="model" disabled>
+                                            <option value="">Sélectionner d'abord une marque...</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-row">
+                                        <div class="input-group">
+                                            <label for="year">Année</label>
+                                            <input type="number" id="year" placeholder="2018" disabled>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="engine">Motorisation</label>
+                                            <input type="text" id="engine" placeholder="Ex: 1.5 dCi 90" disabled>
+                                        </div>
+                                    </div>
+                                </div>
+                        </section>
+
+                        <!-- Section 2: Part Identification -->
+                        <section class="form-section" id="section-part">
+                            <div class="section-header">
+                                <span class="step-num">2</span>
+                                <h2>Identification Pièce</h2>
+                            </div>
+
+                            <div class="input-group primary-input">
+                                <label for="part-number">Référence Constructeur (OEM / IAM)</label>
+                                <div class="input-wrapper">
+                                    <i class="ph ph-hash"></i>
+                                    <input type="text" id="part-number" placeholder="Ex: 7701477023 ou 0986424794">
+                                </div>
+                            </div>
+
+                            <div class="divider-text"><span>OU</span></div>
+
+                            <div class="input-group file-upload-group" id="part-photo-group">
+                                <label>Photo de la pièce (Recherche IA)</label>
+                                <div class="upload-area" id="drop-zone">
+                                    <i class="ph ph-upload-simple"></i>
+                                    <p>Glissez une image ici ou <span>cliquez pour parcourir</span></p>
+                                    <input type="file" id="part-image" accept="image/*" hidden>
+                                </div>
+                                <div class="file-preview display-none" id="file-preview">
+                                    <img src="" alt="Preview" id="preview-img">
+                                    <button type="button" class="btn-remove-img" id="btn-remove-img"><i
+                                            class="ph ph-x"></i></button>
+                                </div>
+                            </div>
+
+                            <div class="input-group">
+                                <label for="part-desc">Description (si pas de réf/photo)</label>
+                                <textarea id="part-desc" rows="2"
+                                    placeholder="Ex: Plaquettes de frein avant pour Clio 4 1.5 dCi"></textarea>
+                            </div>
+                        </section>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" id="btn-reset">Réinitialiser</button>
+                            <button type="submit" class="btn-primary" id="btn-search">
+                                <i class="ph ph-magnifying-glass"></i>
+                                Rechercher
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Results Column -->
+                <div class="results-panel">
+                    <div class="empty-state" id="empty-state">
+                        <div class="pulsing-circle">
+                            <i class="ph ph-engine"></i>
+                        </div>
+                        <h3>Prêt à chercher</h3>
+                        <p>Renseignez les infos à gauche. Le système s'adaptera automatiquement à ce que vous saisissez.
+                        </p>
                     </div>
-                    <button class="btn-order" id="btn-add-cart">
-                        <span class="icon">➕</span> COMMANDER
-                    </button>
+
+                    <div class="loading-state display-none" id="loading-state">
+                        <div class="spinner"></div>
+                        <h3>Recherche en cours...</h3>
+                        <div class="loading-steps">
+                            <div class="step step-done"><i class="ph ph-check-circle"></i> Décodage VIN</div>
+                            <div class="step step-active"><i class="ph ph-spinner-gap"></i> Interrogation Base Locale
+                            </div>
+                            <div class="step"><i class="ph ph-circle"></i> Interrogation APIs Marchands</div>
+                        </div>
+                    </div>
+
+                    <div class="results-content display-none" id="results-content">
+                        <!-- Part Info Header -->
+                        <div class="part-info-card">
+                            <div class="part-header">
+                                <div class="part-titles">
+                                    <h2 id="res-part-name">Plaquettes de frein avant</h2>
+                                    <div class="part-tags">
+                                        <span class="tag tag-oem" id="res-part-oem">OEM: 7701477023</span>
+                                        <span class="tag tag-vehicle" id="res-part-vehicle">Renault Clio IV 1.5
+                                            dCi</span>
+                                    </div>
+                                </div>
+                                <button class="btn-icon btn-outline"><i class="ph ph-bookmark"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- Price Offers Grid -->
+                        <div class="offers-header">
+                            <h3>Offres disponibles</h3>
+                            <div class="filters">
+                                <select>
+                                    <option>Prix croissant</option>
+                                    <option>Disponibilité</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="offers-grid" id="offers-grid">
+                            <!-- Offers will be injected here by JS -->
+                        </div>
+                    </div>
                 </div>
+            </div>
+        </main>
+
+        <!-- Shopping Cart / Order Panel (Hidden by default) -->
+        <div class="cart-panel display-none" id="cart-panel">
+            <div class="cart-header">
+                <h2>Sélection à commander</h2>
+                <button class="btn-icon" id="close-cart"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="cart-items" id="cart-items">
+                <!-- Cart items injected by JS -->
+            </div>
+            <div class="cart-footer">
+                <div class="cart-total">
+                    <span>Total Client TTC</span>
+                    <strong id="cart-total-price">0.00 €</strong>
+                </div>
+                <button class="btn-primary" id="btn-checkout">Valider la demande</button>
             </div>
         </div>
     </div>
 
-    <!-- Script de compression canvas -->
+    <!-- Assistant Chat widget -->
+    <div class="chat-widget collapsed">
+        <div class="chat-header">
+            <div class="ai-avatar">
+                <i class="ph-fill ph-sparkle"></i>
+            </div>
+            <span>Assistant Pièces</span>
+            <button class="btn-icon" id="toggle-chat"><i class="ph ph-caret-up"></i></button>
+        </div>
+        <div class="chat-body" id="chat-body">
+            <div class="chat-msg ai">Je suis là si la photo de la pièce est ambiguë ou si vous avez besoin d'aide.</div>
+        </div>
+        <div class="chat-input">
+            <input type="text" placeholder="Préciser une info...">
+            <button class="btn-icon"><i class="ph-fill ph-paper-plane-right"></i></button>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal-overlay display-none" id="modal-offer">
+        <div class="modal-content">
+            <button class="btn-icon close-modal"><i class="ph ph-x"></i></button>
+            <div class="modal-body" id="modal-offer-body">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+    </div>
+
     <script src="js/app.js"></script>
 </body>
+
 </html>
