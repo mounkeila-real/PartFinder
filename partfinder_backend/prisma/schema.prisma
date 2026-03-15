@@ -50,3 +50,37 @@ model OrderItem {
   priceSold Float  // Price with margin applied
 }
 
+// Vehicle Database Models (imported from vehicle-make-model-data)
+model VehicleMake {
+  id        Int                @id @default(autoincrement())
+  name      String             @unique
+  years     VehicleModelYear[]
+  models    VehicleModel[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+model VehicleModelYear {
+  id        Int            @id @default(autoincrement())
+  year      Int
+  makeId    Int
+  make      VehicleMake    @relation(fields: [makeId], references: [id])
+  models    VehicleModel[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([makeId, year])
+}
+
+model VehicleModel {
+  id          Int              @id @default(autoincrement())
+  name        String
+  makeId      Int
+  make        VehicleMake      @relation(fields: [makeId], references: [id])
+  makeYearId  Int
+  makeYear    VehicleModelYear @relation(fields: [makeYearId], references: [id])
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([makeYearId, name])
+}

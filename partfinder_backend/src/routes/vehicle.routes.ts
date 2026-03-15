@@ -30,24 +30,10 @@ router.get('/vin/:vin', async (req: express.Request, res: express.Response) => {
 });
 
 // --- CATALOG ENDPOINTS ---
-
+// Proxy methods to external catalog 
 router.get('/all', async (req: express.Request, res: express.Response) => {
     try {
         const data = await VehicleService.getVehicles();
-        res.json(data);
-    } catch (error: any) { res.status(500).json({ error: error.message }); }
-});
-
-router.get('/makes', async (req: express.Request, res: express.Response) => {
-    try {
-        const data = await VehicleService.getMakes();
-        res.json(data);
-    } catch (error: any) { res.status(500).json({ error: error.message }); }
-});
-
-router.get('/models/:make', async (req: express.Request, res: express.Response) => {
-    try {
-        const data = await VehicleService.getModels(req.params.make as string);
         res.json(data);
     } catch (error: any) { res.status(500).json({ error: error.message }); }
 });
@@ -123,4 +109,52 @@ router.get('/ktype/:id', async (req: express.Request, res: express.Response) => 
     } catch (error: any) { res.status(500).json({ error: error.message }); }
 });
 
+// --- LOCAL DB ENDPOINTS ---
+
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+// Get all makes
+router.get('/makes', async (req: express.Request, res: express.Response) => {
+    try {
+        const makes = await prisma.vehicleMake.findMany({
+            orderBy: { name: 'asc' }
+        });
+        res.json(makes);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get years for a make
+router.get('/makes/:makeId/years', async (req: express.Request, res: express.Response) => {
+    try {
+        const makeId = parseInt(req.params.makeId as string, 10);
+        const years = await prisma.vehicleModelYear.findMany({
+            where: { makeId },
+            orderBy: { year: 'desc' }
+        });
+        res.json(years);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get models for a make and year
+router.get('/makes/:makeId/years/:makeYearId/models', async (req: express.Request, res: express.Response) => {
+    try {
+        const makeId = parseInt(req.params.makeId as string, 10);
+        const makeYearId = parseInt(req.params.makeYearId as string, 10);
+        const models = await prisma.vehicleModel.findMany({
+            where: { makeId, makeYearId },
+            orderBy: { name: 'asc' }
+        });
+        res.json(models);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;
+

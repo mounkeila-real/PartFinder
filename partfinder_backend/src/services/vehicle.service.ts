@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { decodeVinLocal } from '../utils/vin_decoder';
 
 const RAPID_API_KEY = process.env.RAPID_API_KEY;
 
@@ -47,44 +48,12 @@ export class VehicleService {
     }
 
     /**
-     * Decodes a VIN using the vin-decoder19 API (European coverage via RapidAPI).
-     * Returns a normalized object: { make, model, modelYear, engine }
+    /**
+     * Decodes a VIN using the local database and WMI logic
+     * Returns a normalized object containing make, model, modelYear, etc.
      */
     static async getInfoByVin(vin: string) {
-        const options = {
-            method: 'GET',
-            url: 'https://vin-decoder19.p.rapidapi.com/vin_decoder_standard',
-            params: { vin },
-            headers: {
-                'x-rapidapi-key': RAPID_API_KEY,
-                'x-rapidapi-host': 'vin-decoder19.p.rapidapi.com'
-            }
-        };
-
-        try {
-            const response = await axios.request(options);
-            const raw = response.data;
-
-            // vin-decoder19 returns an object with varied field names — normalize here
-            const get = (...keys: string[]) => {
-                for (const k of keys) {
-                    const val = raw[k] || raw[k.toLowerCase()] || raw[k.toUpperCase()];
-                    if (val && val !== 'Not Applicable' && val !== '0' && val !== 'null') return val;
-                }
-                return null;
-            };
-
-            return {
-                make:      get('make', 'Make', 'MAKE', 'manufacturer'),
-                model:     get('model', 'Model', 'MODEL', 'model_name'),
-                modelYear: get('modelYear', 'model_year', 'year', 'Year', 'MODEL_YEAR'),
-                engine:    get('engine', 'Engine', 'engine_displacement', 'displacementL', 'Displacement (L)',
-                               'engineDisplacement', 'displacement'),
-            };
-        } catch (error: any) {
-            console.error('Error decoding VIN via vin-decoder19:', error.message);
-            throw new Error('Failed to decode VIN.');
-        }
+        return await decodeVinLocal(vin);
     }
 
     // --- NEW CATALOG ENDPOINTS ---
