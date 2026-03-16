@@ -8,8 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Change this to your backend's actual Railway URL if different.
     const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'http://localhost:3000/api'
-        : 'https://partfinder-backend-production.up.railway.app/api'; 
-        // WARNING: Replace with the actual API backend URL on Railway if needed.
+        : 'https://partfinder-backend-production.up.railway.app/api';
+    // WARNING: Replace with the actual API backend URL on Railway if needed.
 
     // --- State Management ---
     const state = {
@@ -125,25 +125,25 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(async () => {
                 const simulatedExtractedPlate = 'AA123AA'; // Replace with actual OCR later
                 vinFeedback.textContent = `⏳ Plaque détectée (${simulatedExtractedPlate}). Recherche des infos du véhicule...`;
-                
+
                 try {
                     const response = await fetch(`${API_BASE_URL}/vehicle/plate/${simulatedExtractedPlate}`);
                     if (!response.ok) throw new Error('API Error');
-                    
+
                     const data = await response.json();
-                    
+
                     if (data && data.make) {
                         const parsedData = {
                             make: data.make,
                             model: data.model || '',
                             year: data.modelYear || data.year || '',
                             engine: data.engine || data.engine_displacement || '',
-                            vin: data.vin || 'VIN NON TROUVÉ' 
+                            vin: data.vin || 'VIN NON TROUVÉ'
                         };
-                        
+
                         state.vehicle.method = 'carte_grise';
                         state.vehicle.data = parsedData;
-                        
+
                         vinInput.value = parsedData.vin;
                         vinInput.disabled = true;
                         vinInput.style.opacity = '0.5';
@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.error("Erreur API Plaque:", error);
                     vinFeedback.textContent = '✗ Impossible de récupérer les infos de cette plaque via l\'API. (Vérifiez votre clé RapidAPI backend)';
                     vinFeedback.className = 'field-feedback feedback-error';
-                    
+
                     // Cleanup file input so they can try again
                     cgInput.value = '';
                 }
@@ -187,15 +187,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 setManualFieldsDisabled(true);
 
                 try {
-                    const response = await fetch(`${API_BASE_URL}/vehicle/vin/${val}`);
+                    const response = await fetch(`/api/decode-vin/${val}`);
                     if (!response.ok) throw new Error('API Error');
-                    
+
                     const data = await response.json();
-                    
+
                     if (data && data.make) {
                         vinFeedback.textContent = `✓ Constructeur identifié: ${data.make} ${data.model || ''}`;
                         vinFeedback.className = 'field-feedback feedback-success';
-                        
+
                         state.vehicle.method = 'vin';
                         state.vehicle.wmiDecoded = true;
                         state.vehicle.data = {
@@ -221,11 +221,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (mockWMI[wmi]) {
                         vinFeedback.textContent = `✓ (Fallback) Constructeur: ${mockWMI[wmi].make}`;
                         vinFeedback.className = 'field-feedback feedback-warning';
-                        
+
                         state.vehicle.method = 'vin';
                         state.vehicle.wmiDecoded = true;
                         state.vehicle.data.make = mockWMI[wmi].make;
-                        
+
                         syncManualFields({ make: mockWMI[wmi].make, model: '', year: '', engine: '' });
                     } else {
                         vinFeedback.textContent = '✗ Impossible de décoder ce VIN.';
@@ -237,16 +237,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 800); // 800ms debounce
         } else if (val.length >= 3 && val.length < 11) {
             // Very basic WMI check while typing if they haven't typed enough for full decode
-             const wmi = val.substring(0, 3);
-             if (mockWMI[wmi]) {
+            const wmi = val.substring(0, 3);
+            if (mockWMI[wmi]) {
                 vinFeedback.textContent = `ℹ️ WMI détecté: ${mockWMI[wmi].make} (Attente de la suite...)`;
                 vinFeedback.className = 'field-feedback feedback-info';
                 vinFeedback.style.display = 'block';
-             } else {
-                 vinFeedback.style.display = 'none';
-             }
-             setManualFieldsDisabled(false);
-             state.vehicle.method = null;
+            } else {
+                vinFeedback.style.display = 'none';
+            }
+            setManualFieldsDisabled(false);
+            state.vehicle.method = null;
         } else {
             vinFeedback.style.display = 'none';
             setManualFieldsDisabled(false);
@@ -259,9 +259,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.vehicle.method === 'carte_grise' || state.vehicle.method === 'vin') {
             return; // Protected fields
         }
-        
+
         const hasManualData = makeSelect.value !== '' || modelInput.value !== '' || yearInput.value !== '' || engineInput.value !== '';
-        
+
         if (hasManualData) {
             state.vehicle.method = 'manual';
             state.vehicle.data = {
@@ -314,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
     makeSelect.addEventListener('change', async () => {
         handleManualInput();
         const make = makeSelect.value;
-        
+
         // Reset models
         modelInput.innerHTML = '<option value="">Sélectionner d\'abord une marque...</option>';
         modelInput.disabled = true;
@@ -335,7 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     modelInput.disabled = false;
                 } else {
-                   modelInput.innerHTML = '<option value="">Modèles introuvables</option>'; 
+                    modelInput.innerHTML = '<option value="">Modèles introuvables</option>';
                 }
             } catch (error) {
                 modelInput.innerHTML = '<option value="">Erreur de chargement</option>';
@@ -458,13 +458,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // We use dummy fetch logic for search because real catalog search 
             // wasn't fully requested yet (requires eCommerce DB).
             let resultsToRender = [
-            {
-                id: 'p1', oem: '7701477023', brand: 'BOSCH', name: 'Jeu de 4 plaquettes de frein', img: 'https://images.oscaro.com/catalog/bosch/400/0986424794.jpg', sourcePrice: 28.50, condition: 'new'
-            },
-            {
-                id: 'p2', oem: 'GEN-X01', brand: 'VALEO', name: 'Pièce de rechange', img: 'https://images.oscaro.com/catalog/valeo/400/301636.jpg', sourcePrice: 32.10, condition: 'new'
-            }];
-            
+                {
+                    id: 'p1', oem: '7701477023', brand: 'BOSCH', name: 'Jeu de 4 plaquettes de frein', img: 'https://images.oscaro.com/catalog/bosch/400/0986424794.jpg', sourcePrice: 28.50, condition: 'new'
+                },
+                {
+                    id: 'p2', oem: 'GEN-X01', brand: 'VALEO', name: 'Pièce de rechange', img: 'https://images.oscaro.com/catalog/valeo/400/301636.jpg', sourcePrice: 32.10, condition: 'new'
+                }];
+
             const makeValue = makeSelect.value.toLowerCase();
             const descValue = partDescInput.value.toLowerCase();
             const method = state.vehicle.method;
@@ -474,7 +474,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const resTags = document.querySelector('.part-tags');
             if (resultsToRender.length > 0) {
                 resTitle.innerText = resultsToRender[0].name;
-                
+
                 let vehicleDisplay = 'Véhicule Multiple';
                 if (method === 'carte_grise' || method === 'vin') {
                     vehicleDisplay = state.vehicle.data.make;
@@ -699,7 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-reset').addEventListener('click', () => {
         form.reset();
         vinFeedback.style.display = 'none';
-        
+
         // Reset manual fields UI
         makeSelect.disabled = false;
         modelInput.disabled = true; // disabled until make selected
@@ -707,10 +707,10 @@ document.addEventListener('DOMContentLoaded', () => {
         yearInput.disabled = false;
         engineInput.disabled = false;
         manualVehicleFields.style.opacity = '1';
-        
+
         vinInput.disabled = false;
         vinInput.style.opacity = '1';
-        
+
         partNumberInput.style.opacity = '1';
         partDescInput.style.opacity = '1';
         document.getElementById('part-photo-group').style.opacity = '1';
