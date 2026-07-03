@@ -1,5 +1,9 @@
 import axios from 'axios';
+import crypto from 'crypto';
 import { decodeVinLocal } from '../utils/vin_decoder';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 const RAPID_API_KEY = process.env.RAPID_API_KEY;
 
@@ -47,13 +51,119 @@ export class VehicleService {
         }
     }
 
-    /**
-    /**
-     * Decodes a VIN using the local database and WMI logic
-     * Returns a normalized object containing make, model, modelYear, etc.
-     */
     static async getInfoByVin(vin: string) {
-        return await decodeVinLocal(vin);
+        const upperVin = vin.toUpperCase();
+        console.log(`Starting VIN lookup for ${upperVin}...`);
+
+        // Check local cache first
+        try {
+            const cachedVehicle = await prisma.vehicle.findUnique({
+                where: { vin: upperVin }
+            });
+            if (cachedVehicle) {
+                console.log(`Found cached vehicle specifications for VIN: ${upperVin}`);
+                return {
+                    vin: cachedVehicle.vin,
+                    make: cachedVehicle.make,
+                    model: cachedVehicle.model,
+                    modelYear: cachedVehicle.year,
+                    engine: cachedVehicle.engine,
+                    source: "Local Cache",
+                    specifications: JSON.parse(cachedVehicle.specifications)
+                };
+            }
+        } catch (error: any) {
+            console.warn("Failed to read from local Vehicle cache:", error.message);
+        }
+
+        // Attempt Vincario decode
+        try {
+            const vincarioData = await this.decodeWithVincario(upperVin);
+            if (vincarioData && !vincarioData.error) {
+                const make = vincarioData.make || vincarioData.Make || vincarioData.manufacturer || vincarioData["Marque"] || null;
+                const model = vincarioData.model || vincarioData.Model || vincarioData["Modèle"] || null;
+                const yearVal = vincarioData.modelYear || vincarioData['Model Year'] || vincarioData.year || vincarioData["Année modèle"] || null;
+                const engine = vincarioData.engine || vincarioData.Engine || vincarioData["Puissance moteur"] || null;
+
+                // Cache successful API result
+                try {
+                    await prisma.vehicle.create({
+                        data: {
+                            vin: upperVin,
+                            make: make || "Inconnu",
+                            model: model || "Inconnu",
+                            year: yearVal ? parseInt(String(yearVal), 10) : null,
+                            engine: engine,
+                            specifications: JSON.stringify(vincarioData)
+                        }
+                    });
+                    console.log(`Cached vehicle details for VIN: ${upperVin}`);
+                } catch (cacheError: any) {
+                    console.warn("Failed to write to vehicle cache:", cacheError.message);
+                }
+
+                return {
+                    vin: upperVin,
+                    make,
+                    model,
+                    modelYear: yearVal ? parseInt(String(yearVal), 10) : null,
+                    engine,
+                    source: "Vincario API",
+                    specifications: vincarioData
+                };
+            }
+        } catch (error: any) {
+            console.warn("Vincario API failed. Proceeding with local fallback.", error.message);
+        }
+
+        console.log("Vincario API failed or empty. Falling back to local WMI decode.");
+        const localData = await decodeVinLocal(upperVin);
+        return {
+            vin: upperVin,
+            make: localData.manufacturer.name,
+            model: null,
+            modelYear: localData.modelYear,
+            engine: null,
+            source: "Local WMI Database (Fallback)",
+            specifications: null
+        };
+    }
+
+    /**
+     * Performs a direct call to the Vincario VIN Lookup API.
+     */
+    static async decodeWithVincario(vin: string) {
+        const apiKey = process.env.VINCARIO_API_KEY;
+        const secretKey = process.env.VINCARIO_SECRET_KEY;
+        
+        if (!apiKey || !secretKey) {
+            console.log("Vincario API keys missing. Skipping Vincario decode.");
+            return null;
+        }
+
+        const upperVin = vin.toUpperCase();
+        const id = "decode";
+        const inputStr = `${upperVin}|${id}|${apiKey}|${secretKey}`;
+        const hash = crypto.createHash('sha1').update(inputStr).digest('hex');
+        const controlSum = hash.substring(0, 10);
+
+        const url = `https://api.vindecoder.eu/3.2/${apiKey}/${controlSum}/${id}/${upperVin}.json`;
+        console.log("Querying Vincario API URL:", url);
+
+        try {
+            // Disable TLS reject during test if needed
+            const rejectUnauthorized = process.env.NODE_ENV === 'production';
+            const response = await axios.get(url, { 
+                timeout: 5000,
+                // If NODE_TLS_REJECT_UNAUTHORIZED environment variable is used, it handles it,
+                // otherwise we can set rejectUnauthorized locally to allow local testing
+            });
+            console.log("Vincario API response status:", response.status);
+            return response.data;
+        } catch (error: any) {
+            console.warn("Vincario API request failed:", error.response?.status, error.response?.data || error.message);
+            return null;
+        }
     }
 
     // --- NEW CATALOG ENDPOINTS ---

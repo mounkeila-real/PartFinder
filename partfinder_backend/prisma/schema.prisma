@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -83,4 +83,16 @@ model VehicleModel {
   updatedAt   DateTime         @updatedAt
 
   @@unique([makeYearId, name])
+}
+
+// Model for caching full VIN decode results locally
+model Vehicle {
+  vin            String   @id @unique
+  make           String
+  model          String
+  year           Int?
+  engine         String?
+  specifications String   // JSON string storing all Vincario parameters
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

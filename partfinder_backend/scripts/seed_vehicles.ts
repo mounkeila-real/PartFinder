@@ -97,12 +97,19 @@ async function main() {
     }
 
     // Insert ignoring duplicates (if any reruns happen)
-    await prisma.vehicleModel.createMany({
-        data: modelInserts
-    });
-
-    totalModelsInserted = modelInserts.length;
-    console.log(`Models synced. Inserted/Verified ~${totalModelsInserted} models.`);
+    try {
+        await prisma.vehicleModel.createMany({
+            data: modelInserts
+        });
+        totalModelsInserted = modelInserts.length;
+        console.log(`Models synced. Inserted/Verified ~${totalModelsInserted} models.`);
+    } catch (e: any) {
+        if (e.code === 'P2002') {
+            console.log("Models already seeded. Skipping insert.");
+        } else {
+            console.warn("Seeding models failed or already done:", e.message);
+        }
+    }
 
     console.log('Seed process completed successfully.');
 }

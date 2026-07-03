@@ -1,4 +1,5 @@
 import express from 'express';
+import axios from 'axios';
 import { VehicleService } from '../services/vehicle.service';
 
 const router = express.Router();
@@ -151,6 +152,84 @@ router.get('/makes/:makeId/years/:makeYearId/models', async (req: express.Reques
             orderBy: { name: 'asc' }
         });
         res.json(models);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get all models for a make by make name
+router.get('/models/:makeName', async (req: express.Request, res: express.Response) => {
+    try {
+        const makeName = req.params.makeName as string;
+        const makes = await prisma.vehicleMake.findMany();
+        let makeObj = makes.find(m => m.name.toLowerCase() === makeName.toLowerCase());
+
+        if (!makeObj) {
+            console.log(`Make "${makeName}" not found in DB. Fetching from NHTSA...`);
+            const nhtsaUrl = `https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMake/${encodeURIComponent(makeName)}?format=json`;
+            try {
+                const response = await axios.get(nhtsaUrl, { timeout: 8000 });
+                const results = response.data.Results || [];
+                if (results.length > 0) {
+                    const officialMakeName = results[0].Make_Name || makeName;
+                    
+                    // Double check in memory to prevent duplicate create on different capitalization
+                    makeObj = makes.find(m => m.name.toLowerCase() === officialMakeName.toLowerCase());
+                    
+                    if (!makeObj) {
+                        // Create Make in DB
+                        makeObj = await prisma.vehicleMake.create({
+                            data: { name: officialMakeName }
+                        });
+                    }
+
+                    // Create a default Model Year (2020) for relation constraints
+                    let defaultYear = await prisma.vehicleModelYear.findFirst({
+                        where: { makeId: makeObj.id, year: 2020 }
+                    });
+                    if (!defaultYear) {
+                        defaultYear = await prisma.vehicleModelYear.create({
+                            data: {
+                                makeId: makeObj.id,
+                                year: 2020
+                            }
+                        });
+                    }
+
+                    // Insert models in bulk
+                    const modelNames = Array.from(new Set(results.map((r: any) => r.Model_Name).filter(Boolean)));
+                    const modelInserts = modelNames.map((name: any) => ({
+                        name,
+                        makeId: makeObj!.id,
+                        makeYearId: defaultYear!.id
+                    }));
+
+                    try {
+                        await prisma.vehicleModel.createMany({
+                            data: modelInserts
+                        });
+                    } catch (dbErr) {
+                        // Ignore duplicate key errors on SQLite
+                    }
+                    console.log(`Cached ${modelNames.length} models for "${officialMakeName}" from NHTSA in SQLite DB.`);
+                }
+            } catch (apiError: any) {
+                console.error("NHTSA API fetch failed:", apiError.message);
+            }
+        }
+
+        // Return models if brand exists
+        if (makeObj) {
+            const models = await prisma.vehicleModel.findMany({
+                where: { makeId: makeObj.id },
+                select: { name: true },
+                distinct: ['name'],
+                orderBy: { name: 'asc' }
+            });
+            return res.json(models.map(m => m.name));
+        }
+
+        res.json([]);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

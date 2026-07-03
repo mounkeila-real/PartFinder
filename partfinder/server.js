@@ -259,6 +259,36 @@ function decodeVinYear(vin) {
     return candidates.filter(y => y <= now + 1).pop() || candidates[0];
 }
 
+// Generic proxy helper to route API calls to the backend on port 3001
+const proxyToBackend = async (req, res) => {
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+    const targetUrl = `${backendUrl}${req.baseUrl}${req.url}`;
+    try {
+        const headers = {};
+        if (req.headers['content-type']) {
+            headers['content-type'] = req.headers['content-type'];
+        }
+        if (req.headers['authorization']) {
+            headers['authorization'] = req.headers['authorization'];
+        }
+
+        const response = await axios({
+            method: req.method,
+            url: targetUrl,
+            data: req.body,
+            params: req.query,
+            headers
+        });
+        res.status(response.status).json(response.data);
+    } catch (error) {
+        console.error(`Proxy error for ${targetUrl}:`, error.message);
+        res.status(error.response?.status || 500).json(error.response?.data || { error: "Backend communication failed" });
+    }
+};
+
+app.use('/api/vehicle', proxyToBackend);
+app.use('/api/parts', proxyToBackend);
+app.use('/api/orders', proxyToBackend);
 
 app.get('/api/decode-vin/:vin', async (req, res) => {
     try {
@@ -279,19 +309,39 @@ app.get('/api/decode-vin/:vin', async (req, res) => {
             try {
                 const apiResp = await axios.get(`${backendUrl}/api/vehicle/vin/${vin}`, { timeout: 4000 });
                 const d = apiResp.data;
-                return res.json({
+                const result = {
                     marque:  d.make  || d.Make  || localBrand  || 'Inconnu',
                     modele:  d.model || d.Model || localModel.modele,
                     annee:   d.modelYear || d.model_year || localYear || localModel.annees || null,
-                    moteur:  d.engine || d.Engine || d.engineDisplacement || null
+                    moteur:  d.engine || d.Engine || d.engineDisplacement || null,
+                    platform: d.specifications ? d.specifications['Série'] : (localModel ? localModel.modele : null),
+                    version: d.specifications ? d.specifications['Modèle'] : (d.model || null)
+                };
+                return res.json({
+                    ...result,
+                    make: result.marque,
+                    model: result.modele,
+                    modelYear: result.annee,
+                    engine: result.moteur,
+                    specifications: d.specifications || null
                 });
             } catch {
                 // API failed — local data is enough
-                return res.json({
+                const result = {
                     marque:  localBrand || 'Inconnu',
                     modele:  localModel.modele,
                     annee:   localYear || localModel.annees || null,
-                    moteur:  null
+                    moteur:  null,
+                    platform: localModel.modele,
+                    version: localModel.modele
+                };
+                return res.json({
+                    ...result,
+                    make: result.marque,
+                    model: result.modele,
+                    modelYear: result.annee,
+                    engine: result.moteur,
+                    specifications: null
                 });
             }
         }
@@ -301,15 +351,33 @@ app.get('/api/decode-vin/:vin', async (req, res) => {
         try {
             const response = await axios.get(`${backendUrl}/api/vehicle/vin/${vin}`, { timeout: 5000 });
             const d = response.data;
-            res.json({
+            const result = {
                 marque:  d.make  || d.Make  || localBrand  || 'Inconnu',
                 modele:  d.model || d.Model || null,
                 annee:   d.modelYear || d.model_year || d['Model Year'] || localYear,
-                moteur:  d.engine || d.Engine || d.engineDisplacement || null
+                moteur:  d.engine || d.Engine || d.engineDisplacement || null,
+                platform: d.specifications ? d.specifications['Série'] : null,
+                version: d.specifications ? d.specifications['Modèle'] : (d.model || null)
+            };
+            res.json({
+                ...result,
+                make: result.marque,
+                model: result.modele,
+                modelYear: result.annee,
+                engine: result.moteur,
+                specifications: d.specifications || null
             });
         } catch (apiError) {
             console.warn("Backend VIN API failed:", apiError.message);
-            res.json({ marque: localBrand || 'Inconnu', modele: null, annee: localYear, moteur: null });
+            const result = { marque: localBrand || 'Inconnu', modele: null, annee: localYear, moteur: null, platform: null, version: null };
+            res.json({
+                ...result,
+                make: result.marque,
+                model: result.modele,
+                modelYear: result.annee,
+                engine: result.moteur,
+                specifications: null
+            });
         }
     } catch (error) {
         res.status(500).json({ error: "Erreur de décodage VIN" });

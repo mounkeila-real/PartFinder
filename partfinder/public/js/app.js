@@ -51,12 +51,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const vinFeedback = document.getElementById('vin-feedback');
     const btnScanCg = document.getElementById('btn-scan-cg');
     const cgInput = document.getElementById('cg-image');
+    const btnMoreInfo = document.getElementById('btn-more-info');
 
     const manualVehicleFields = document.getElementById('manual-vehicle-fields');
     const makeSelect = document.getElementById('make');
     const modelInput = document.getElementById('model');
     const yearInput = document.getElementById('year');
     const engineInput = document.getElementById('engine');
+    const platformInput = document.getElementById('platform');
+    const versionInput = document.getElementById('version');
 
     const partNumberInput = document.getElementById('part-number');
     const partDescInput = document.getElementById('part-desc');
@@ -96,21 +99,75 @@ document.addEventListener('DOMContentLoaded', () => {
         modelInput.disabled = disabled;
         yearInput.disabled = disabled;
         engineInput.disabled = disabled;
+        platformInput.disabled = disabled;
+        versionInput.disabled = disabled;
         manualVehicleFields.style.opacity = disabled ? '0.5' : '1';
     }
 
-    function syncManualFields(data) {
+    async function syncManualFields(data) {
         if (data.make) {
-            for (let i = 0; i < makeSelect.options.length; i++) {
-                if (makeSelect.options[i].text.toLowerCase() === data.make.toLowerCase()) {
-                    makeSelect.selectedIndex = i;
-                    break;
+            makeSelect.value = data.make;
+            const make = data.make;
+            modelInput.innerHTML = '<option value="">Chargement des modèles...</option>';
+            modelInput.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/vehicle/models/${encodeURIComponent(make)}`);
+                if (response.ok) {
+                    const models = await response.json();
+                    modelInput.innerHTML = '<option value="">Sélectionner...</option>';
+                    models.forEach(mod => {
+                        const modelValue = typeof mod === 'object' ? (mod.model || mod.name) : mod;
+                        const option = document.createElement('option');
+                        option.value = modelValue;
+                        option.textContent = modelValue;
+                        modelInput.appendChild(option);
+                    });
+                    modelInput.disabled = false;
+
+                    if (data.model) {
+                        let matchedValue = "";
+                        for (let i = 0; i < modelInput.options.length; i++) {
+                            const optionText = modelInput.options[i].text.toLowerCase();
+                            const targetText = data.model.toLowerCase();
+                            
+                            const cleanOption = optionText.replace(/classe\s+/g, '').trim();
+                            const cleanTarget = targetText.replace(/classe\s+/g, '').trim();
+
+                            if (optionText === targetText || 
+                                optionText.includes(targetText) || 
+                                targetText.includes(optionText) ||
+                                cleanTarget.startsWith(cleanOption) ||
+                                cleanOption.startsWith(cleanTarget)) {
+                                modelInput.selectedIndex = i;
+                                matchedValue = modelInput.options[i].value;
+                                break;
+                            }
+                        }
+                        if (matchedValue) {
+                            modelInput.value = matchedValue;
+                        }
+                    }
                 }
+            } catch (error) {
+                console.error("Failed to load models during sync:", error);
+                modelInput.innerHTML = '<option value="">Erreur de chargement</option>';
             }
         }
-        if (data.model) modelInput.value = data.model;
-        if (data.year) yearInput.value = data.year;
+        if (data.year) {
+            const yearMatch = String(data.year).match(/\d{4}/);
+            if (yearMatch) {
+                yearInput.value = yearMatch[0];
+            } else {
+                yearInput.value = data.year;
+            }
+        }
         if (data.engine) engineInput.value = data.engine;
+        if (data.platform) {
+            // Clean platform value to first word (e.g. W246 (2011-) -> W246)
+            platformInput.value = String(data.platform).split(' ')[0];
+        }
+        if (data.version) versionInput.value = data.version;
     }
 
     // Carte Grise Mockup (Highest Priority)
@@ -138,11 +195,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             model: data.model || '',
                             year: data.modelYear || data.year || '',
                             engine: data.engine || data.engine_displacement || '',
-                            vin: data.vin || 'VIN NON TROUVÉ'
+                            vin: data.vin || 'VIN NON TROUVÉ',
+                            platform: data.platform || '',
+                            version: data.version || ''
                         };
 
                         state.vehicle.method = 'carte_grise';
                         state.vehicle.data = parsedData;
+                        state.vehicle.specifications = data.specifications || null;
 
                         vinInput.value = parsedData.vin;
                         vinInput.disabled = true;
@@ -153,6 +213,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         vinFeedback.textContent = `✓ Carte Grise validée: ${parsedData.make} ${parsedData.model}`;
                         vinFeedback.className = 'field-feedback feedback-success';
+
+                        if (state.vehicle.specifications) {
+                            btnMoreInfo.classList.remove('display-none');
+                        } else {
+                            btnMoreInfo.classList.add('display-none');
+                        }
                     } else {
                         throw new Error("Données insuffisantes");
                     }
@@ -203,14 +269,23 @@ document.addEventListener('DOMContentLoaded', () => {
                             model: data.model || '',
                             year: data.modelYear || '',
                             engine: data.engine || '',
-                            vin: val
+                            vin: val,
+                            platform: data.platform || '',
+                            version: data.version || ''
                         };
+                        state.vehicle.specifications = data.specifications || null;
 
                         // Sync inputs
                         syncManualFields(state.vehicle.data);
                         setManualFieldsDisabled(true);
-                        vinInput.disabled = false;
-                        vinInput.style.opacity = '1';
+                        vinInput.disabled = true;
+                        vinInput.style.opacity = '0.5';
+
+                        if (state.vehicle.specifications) {
+                            btnMoreInfo.classList.remove('display-none');
+                        } else {
+                            btnMoreInfo.classList.add('display-none');
+                        }
                     } else {
                         throw new Error('No useful data returned');
                     }
@@ -260,15 +335,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return; // Protected fields
         }
 
-        const hasManualData = makeSelect.value !== '' || modelInput.value !== '' || yearInput.value !== '' || engineInput.value !== '';
+        const hasManualData = makeSelect.value !== '' || modelInput.value !== '' || yearInput.value !== '' || engineInput.value !== '' || platformInput.value !== '' || versionInput.value !== '';
 
         if (hasManualData) {
             state.vehicle.method = 'manual';
             state.vehicle.data = {
-                make: makeSelect.options[makeSelect.selectedIndex]?.text || '',
+                make: makeSelect.value.trim(),
                 model: modelInput.value,
                 year: yearInput.value,
-                engine: engineInput.value
+                engine: engineInput.value,
+                platform: platformInput.value,
+                version: versionInput.value
             };
             vinInput.style.opacity = '0.5';
         } else {
@@ -279,32 +356,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load Makes from Backend on initialization
     async function initMakes() {
+        const makesDatalist = document.getElementById('makes-list');
+        if (!makesDatalist) return;
         try {
-            makeSelect.innerHTML = '<option value="">Chargement des marques...</option>';
             const response = await fetch(`${API_BASE_URL}/vehicle/makes`);
             if (response.ok) {
                 const makesList = await response.json();
-                makeSelect.innerHTML = '<option value="">Sélectionner...</option>';
+                makesDatalist.innerHTML = '';
                 cachedMakes = makesList;
                 makesList.forEach(m => {
                     const makeValue = typeof m === 'object' ? (m.make || m.name) : m;
                     const option = document.createElement('option');
                     option.value = makeValue;
-                    option.textContent = makeValue;
-                    makeSelect.appendChild(option);
+                    makesDatalist.appendChild(option);
                 });
             } else {
                 throw new Error("Failed to load");
             }
         } catch (e) {
             console.warn("Could not load dynamic makes, using basic fallback.", e);
-            makeSelect.innerHTML = `
-                <option value="">Sélectionner...</option>
-                <option value="Renault">Renault</option>
-                <option value="Peugeot">Peugeot</option>
-                <option value="Citroen">Citroën</option>
-                <option value="Audi">Audi</option>
-                <option value="BMW">BMW</option>
+            makesDatalist.innerHTML = `
+                <option value="Renault"></option>
+                <option value="Peugeot"></option>
+                <option value="Citroën"></option>
+                <option value="Audi"></option>
+                <option value="BMW"></option>
+                <option value="Mercedes-Benz"></option>
+                <option value="Volkswagen"></option>
             `;
         }
     }
@@ -313,10 +391,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fetch models when make changes
     makeSelect.addEventListener('change', async () => {
         handleManualInput();
-        const make = makeSelect.value;
+        const make = makeSelect.value.trim();
 
         // Reset models
-        modelInput.innerHTML = '<option value="">Sélectionner d\'abord une marque...</option>';
+        modelInput.innerHTML = '<option value="">Sélectionner...</option>';
         modelInput.disabled = true;
 
         if (make) {
@@ -325,7 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await fetch(`${API_BASE_URL}/vehicle/models/${encodeURIComponent(make)}`);
                 if (response.ok) {
                     const models = await response.json();
-                    modelInput.innerHTML = '<option value="">Sélectionner le modèle...</option>';
+                    modelInput.innerHTML = '<option value="">Sélectionner...</option>';
                     models.forEach(mod => {
                         const modelValue = typeof mod === 'object' ? (mod.model || mod.name) : mod;
                         const option = document.createElement('option');
@@ -334,6 +412,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         modelInput.appendChild(option);
                     });
                     modelInput.disabled = false;
+                    
+                    // Reload makes to cache new entries in the datalist
+                    initMakes();
                 } else {
                     modelInput.innerHTML = '<option value="">Modèles introuvables</option>';
                 }
@@ -346,6 +427,8 @@ document.addEventListener('DOMContentLoaded', () => {
     modelInput.addEventListener('change', handleManualInput);
     yearInput.addEventListener('input', handleManualInput);
     engineInput.addEventListener('input', handleManualInput);
+    platformInput.addEventListener('input', handleManualInput);
+    versionInput.addEventListener('input', handleManualInput);
 
     // Part input adaptiveness
     partNumberInput.addEventListener('input', (e) => {
@@ -423,8 +506,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Search Submission ---
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        // Determine the query
+        let query = partNumberInput.value.trim() || partDescInput.value.trim();
+        if (!query) {
+            const make = makeSelect.value.trim();
+            const model = modelInput.value || '';
+            if (make || model) {
+                query = `${make} ${model} pièce`.trim();
+            } else {
+                query = "plaquettes de frein";
+            }
+        }
 
         // Hide empty state, show loading
         emptyState.classList.add('display-none');
@@ -434,44 +529,73 @@ document.addEventListener('DOMContentLoaded', () => {
         // Simulate network / processing delay cascade
         let steps = document.querySelectorAll('.loading-steps .step');
 
-        setTimeout(() => {
+        const step1 = setTimeout(() => {
             steps[0].classList.replace('step-active', 'step-done');
             steps[0].querySelector('i').classList.replace('ph-spinner-gap', 'ph-check-circle');
 
             steps[1].classList.add('step-active');
             steps[1].querySelector('i').classList.replace('ph-circle', 'ph-spinner-gap');
-        }, 800);
+        }, 600);
 
-        setTimeout(() => {
+        const step2 = setTimeout(() => {
             steps[1].classList.replace('step-active', 'step-done');
             steps[1].querySelector('i').classList.replace('ph-spinner-gap', 'ph-check-circle');
 
             steps[2].classList.add('step-active');
             steps[2].querySelector('i').classList.replace('ph-circle', 'ph-spinner-gap');
-        }, 1600);
+        }, 1200);
 
-        setTimeout(() => {
-            // Processing done
+        try {
+            const response = await fetch(`${API_BASE_URL}/parts/search`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+
+            if (!response.ok) throw new Error('Search failed');
+            const searchData = await response.json();
+
+            // Clear timeouts and mark all steps done
+            clearTimeout(step1);
+            clearTimeout(step2);
+            steps.forEach(s => {
+                s.className = 'step step-done';
+                const i = s.querySelector('i');
+                if (i) i.className = 'ph ph-check-circle';
+            });
+
             loadingState.classList.add('display-none');
 
-            // Dynamic mock logic based on inputs
-            // We use dummy fetch logic for search because real catalog search 
-            // wasn't fully requested yet (requires eCommerce DB).
-            let resultsToRender = [
-                {
-                    id: 'p1', oem: '7701477023', brand: 'BOSCH', name: 'Jeu de 4 plaquettes de frein', img: 'https://images.oscaro.com/catalog/bosch/400/0986424794.jpg', sourcePrice: 28.50, condition: 'new'
-                },
-                {
-                    id: 'p2', oem: 'GEN-X01', brand: 'VALEO', name: 'Pièce de rechange', img: 'https://images.oscaro.com/catalog/valeo/400/301636.jpg', sourcePrice: 32.10, condition: 'new'
-                }];
+            // Format results for the frontend renderer
+            let resultsToRender = [];
+            if (searchData.itemSummaries && searchData.itemSummaries.length > 0) {
+                resultsToRender = searchData.itemSummaries.map(item => {
+                    const parsedPrice = parseFloat(item.price?.value || '0');
+                    return {
+                        id: item.itemId,
+                        oem: partNumberInput.value.trim() || 'OEM-REF',
+                        brand: item.title.includes('BOSCH') ? 'BOSCH' : (item.title.includes('VALEO') ? 'VALEO' : 'OEM'),
+                        name: item.title,
+                        img: item.image?.imageUrl || 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&q=80&w=400',
+                        sourcePrice: parsedPrice > 0 ? parsedPrice : 30.00,
+                        condition: 'new'
+                    };
+                });
+            } else {
+                resultsToRender = [
+                    {
+                        id: 'p1', oem: partNumberInput.value.trim() || '7701477023', brand: 'BOSCH', name: `Jeu de 4 plaquettes de frein pour ${query}`, img: 'https://images.oscaro.com/catalog/bosch/400/0986424794.jpg', sourcePrice: 28.50, condition: 'new'
+                    },
+                    {
+                        id: 'p2', oem: 'GEN-X01', brand: 'VALEO', name: `Pièce de rechange pour ${query}`, img: 'https://images.oscaro.com/catalog/valeo/400/301636.jpg', sourcePrice: 32.10, condition: 'new'
+                    }
+                ];
+            }
 
-            const makeValue = makeSelect.value.toLowerCase();
-            const descValue = partDescInput.value.toLowerCase();
             const method = state.vehicle.method;
-
-            // Update title
             const resTitle = document.getElementById('res-part-name');
             const resTags = document.querySelector('.part-tags');
+
             if (resultsToRender.length > 0) {
                 resTitle.innerText = resultsToRender[0].name;
 
@@ -481,7 +605,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (state.vehicle.data.model) vehicleDisplay += ` ${state.vehicle.data.model}`;
                     if (state.vehicle.data.engine) vehicleDisplay += ` ${state.vehicle.data.engine}`;
                 } else if (method === 'manual') {
-                    vehicleDisplay = makeSelect.options[makeSelect.selectedIndex]?.text;
+                    vehicleDisplay = makeSelect.value.trim();
                     if (modelInput.value) vehicleDisplay += ` ${modelInput.value}`;
                     if (engineInput.value) vehicleDisplay += ` ${engineInput.value}`;
                 }
@@ -492,18 +616,24 @@ document.addEventListener('DOMContentLoaded', () => {
                  `;
             }
 
+            window.currentSearchResults = resultsToRender;
+
             renderResults(resultsToRender);
             resultsContent.classList.remove('display-none');
 
+        } catch (error) {
+            console.error("Search failed:", error);
+            loadingState.classList.add('display-none');
+            emptyState.classList.remove('display-none');
+        } finally {
             // Reset loading UI for next time
             steps.forEach(s => {
                 s.className = 'step';
-                s.innerHTML = '<i class="ph ph-circle"></i> ' + s.innerText;
+                s.innerHTML = '<i class="ph ph-circle"></i> ' + s.innerText.replace('✓', '').replace('⏳', '').trim();
             });
             steps[0].classList.add('step-active');
             steps[0].querySelector('i').className = 'ph ph-spinner-gap';
-
-        }, 2500);
+        }
     });
 
     // --- Results Rendering ---
@@ -547,14 +677,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Cart / Order Logic ---
     function addToCart(id) {
-        let allItems = [];
-        Object.values(mockResults).forEach(arr => allItems = allItems.concat(arr));
+        const allItems = window.currentSearchResults || [];
         const item = allItems.find(r => r.id === id);
         if (!item) return;
 
         // Prevent duplicates (simple logic)
         if (state.cart.find(c => c.id === id)) {
-            // Flash red on button or similar
             return;
         }
 
@@ -621,6 +749,54 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+
+    // Checkout Action
+    btnCheckout.addEventListener('click', async () => {
+        if (state.cart.length === 0) {
+            alert("Votre panier est vide.");
+            return;
+        }
+
+        const contact = prompt("Entrez les coordonnées du client pour cette commande :", "client@example.com");
+        if (contact === null) return; // User cancelled
+
+        const items = state.cart.map(item => ({
+            partOem: item.oem || 'OEM-REF',
+            partName: item.name,
+            quantity: 1,
+            priceSold: item.displayPrice
+        }));
+
+        try {
+            btnCheckout.disabled = true;
+            btnCheckout.textContent = "Validation en cours...";
+
+            const response = await fetch(`${API_BASE_URL}/orders`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contactInfo: contact, items })
+            });
+
+            if (!response.ok) throw new Error('Order creation failed');
+
+            const orderData = await response.json();
+            alert(`✓ Commande enregistrée ! ID Commande : ${orderData.order.id}`);
+
+            // Clear cart
+            state.cart = [];
+            updateCartUI();
+
+            // Close cart panel
+            closeCartBtn.click();
+
+        } catch (error) {
+            console.error("Checkout failed:", error);
+            alert("Une erreur est survenue lors de l'enregistrement de la commande.");
+        } finally {
+            btnCheckout.disabled = false;
+            btnCheckout.textContent = "Valider la demande";
+        }
+    });
 
     // Navigation and Cart toggling
     navItems[0].addEventListener('click', (e) => {
@@ -699,6 +875,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-reset').addEventListener('click', () => {
         form.reset();
         vinFeedback.style.display = 'none';
+        btnMoreInfo.classList.add('display-none');
 
         // Reset manual fields UI
         makeSelect.disabled = false;
@@ -706,6 +883,8 @@ document.addEventListener('DOMContentLoaded', () => {
         modelInput.innerHTML = '<option value="">Sélectionner d\'abord une marque...</option>';
         yearInput.disabled = false;
         engineInput.disabled = false;
+        platformInput.disabled = false;
+        versionInput.disabled = false;
         manualVehicleFields.style.opacity = '1';
 
         vinInput.disabled = false;
@@ -720,8 +899,127 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsContent.classList.add('display-none');
         loadingState.classList.add('display-none');
 
-        state.vehicle = { method: null, data: { make: '', model: '', year: '', engine: '', vin: '' }, wmiDecoded: false };
+        state.vehicle = { method: null, data: { make: '', model: '', year: '', engine: '', vin: '', platform: '', version: '' }, wmiDecoded: false, specifications: null };
         state.part = { method: null, number: null, hasPhoto: false };
+    });
+
+    // Plus d'infos btn (Detailed specs window)
+    btnMoreInfo.addEventListener('click', () => {
+        if (!state.vehicle.specifications) return;
+        
+        const specs = state.vehicle.specifications;
+        const vin = state.vehicle.data.vin || '';
+        
+        const specWindow = window.open('', '_blank');
+        if (!specWindow) {
+            alert("Veuillez autoriser les fenêtres pop-up pour voir les détails.");
+            return;
+        }
+
+        let tableRows = '';
+        for (const [key, value] of Object.entries(specs)) {
+            tableRows += `
+                <tr>
+                    <td><strong>${key}</strong></td>
+                    <td>${value}</td>
+                </tr>
+            `;
+        }
+
+        specWindow.document.write(`
+            <!DOCTYPE html>
+            <html lang="fr">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Détails Véhicule - ${vin}</title>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+                <script src="https://unpkg.com/@phosphor-icons/web"></script>
+                <style>
+                    body {
+                        background-color: #0B0F19;
+                        color: #F8FAFC;
+                        font-family: 'Inter', sans-serif;
+                        margin: 0;
+                        padding: 40px 20px;
+                        display: flex;
+                        justify-content: center;
+                    }
+                    .container {
+                        max-width: 800px;
+                        width: 100%;
+                        background: #131A2A;
+                        border: 1px solid rgba(255, 255, 255, 0.08);
+                        border-radius: 12px;
+                        padding: 30px;
+                        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+                    }
+                    .header {
+                        display: flex;
+                        align-items: center;
+                        gap: 15px;
+                        margin-bottom: 25px;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+                        padding-bottom: 20px;
+                    }
+                    .header i {
+                        font-size: 2.5rem;
+                        color: #3B82F6;
+                    }
+                    .header h1 {
+                        margin: 0;
+                        font-family: 'Outfit', sans-serif;
+                        font-size: 1.8rem;
+                    }
+                    .header p {
+                        margin: 5px 0 0 0;
+                        color: #94A3B8;
+                        font-size: 0.95rem;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-top: 10px;
+                    }
+                    tr {
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                    }
+                    tr:hover {
+                        background: rgba(255, 255, 255, 0.02);
+                    }
+                    td {
+                        padding: 12px 16px;
+                        font-size: 0.9rem;
+                    }
+                    td:first-child {
+                        color: #94A3B8;
+                        width: 40%;
+                    }
+                    td:last-child {
+                        color: #F8FAFC;
+                        font-weight: 500;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <i class="ph-fill ph-barcode"></i>
+                        <div>
+                            <h1>Détails Techniques Véhicule</h1>
+                            <p>Numéro de Châssis (VIN) : <strong>${vin}</strong></p>
+                        </div>
+                    </div>
+                    <table>
+                        <tbody>
+                            ${tableRows}
+                        </tbody>
+                    </table>
+                </div>
+            </body>
+            </html>
+        `);
+        specWindow.document.close();
     });
 
 });
