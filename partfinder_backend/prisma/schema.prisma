@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -94,5 +94,4 @@ model Vehicle {
   engine         String?
   specifications String   // JSON string storing all Vincario parameters
   createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-}
+  updatedAt      DateTime @updatedA

@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Change this to your backend's actual Railway URL if different.
     const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'http://localhost:3000/api'
-        : 'https://partfinder-backend-production.up.railway.app/api';
+        : 'https://partfinder-backend-production-c0af.up.railway.app/api';
     // WARNING: Replace with the actual API backend URL on Railway if needed.
 
     // --- State Management ---
@@ -545,15 +545,30 @@ document.addEventListener('DOMContentLoaded', () => {
             steps[2].querySelector('i').classList.replace('ph-circle', 'ph-spinner-gap');
         }, 1200);
 
+        // Contexte véhicule (VIN prioritaire, sinon données décodées / saisie manuelle)
+        const vehicleCtx = {
+            vin: ((vinInput && vinInput.value) || state.vehicle.data.vin || '').trim() || null,
+            make: (state.vehicle.data.make || makeSelect.value || '').trim() || null,
+            model: (state.vehicle.data.model || modelInput.value || '').trim() || null,
+            year: (state.vehicle.data.year || yearInput.value || '').toString().trim() || null,
+            engine: (state.vehicle.data.engine || engineInput.value || '').trim() || null,
+        };
+        const partRequest = {
+            description: partDescInput.value.trim() || null,
+            oem: partNumberInput.value.trim() || null,
+        };
+        const FALLBACK_IMG = 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&q=80&w=400';
+
         try {
-            const response = await fetch(`${API_BASE_URL}/parts/search`, {
+            // Flux complet : l'IA détermine la pièce PUIS eBay renvoie les offres.
+            const response = await fetch(`${API_BASE_URL}/parts/find`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query })
+                body: JSON.stringify({ vehicle: vehicleCtx, request: partRequest, limit: 8 })
             });
 
             if (!response.ok) throw new Error('Search failed');
-            const searchData = await response.json();
+            const data = await response.json();
 
             // Clear timeouts and mark all steps done
             clearTimeout(step1);
@@ -566,60 +581,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
             loadingState.classList.add('display-none');
 
-            // Format results for the frontend renderer
-            let resultsToRender = [];
-            if (searchData.itemSummaries && searchData.itemSummaries.length > 0) {
-                resultsToRender = searchData.itemSummaries.map(item => {
-                    const parsedPrice = parseFloat(item.price?.value || '0');
-                    return {
-                        id: item.itemId,
-                        oem: partNumberInput.value.trim() || 'OEM-REF',
-                        brand: item.title.includes('BOSCH') ? 'BOSCH' : (item.title.includes('VALEO') ? 'VALEO' : 'OEM'),
-                        name: item.title,
-                        img: item.image?.imageUrl || 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&q=80&w=400',
-                        sourcePrice: parsedPrice > 0 ? parsedPrice : 30.00,
-                        condition: 'new'
-                    };
-                });
-            } else {
-                resultsToRender = [
-                    {
-                        id: 'p1', oem: partNumberInput.value.trim() || '7701477023', brand: 'BOSCH', name: `Jeu de 4 plaquettes de frein pour ${query}`, img: 'https://images.oscaro.com/catalog/bosch/400/0986424794.jpg', sourcePrice: 28.50, condition: 'new'
-                    },
-                    {
-                        id: 'p2', oem: 'GEN-X01', brand: 'VALEO', name: `Pièce de rechange pour ${query}`, img: 'https://images.oscaro.com/catalog/valeo/400/301636.jpg', sourcePrice: 32.10, condition: 'new'
-                    }
-                ];
-            }
+            const determined = data.part || {};
+            const apiResults = Array.isArray(data.results) ? data.results : [];
 
-            const method = state.vehicle.method;
+            // Normalise les annonces eBay pour le renderer.
+            let resultsToRender = apiResults.map(item => {
+                const src = item.sourcePrice != null ? item.sourcePrice : (item.price != null ? item.price : 0);
+                const isUsed = item.condition && /USED|OCCAS|REFURB/i.test(item.condition);
+                return {
+                    id: item.itemId,
+                    oem: determined.oem || partRequest.oem || '—',
+                    brand: determined.category || 'Pièce',
+                    name: item.title,
+                    img: item.image || item.thumbnail || FALLBACK_IMG,
+                    sourcePrice: src,
+                    finalPrice: (item.finalPrice != null ? item.finalPrice : null),
+                    condition: isUsed ? 'used' : 'new',
+                    description: item.fullDescription || item.shortDescription || '',
+                    url: item.itemWebUrl || null,
+                    isMock: !!item.isMock
+                };
+            });
+
             const resTitle = document.getElementById('res-part-name');
             const resTags = document.querySelector('.part-tags');
 
-            if (resultsToRender.length > 0) {
-                resTitle.innerText = resultsToRender[0].name;
+            resTitle.innerText = determined.partName || (resultsToRender[0] && resultsToRender[0].name) || 'Pièce';
 
-                let vehicleDisplay = 'Véhicule Multiple';
-                if (method === 'carte_grise' || method === 'vin') {
-                    vehicleDisplay = state.vehicle.data.make;
-                    if (state.vehicle.data.model) vehicleDisplay += ` ${state.vehicle.data.model}`;
-                    if (state.vehicle.data.engine) vehicleDisplay += ` ${state.vehicle.data.engine}`;
-                } else if (method === 'manual') {
-                    vehicleDisplay = makeSelect.value.trim();
-                    if (modelInput.value) vehicleDisplay += ` ${modelInput.value}`;
-                    if (engineInput.value) vehicleDisplay += ` ${engineInput.value}`;
-                }
-
-                resTags.innerHTML = `
-                    <span class="tag tag-oem">OEM: ${resultsToRender[0].oem}</span>
+            const vehicleDisplay = [vehicleCtx.make, vehicleCtx.model, vehicleCtx.engine]
+                .filter(Boolean).join(' ') || 'Véhicule';
+            const aiTag = determined.source === 'ai' ? '<span class="tag tag-vehicle">IA</span>' : '';
+            resTags.innerHTML = `
+                    <span class="tag tag-oem">OEM: ${determined.oem || partRequest.oem || '—'}</span>
                     <span class="tag tag-vehicle">${vehicleDisplay}</span>
+                    ${aiTag}
                  `;
-            }
 
             window.currentSearchResults = resultsToRender;
 
-            renderResults(resultsToRender);
-            resultsContent.classList.remove('display-none');
+            if (resultsToRender.length === 0) {
+                emptyState.classList.remove('display-none');
+            } else {
+                renderResults(resultsToRender);
+                resultsContent.classList.remove('display-none');
+            }
 
         } catch (error) {
             console.error("Search failed:", error);
@@ -643,23 +648,39 @@ document.addEventListener('DOMContentLoaded', () => {
         offersGrid.innerHTML = '';
 
         results.forEach(item => {
-            const displayPrice = (item.sourcePrice * MARGIN_MULTIPLIER).toFixed(2);
+            const displayPrice = (item.finalPrice != null
+                ? item.finalPrice
+                : (item.sourcePrice || 0) * MARGIN_MULTIPLIER).toFixed(2);
+
+            // Description complète eBay, nettoyée du HTML et tronquée.
+            const rawDesc = (item.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            const shortDesc = rawDesc.length > 160 ? rawDesc.slice(0, 160) + '…' : rawDesc;
+            const descHtml = shortDesc ? `<p class="offer-desc">${shortDesc}</p>` : '';
+            const linkHtml = item.url
+                ? `<a class="offer-link" href="${item.url}" target="_blank" rel="noopener">Voir la fiche</a>`
+                : '';
+            const mockBadge = item.isMock ? '<span class="offer-mock" title="Résultat de démonstration">DÉMO</span>' : '';
 
             const card = document.createElement('div');
             card.className = 'offer-card';
             card.innerHTML = `
                 <div class="offer-img">
                     <span class="offer-condition cond-${item.condition}">${item.condition === 'new' ? 'Neuf' : 'Occasion'}</span>
-                    <img src="${item.img}" alt="${item.name}">
+                    ${mockBadge}
+                    <img src="${item.img}" alt="${item.name}" onerror="this.src='${'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&q=80&w=400'}'">
                 </div>
                 <div class="offer-body">
                     <span class="offer-brand">${item.brand}</span>
                     <h4 class="offer-title">${item.name}</h4>
+                    ${descHtml}
                     <div class="offer-footer">
                         <div class="offer-price">${displayPrice} <span>€ TTC</span></div>
-                        <button class="btn-add" data-id="${item.id}" title="Ajouter à la commande">
-                            <i class="ph ph-plus"></i>
-                        </button>
+                        <div class="offer-actions">
+                            ${linkHtml}
+                            <button class="btn-add" data-id="${item.id}" title="Ajouter à la commande">
+                                <i class="ph ph-plus"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -688,7 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const cartItem = {
             ...item,
-            displayPrice: parseFloat((item.sourcePrice * MARGIN_MULTIPLIER).toFixed(2))
+            displayPrice: parseFloat((item.finalPrice != null ? item.finalPrice : item.sourcePrice * MARGIN_MULTIPLIER).toFixed(2))
         };
 
         state.cart.push(cartItem);
@@ -981,45 +1002,4 @@ document.addEventListener('DOMContentLoaded', () => {
                         border-collapse: collapse;
                         margin-top: 10px;
                     }
-                    tr {
-                        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-                    }
-                    tr:hover {
-                        background: rgba(255, 255, 255, 0.02);
-                    }
-                    td {
-                        padding: 12px 16px;
-                        font-size: 0.9rem;
-                    }
-                    td:first-child {
-                        color: #94A3B8;
-                        width: 40%;
-                    }
-                    td:last-child {
-                        color: #F8FAFC;
-                        font-weight: 500;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <i class="ph-fill ph-barcode"></i>
-                        <div>
-                            <h1>Détails Techniques Véhicule</h1>
-                            <p>Numéro de Châssis (VIN) : <strong>${vin}</strong></p>
-                        </div>
-                    </div>
-                    <table>
-                        <tbody>
-                            ${tableRows}
-                        </tbody>
-                    </table>
-                </div>
-            </body>
-            </html>
-        `);
-        specWindow.document.close();
-    });
-
-});
+            

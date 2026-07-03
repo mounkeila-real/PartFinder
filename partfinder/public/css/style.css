@@ -807,6 +807,43 @@ textarea:focus {
     flex: 1;
 }
 
+.offer-desc {
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+    margin: 0 0 14px;
+}
+
+.offer-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.offer-link {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-decoration: underline;
+    white-space: nowrap;
+}
+
+.offer-link:hover {
+    color: var(--accent-neon);
+}
+
+.offer-mock {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.65);
+    color: #ffd36b;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
 .offer-footer {
     display: flex;
     justify-content: space-between;
@@ -1068,32 +1105,4 @@ textarea:focus {
 }
 
 .feedback-success {
-    color: var(--success);
-}
-
-.feedback-error {
-    color: var(--danger);
-}
-
-/* Button for detailed specifications */
-.btn-more-info {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(59, 130, 246, 0.12);
-    border: 1px solid var(--accent-electric);
-    color: var(--text-primary);
-    padding: 6px 12px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    margin-top: 6px;
-}
-
-.btn-more-info:hover {
-    background: var(--accent-electric);
-    color: var(--text-primary);
-    box-shadow: var(--shadow-glow);
-}
+    
