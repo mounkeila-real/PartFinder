@@ -1002,4 +1002,45 @@ document.addEventListener('DOMContentLoaded', () => {
                         border-collapse: collapse;
                         margin-top: 10px;
                     }
-            
+                                tr {
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                    }
+                    tr:hover {
+                        background: rgba(255, 255, 255, 0.02);
+                    }
+                    td {
+                        padding: 12px 16px;
+                        font-size: 0.9rem;
+                    }
+                    td:first-child {
+                        color: #94A3B8;
+                        width: 40%;
+                    }
+                    td:last-child {
+                        color: #F8FAFC;
+                        font-weight: 500;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <i class="ph-fill ph-barcode"></i>
+                        <div>
+                            <h1>Détails Techniques Véhicule</h1>
+                            <p>Numéro de Châssis (VIN) : <strong>${vin}</strong></p>
+                        </div>
+                    </div>
+                    <table>
+                        <tbody>
+                            ${tableRows}
+                        </tbody>
+                    </table>
+                </div>
+            </body>
+            </html>
+        `);
+        specWindow.document.close();
+    });
+
+});
