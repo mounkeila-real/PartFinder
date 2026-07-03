@@ -23,4 +23,9 @@ app.use('/api/ebay', ebayNotificationRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
-    res.json({ status: 'OK', message: 'PartFinder A
+    res.json({ status: 'OK', message: 'PartFinder API is running' });
+});
+
+app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+});

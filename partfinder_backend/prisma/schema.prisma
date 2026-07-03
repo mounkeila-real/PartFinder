@@ -94,4 +94,5 @@ model Vehicle {
   engine         String?
   specifications String   // JSON string storing all Vincario parameters
   createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedA
+  updatedAt      DateTime @updatedAt
+}
