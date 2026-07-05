@@ -181,63 +181,72 @@ document.addEventListener('DOMContentLoaded', () => {
     // Carte Grise Mockup (Highest Priority)
     btnScanCg.addEventListener('click', () => cgInput.click());
     cgInput.addEventListener('change', async (e) => {
-        if (e.target.files.length) {
-            vinFeedback.textContent = '⏳ Analyse de la carte grise en cours (Simulation OCR)...';
-            vinFeedback.className = 'field-feedback feedback-info';
-            vinFeedback.style.display = 'block';
+        if (!e.target.files.length) return;
+        const file = e.target.files[0];
 
-            // Simulate OCR extracting a license plate after a brief delay
-            setTimeout(async () => {
-                const simulatedExtractedPlate = 'AA123AA'; // Replace with actual OCR later
-                vinFeedback.textContent = `⏳ Plaque détectée (${simulatedExtractedPlate}). Recherche des infos du véhicule...`;
+        vinFeedback.style.display = 'block';
+        vinFeedback.className = 'field-feedback feedback-info';
+        vinFeedback.textContent = "⏳ OCR de la carte grise en cours... 0%";
 
-                try {
-                    const response = await fetch(`${API_BASE_URL}/vehicle/plate/${simulatedExtractedPlate}`);
-                    if (!response.ok) throw new Error('API Error');
+        if (typeof Tesseract === 'undefined') {
+            vinFeedback.textContent = "✗ Moteur OCR non charge. Verifie ta connexion et reessaie.";
+            vinFeedback.className = 'field-feedback feedback-error';
+            cgInput.value = '';
+            return;
+        }
 
-                    const data = await response.json();
-
-                    if (data && data.make) {
-                        const parsedData = {
-                            make: data.make,
-                            model: data.model || '',
-                            year: data.modelYear || data.year || '',
-                            engine: data.engine || data.engine_displacement || '',
-                            vin: data.vin || 'VIN NON TROUVÉ',
-                            platform: data.platform || '',
-                            version: data.version || ''
-                        };
-
-                        state.vehicle.method = 'carte_grise';
-                        state.vehicle.data = parsedData;
-                        state.vehicle.specifications = data.specifications || null;
-
-                        vinInput.value = parsedData.vin;
-                        vinInput.disabled = true;
-                        vinInput.style.opacity = '0.5';
-
-                        syncManualFields(parsedData);
-                        setManualFieldsDisabled(true);
-
-                        vinFeedback.textContent = `✓ Carte Grise validée: ${parsedData.make} ${parsedData.model}`;
-                        vinFeedback.className = 'field-feedback feedback-success';
-
-                        btnMoreInfo.classList.remove('display-none');
-                        setTimeout(() => btnMoreInfo.click(), 150);
-                    } else {
-                        throw new Error("Données insuffisantes");
+        try {
+            const result = await Tesseract.recognize(file, 'eng', {
+                logger: m => {
+                    if (m.status === 'recognizing text') {
+                        vinFeedback.textContent = "⏳ OCR de la carte grise... " + Math.round(m.progress * 100) + "%";
                     }
-                } catch (error) {
-                    console.error("Erreur API Plaque:", error);
-                    vinFeedback.textContent = '✗ Impossible de récupérer les infos de cette plaque via l\'API. (Vérifiez votre clé RapidAPI backend)';
-                    vinFeedback.className = 'field-feedback feedback-error';
-
-                    // Cleanup file input so they can try again
-                    cgInput.value = '';
                 }
-            }, 1000);
+            });
+            const text = (result && result.data) ? result.data.text : '';
+            const vin = extractVinFromText(text);
+
+            if (vin) {
+                vinFeedback.textContent = "✓ VIN extrait: " + vin + ". Decodage...";
+                vinFeedback.className = 'field-feedback feedback-success';
+                vinInput.value = vin;
+                vinInput.dispatchEvent(new Event('input', { bubbles: true }));
+            } else {
+                vinFeedback.textContent = "✗ VIN introuvable sur le scan. Reprends une photo nette et bien cadree (champ E du certificat).";
+                vinFeedback.className = 'field-feedback feedback-error';
+            }
+        } catch (err) {
+            console.error('Erreur OCR:', err);
+            vinFeedback.textContent = "✗ Echec de l'OCR. Reessaie avec une image plus nette.";
+            vinFeedback.className = 'field-feedback feedback-error';
+        } finally {
+            cgInput.value = '';
         }
     });
+
+    // Extraction robuste du VIN depuis un texte OCR (17 caracteres, charset VIN, corrections OCR)
+    function extractVinFromText(raw) {
+        if (!raw) return null;
+        const upper = raw.toUpperCase().replace(/[^A-Z0-9\s]/g, ' ');
+        const fix = c => ({ 'I': '1', 'O': '0', 'Q': '0' }[c] || c);
+        const isValid = v => /^[A-HJ-NPR-Z0-9]{17}$/.test(v);
+        const enoughDigits = v => (v.match(/[0-9]/g) || []).length >= 3;
+
+        // 1) Jeton de 17 caracteres exactement
+        for (const tok of upper.split(/\s+/)) {
+            if (tok.length === 17) {
+                const f = tok.split('').map(fix).join('');
+                if (isValid(f) && enoughDigits(f)) return f;
+            }
+        }
+        // 2) Fenetre glissante (VIN coupe par des espaces a l'OCR)
+        const concat = upper.replace(/[^A-Z0-9]/g, '');
+        for (let i = 0; i + 17 <= concat.length; i++) {
+            const sub = concat.substr(i, 17).split('').map(fix).join('');
+            if (isValid(sub) && enoughDigits(sub)) return sub;
+        }
+        return null;
+    }
 
     // VIN Input (Medium Priority)
     let vinTimeout = null;
