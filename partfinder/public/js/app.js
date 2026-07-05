@@ -146,6 +146,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         if (matchedValue) {
                             modelInput.value = matchedValue;
+                        } else {
+                            // Aucun modele de la liste ne correspond: on ajoute la valeur exacte du decodage (ex: B 180)
+                            const exactOpt = document.createElement('option');
+                            exactOpt.value = data.model;
+                            exactOpt.textContent = data.model;
+                            modelInput.appendChild(exactOpt);
+                            modelInput.value = data.model;
                         }
                     }
                 }
@@ -167,7 +174,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Clean platform value to first word (e.g. W246 (2011-) -> W246)
             platformInput.value = String(data.platform).split(' ')[0];
         }
-        if (data.version) versionInput.value = data.version;
+        // Version laissee vide pour l'instant (demande utilisateur)
+        versionInput.value = '';
     }
 
     // Carte Grise Mockup (Highest Priority)
