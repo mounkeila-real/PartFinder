@@ -123,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         option.textContent = modelValue;
                         modelInput.appendChild(option);
                     });
-                    modelInput.disabled = false;
+                    modelInput.disabled = (state.vehicle.method === 'vin' || state.vehicle.method === 'carte_grise');
 
                     if (data.model) {
                         let matchedValue = "";
@@ -275,14 +275,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         };
                         state.vehicle.specifications = data.specifications || null;
 
-                        // Sync inputs
-                        syncManualFields(state.vehicle.data);
+                        // Sync inputs (attendre le chargement des modeles AVANT de verrouiller)
+                        await syncManualFields(state.vehicle.data);
                         setManualFieldsDisabled(true);
                         vinInput.disabled = true;
                         vinInput.style.opacity = '0.5';
 
                         if (state.vehicle.specifications) {
                             btnMoreInfo.classList.remove('display-none');
+                            setTimeout(() => btnMoreInfo.click(), 100); // Ouvre auto la fiche Vincario complete
                         } else {
                             btnMoreInfo.classList.add('display-none');
                         }
