@@ -75,10 +75,14 @@
                                 <div class="input-wrapper">
                                     <i class="ph ph-barcode"></i>
                                     <input type="text" id="vin" placeholder="Ex: VF1XXXXXXXXXXXXXX" maxlength="17">
-                                    <button type="button" class="btn-scan" id="btn-scan-cg" title="Scanner la carte grise">
-                                        <i class="ph ph-scan"></i>
+                                    <button type="button" class="btn-scan" id="btn-scan-cg" title="Importer une carte grise">
+                                        <i class="ph ph-image"></i>
+                                    </button>
+                                    <button type="button" class="btn-scan" id="btn-scan-camera" title="Prendre une photo">
+                                        <i class="ph ph-camera"></i>
                                     </button>
                                     <input type="file" id="cg-image" accept="image/*" class="display-none">
+                                    <input type="file" id="cg-camera" accept="image/*" capture="environment" class="display-none">
                                 </div>
                                 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; width: 100%;">
                                     <div class="field-feedback" id="vin-feedback" style="margin-top: 4px;"></div>

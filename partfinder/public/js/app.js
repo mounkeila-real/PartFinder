@@ -51,6 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const vinFeedback = document.getElementById('vin-feedback');
     const btnScanCg = document.getElementById('btn-scan-cg');
     const cgInput = document.getElementById('cg-image');
+    const cgCamera = document.getElementById('cg-camera');
+    const btnScanCamera = document.getElementById('btn-scan-camera');
     const btnMoreInfo = document.getElementById('btn-more-info');
 
     const manualVehicleFields = document.getElementById('manual-vehicle-fields');
@@ -180,9 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Carte Grise Mockup (Highest Priority)
     btnScanCg.addEventListener('click', () => cgInput.click());
-    cgInput.addEventListener('change', async (e) => {
-        if (!e.target.files.length) return;
-        const file = e.target.files[0];
+    async function runCgOcr(file) {
 
         vinFeedback.style.display = 'block';
         vinFeedback.className = 'field-feedback feedback-info';
@@ -221,8 +221,13 @@ document.addEventListener('DOMContentLoaded', () => {
             vinFeedback.className = 'field-feedback feedback-error';
         } finally {
             cgInput.value = '';
+            cgCamera.value = '';
         }
-    });
+    }
+
+    cgInput.addEventListener('change', (e) => { if (e.target.files.length) runCgOcr(e.target.files[0]); });
+    cgCamera.addEventListener('change', (e) => { if (e.target.files.length) runCgOcr(e.target.files[0]); });
+    btnScanCamera.addEventListener('click', () => cgCamera.click());
 
     // Extraction robuste du VIN depuis un texte OCR (17 caracteres, charset VIN, corrections OCR)
     function extractVinFromText(raw) {
