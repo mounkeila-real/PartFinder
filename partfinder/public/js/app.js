@@ -214,11 +214,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         vinFeedback.textContent = `✓ Carte Grise validée: ${parsedData.make} ${parsedData.model}`;
                         vinFeedback.className = 'field-feedback feedback-success';
 
-                        if (state.vehicle.specifications) {
-                            btnMoreInfo.classList.remove('display-none');
-                        } else {
-                            btnMoreInfo.classList.add('display-none');
-                        }
+                        btnMoreInfo.classList.remove('display-none');
+                        setTimeout(() => btnMoreInfo.click(), 150);
                     } else {
                         throw new Error("Données insuffisantes");
                     }
@@ -281,12 +278,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         vinInput.disabled = true;
                         vinInput.style.opacity = '0.5';
 
-                        if (state.vehicle.specifications) {
-                            btnMoreInfo.classList.remove('display-none');
-                            setTimeout(() => btnMoreInfo.click(), 100); // Ouvre auto la fiche Vincario complete
-                        } else {
-                            btnMoreInfo.classList.add('display-none');
-                        }
+                        // Toujours proposer la fiche (specs Vincario si dispo, sinon infos de base)
+                        btnMoreInfo.classList.remove('display-none');
+                        setTimeout(() => btnMoreInfo.click(), 150); // Ouvre auto la fiche
                     } else {
                         throw new Error('No useful data returned');
                     }
@@ -927,9 +921,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Plus d'infos btn (Detailed specs window)
     btnMoreInfo.addEventListener('click', () => {
-        if (!state.vehicle.specifications) return;
         
-        const specs = state.vehicle.specifications;
+        const d = state.vehicle.data || {};
+        const specs = state.vehicle.specifications || {
+            'Marque': d.make || '—',
+            'Modèle': d.model || '—',
+            'Année': d.year || '—',
+            'Plateforme': d.platform || '—',
+            'Version': d.version || '—',
+            'Moteur': d.engine || '—',
+            'VIN': d.vin || '—'
+        };
         const vin = state.vehicle.data.vin || '';
         
         const specWindow = window.open('', '_blank');
