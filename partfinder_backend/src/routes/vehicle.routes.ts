@@ -116,12 +116,41 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Get all makes
+// Get all makes (auto-remplissage depuis NHTSA si la table est quasi vide)
 router.get('/makes', async (req: express.Request, res: express.Response) => {
     try {
-        const makes = await prisma.vehicleMake.findMany({
-            orderBy: { name: 'asc' }
-        });
+        let makes = await prisma.vehicleMake.findMany({ orderBy: { name: 'asc' } });
+
+        if (makes.length < 20) {
+            console.log('Table des marques quasi vide. Chargement depuis NHTSA...');
+            try {
+                const url = 'https://vpic.nhtsa.dot.gov/api/vehicles/GetMakesForVehicleType/car?format=json';
+                const response = await axios.get(url, { timeout: 15000 });
+                const results = response.data.Results || [];
+                const acronyms = new Set(['BMW', 'BYD', 'GMC', 'AMG', 'DS']);
+                const format = (name: string): string => {
+                    const up = String(name).toUpperCase().trim();
+                    if (acronyms.has(up)) return up;
+                    if (up === 'MERCEDES-BENZ') return 'Mercedes-Benz';
+                    return up.toLowerCase().split(/([\s\-])/)
+                        .map(part => (part === ' ' || part === '-') ? part : part.charAt(0).toUpperCase() + part.slice(1))
+                        .join('');
+                };
+                const names = Array.from(
+                    new Set(results.map((r: any) => format(r.MakeName)).filter(Boolean))
+                ) as string[];
+                if (names.length) {
+                    await prisma.vehicleMake.createMany({
+                        data: names.map(name => ({ name })),
+                        skipDuplicates: true
+                    });
+                    makes = await prisma.vehicleMake.findMany({ orderBy: { name: 'asc' } });
+                }
+            } catch (seedErr: any) {
+                console.warn('Auto-seed des marques echoue:', seedErr.message);
+            }
+        }
+
         res.json(makes);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
