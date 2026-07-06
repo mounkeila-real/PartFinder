@@ -106,6 +106,31 @@ document.addEventListener('DOMContentLoaded', () => {
         manualVehicleFields.style.opacity = disabled ? '0.5' : '1';
     }
 
+    const sectionPart = document.getElementById('section-part');
+    const btnSearch = document.getElementById('btn-search');
+
+    // Le vehicule est-il decrit ? (VIN / carte grise decode, ou saisie manuelle de la marque)
+    function isVehicleDescribed() {
+        const m = ((state.vehicle && state.vehicle.data && state.vehicle.data.make) || makeSelect.value || '').trim();
+        return m.length > 0;
+    }
+
+    // Verrouille la section "Identification Piece" tant qu'aucun vehicule n'est decrit
+    function setPartSectionEnabled(enabled) {
+        partNumberInput.disabled = !enabled;
+        partDescInput.disabled = !enabled;
+        if (fileInput) fileInput.disabled = !enabled;
+        if (btnSearch) btnSearch.disabled = !enabled;
+        if (sectionPart) {
+            sectionPart.style.opacity = enabled ? '1' : '0.45';
+            sectionPart.style.pointerEvents = enabled ? 'auto' : 'none';
+        }
+    }
+
+    function refreshPartLock() {
+        setPartSectionEnabled(isVehicleDescribed());
+    }
+
     async function syncManualFields(data) {
         if (data.make) {
             makeSelect.value = data.make;
@@ -178,6 +203,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // Version laissee vide pour l'instant (demande utilisateur)
         versionInput.value = '';
+
+        refreshPartLock();
     }
 
     // Carte Grise Mockup (Highest Priority)
@@ -416,6 +443,8 @@ document.addEventListener('DOMContentLoaded', () => {
             state.vehicle.method = null;
             vinInput.style.opacity = '1';
         }
+
+        refreshPartLock();
     }
 
     // Load Makes from Backend on initialization
@@ -451,6 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     initMakes();
+    refreshPartLock(); // section piece verrouillee au demarrage
 
     // Fetch models when make changes
     makeSelect.addEventListener('change', async () => {
@@ -616,6 +646,7 @@ document.addEventListener('DOMContentLoaded', () => {
             model: (state.vehicle.data.model || modelInput.value || '').trim() || null,
             year: (state.vehicle.data.year || yearInput.value || '').toString().trim() || null,
             engine: (state.vehicle.data.engine || engineInput.value || '').trim() || null,
+            platform: (state.vehicle.data.platform || platformInput.value || '').trim() || null,
         };
         const partRequest = {
             description: partDescInput.value.trim() || null,
@@ -986,6 +1017,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         state.vehicle = { method: null, data: { make: '', model: '', year: '', engine: '', vin: '', platform: '', version: '' }, wmiDecoded: false, specifications: null };
         state.part = { method: null, number: null, hasPhoto: false };
+        refreshPartLock();
     });
 
     // Plus d'infos btn (Detailed specs window)
@@ -1109,10 +1141,4 @@ document.addEventListener('DOMContentLoaded', () => {
                         </tbody>
                     </table>
                 </div>
-            </body>
-            </html>
-        `);
-        specWindow.document.close();
-    });
-
-});
+     

@@ -21,6 +21,7 @@ export interface VehicleContext {
     model?: string | null;
     year?: string | number | null;
     engine?: string | null;
+    platform?: string | null;   // code chassis / generation (ex: W246, Mk7, E46)
 }
 
 export interface PartRequest {
@@ -60,28 +61,39 @@ export class PartAiService {
 
     private static async determineWithAI(vehicle: VehicleContext, request: PartRequest): Promise<DeterminedPart> {
         const vehicleStr = [
-            vehicle.make, vehicle.model, vehicle.year, vehicle.engine,
+            vehicle.make, vehicle.model, vehicle.platform, vehicle.year, vehicle.engine,
         ].filter(Boolean).join(' ');
 
-        const system = `Tu es un expert en pièces détachées automobiles et en recherche sur eBay.
+        const system = `Tu es un expert en pièces détachées automobiles et en recherche eBay.
 À partir d'un véhicule et d'une demande client, tu identifies la pièce exacte et tu construis
-la meilleure requête de recherche eBay possible en utilisant la terminologie attendue par eBay
-(nom de pièce précis, position, marque/OEM si pertinent, véhicule).
+la MEILLEURE requête eBay possible, en suivant cette nomenclature de pros :
+
+  [Nom de la pièce] + [Marque Modèle Code-chassis] + [Année] + [Code moteur / Énergie] + [OEM si dispo]
+
+Règles impératives :
+- L'OEM est ROI : si une référence OEM/constructeur est fournie, la requête doit être AVANT TOUT cette référence (pièce d'origine), éventuellement suivie du nom de la pièce.
+- Le code châssis / génération (ex: W246, Mk7, E46) est crucial, surtout pour les marques allemandes : inclus-le s'il est connu.
+- Pour une pièce mécanique, ajoute le code moteur (ex: OM651, EA888, K9K) et l'énergie (Diesel / Essence) si disponibles.
+- Utilise la terminologie EXACTE attendue par eBay (nom de pièce précis + position avant/arrière/gauche/droite).
+- Requête concise : 5 à 9 termes clés maximum, aucun mot inutile.
+
 Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, au format :
 {
   "partName": "nom de la pièce en français",
   "partNameEn": "part name in English",
-  "oem": "référence OEM si connue sinon null",
+  "partNameDe": "Teilename auf Deutsch",
+  "oem": "référence OEM si connue/fournie sinon null",
   "position": "avant/arrière/gauche/droite si pertinent sinon null",
-  "category": "famille de pièce (ex: freinage, filtration, éclairage) sinon null",
-  "keywords": ["mot-clé", "..."],
-  "ebayQuery": "requête eBay optimale, concise, ~4 à 8 termes clés"
-}
-La ebayQuery doit combiner: type de pièce + position + marque/modèle + motorisation + OEM si dispo.`;
+  "category": "famille de pièce (freinage, filtration, éclairage...) sinon null",
+  "keywords": ["mots-clés utiles FR/EN/DE"],
+  "ebayQuery": "requête eBay finale selon la nomenclature ci-dessus"
+}`;
 
         const user = `Véhicule: ${vehicleStr || 'inconnu'}
+Code châssis / plateforme: ${vehicle.platform || 'inconnu'}
+Motorisation: ${vehicle.engine || 'inconnue'}
 VIN: ${vehicle.vin || 'inconnu'}
-Demande client: ${request.description || '(non précisée)'}
+Demande client (pièce recherchée): ${request.description || '(non précisée)'}
 Référence OEM fournie: ${request.oem || 'aucune'}`;
 
         const response = await axios.post(
@@ -134,11 +146,14 @@ Référence OEM fournie: ${request.oem || 'aucune'}`;
     }
 
     private static buildHeuristicQuery(vehicle: VehicleContext, request: PartRequest): string {
+        // OEM est roi : s'il est fourni, il est place en tete
         const parts = [
             request.oem,
             request.description,
             vehicle.make,
             vehicle.model,
+            vehicle.platform,
+            vehicle.year,
             vehicle.engine,
         ].filter(Boolean);
         return parts.join(' ').trim() || 'pièce détachée auto';
