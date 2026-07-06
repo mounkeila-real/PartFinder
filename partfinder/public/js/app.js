@@ -196,7 +196,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const result = await Tesseract.recognize(file, 'eng', {
+            vinFeedback.textContent = "⏳ Pretraitement de l'image...";
+            const canvas = await preprocessCgImage(file);
+            const result = await Tesseract.recognize(canvas, 'eng', {
                 logger: m => {
                     if (m.status === 'recognizing text') {
                         vinFeedback.textContent = "⏳ OCR de la carte grise... " + Math.round(m.progress * 100) + "%";
@@ -229,28 +231,73 @@ document.addEventListener('DOMContentLoaded', () => {
     cgCamera.addEventListener('change', (e) => { if (e.target.files.length) runCgOcr(e.target.files[0]); });
     btnScanCamera.addEventListener('click', () => cgCamera.click());
 
-    // Extraction robuste du VIN depuis un texte OCR (17 caracteres, charset VIN, corrections OCR)
+    // Extraction robuste du VIN: on collecte tous les candidats valides
+    // (17 car., charset VIN, >=4 chiffres, >=3 lettres) et on retient le PLUS FREQUENT
+    // (le VIN figure en champ E, sur le coupon et dans la bande MRZ du bas).
     function extractVinFromText(raw) {
         if (!raw) return null;
         const upper = raw.toUpperCase().replace(/[^A-Z0-9\s]/g, ' ');
         const fix = c => ({ 'I': '1', 'O': '0', 'Q': '0' }[c] || c);
         const isValid = v => /^[A-HJ-NPR-Z0-9]{17}$/.test(v);
-        const enoughDigits = v => (v.match(/[0-9]/g) || []).length >= 3;
-
-        // 1) Jeton de 17 caracteres exactement
-        for (const tok of upper.split(/\s+/)) {
-            if (tok.length === 17) {
-                const f = tok.split('').map(fix).join('');
-                if (isValid(f) && enoughDigits(f)) return f;
-            }
-        }
-        // 2) Fenetre glissante (VIN coupe par des espaces a l'OCR)
+        const nDigits = v => (v.match(/[0-9]/g) || []).length;
+        const nLetters = v => (v.match(/[A-Z]/g) || []).length;
+        const counts = {};
+        const add = v => {
+            const f = v.split('').map(fix).join('');
+            if (isValid(f) && nDigits(f) >= 4 && nLetters(f) >= 3) counts[f] = (counts[f] || 0) + 1;
+        };
+        for (const tok of upper.split(/\s+/)) if (tok.length === 17) add(tok);
         const concat = upper.replace(/[^A-Z0-9]/g, '');
-        for (let i = 0; i + 17 <= concat.length; i++) {
-            const sub = concat.substr(i, 17).split('').map(fix).join('');
-            if (isValid(sub) && enoughDigits(sub)) return sub;
+        for (let i = 0; i + 17 <= concat.length; i++) add(concat.substr(i, 17));
+        const cands = Object.keys(counts);
+        if (!cands.length) return null;
+        cands.sort((a, b) => counts[b] - counts[a]);
+        return cands[0];
+    }
+
+    // Charge un fichier image dans un objet Image (pour le pretraitement canvas)
+    function loadImage(file) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = URL.createObjectURL(file);
+        });
+    }
+
+    // Pretraitement: agrandit, niveaux de gris + etirement du contraste (ameliore l'OCR)
+    async function preprocessCgImage(file) {
+        try {
+            const img = await loadImage(file);
+            const targetW = 1700;
+            const ratio = img.width ? targetW / img.width : 1;
+            const w = Math.max(1, Math.round(img.width * ratio));
+            const h = Math.max(1, Math.round(img.height * ratio));
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const d = imgData.data;
+            let min = 255, max = 0;
+            for (let i = 0; i < d.length; i += 4) {
+                const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+                d[i] = d[i + 1] = d[i + 2] = g;
+                if (g < min) min = g;
+                if (g > max) max = g;
+            }
+            const range = Math.max(1, max - min);
+            for (let i = 0; i < d.length; i += 4) {
+                let v = (d[i] - min) * 255 / range;
+                v = Math.max(0, Math.min(255, (v - 35) * 1.35));
+                d[i] = d[i + 1] = d[i + 2] = v;
+            }
+            ctx.putImageData(imgData, 0, 0);
+            return canvas;
+        } catch (e) {
+            console.warn('Pretraitement echoue, image brute utilisee:', e);
+            return file;
         }
-        return null;
     }
 
     // VIN Input (Medium Priority)
