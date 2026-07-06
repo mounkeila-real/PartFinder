@@ -314,8 +314,8 @@ app.get('/api/decode-vin/:vin', async (req, res) => {
                     modele:  d.model || d.Model || localModel.modele,
                     annee:   d.modelYear || d.model_year || localYear || localModel.annees || null,
                     moteur:  d.engine || d.Engine || d.engineDisplacement || null,
-                    platform: d.specifications ? d.specifications['Série'] : (localModel ? localModel.modele : null),
-                    version: d.specifications ? d.specifications['Modèle'] : (d.model || null)
+                    platform: d.specifications ? (d.specifications['Série'] || d.specifications['Series'] || d.specifications['Body'] || null) : (localModel ? localModel.modele : null),
+                    version: d.specifications ? (d.specifications['Modèle'] || d.specifications['Model'] || null) : (d.model || null)
                 };
                 return res.json({
                     ...result,
@@ -356,8 +356,8 @@ app.get('/api/decode-vin/:vin', async (req, res) => {
                 modele:  d.model || d.Model || null,
                 annee:   d.modelYear || d.model_year || d['Model Year'] || localYear,
                 moteur:  d.engine || d.Engine || d.engineDisplacement || null,
-                platform: d.specifications ? d.specifications['Série'] : null,
-                version: d.specifications ? d.specifications['Modèle'] : (d.model || null)
+                platform: d.specifications ? (d.specifications['Série'] || d.specifications['Series'] || d.specifications['Body'] || null) : null,
+                version: d.specifications ? (d.specifications['Modèle'] || d.specifications['Model'] || null) : (d.model || null)
             };
             res.json({
                 ...result,

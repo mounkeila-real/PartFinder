@@ -60,7 +60,7 @@ export class VehicleService {
             const cachedVehicle = await prisma.vehicle.findUnique({
                 where: { vin: upperVin }
             });
-            if (cachedVehicle) {
+            if (cachedVehicle && cachedVehicle.make && cachedVehicle.make !== 'Inconnu') {
                 console.log(`Found cached vehicle specifications for VIN: ${upperVin}`);
                 return {
                     vin: cachedVehicle.vin,
@@ -80,22 +80,46 @@ export class VehicleService {
         try {
             const vincarioData = await this.decodeWithVincario(upperVin);
             if (vincarioData && !vincarioData.error) {
-                const make = vincarioData.make || vincarioData.Make || vincarioData.manufacturer || vincarioData["Marque"] || null;
-                const model = vincarioData.model || vincarioData.Model || vincarioData["Modèle"] || null;
-                const yearVal = vincarioData.modelYear || vincarioData['Model Year'] || vincarioData.year || vincarioData["Année modèle"] || null;
-                const engine = vincarioData.engine || vincarioData.Engine || vincarioData["Puissance moteur"] || null;
+                // Vincario 3.2 renvoie les donnees dans un tableau `decode` [{label, value}].
+                // On l'aplatit en un objet propre { label: value }.
+                const specs: any = {};
+                if (Array.isArray(vincarioData.decode)) {
+                    for (const item of vincarioData.decode) {
+                        if (item && item.label != null) specs[item.label] = item.value;
+                    }
+                } else if (vincarioData && typeof vincarioData === 'object') {
+                    for (const [k, v] of Object.entries(vincarioData)) {
+                        if (typeof v !== 'object') specs[k] = v;
+                    }
+                }
 
-                // Cache successful API result
+                const pick = (...keys: string[]) => {
+                    for (const k of keys) if (specs[k] != null && specs[k] !== '') return specs[k];
+                    return null;
+                };
+
+                const make = pick('Make', 'Marque', 'Manufacturer');
+                const model = pick('Model', 'Modèle');
+                const yearVal = pick('Model Year', 'Année modèle', 'Year');
+                const disp = pick('Engine Displacement (ccm)', 'Cylindrée (cm³)', 'Engine Displacement');
+                const fuel = pick('Fuel Type - Primary', 'Fuel Type', 'Carburant');
+                const powerKw = pick('Engine Power (kW)', 'Puissance moteur');
+                const engine = [disp ? disp + ' cm³' : null, fuel, powerKw ? powerKw + ' kW' : null]
+                    .filter(Boolean).join(' ') || null;
+
+                // Cache successful API result (specs a plat)
                 try {
-                    await prisma.vehicle.create({
-                        data: {
-                            vin: upperVin,
-                            make: make || "Inconnu",
-                            model: model || "Inconnu",
-                            year: yearVal ? parseInt(String(yearVal), 10) : null,
-                            engine: engine,
-                            specifications: JSON.stringify(vincarioData)
-                        }
+                    const vehData = {
+                        make: make || "Inconnu",
+                        model: model || "Inconnu",
+                        year: yearVal ? parseInt(String(yearVal), 10) : null,
+                        engine: engine,
+                        specifications: JSON.stringify(specs)
+                    };
+                    await prisma.vehicle.upsert({
+                        where: { vin: upperVin },
+                        update: vehData,
+                        create: { vin: upperVin, ...vehData }
                     });
                     console.log(`Cached vehicle details for VIN: ${upperVin}`);
                 } catch (cacheError: any) {
@@ -109,7 +133,7 @@ export class VehicleService {
                     modelYear: yearVal ? parseInt(String(yearVal), 10) : null,
                     engine,
                     source: "Vincario API",
-                    specifications: vincarioData
+                    specifications: specs
                 };
             }
         } catch (error: any) {
