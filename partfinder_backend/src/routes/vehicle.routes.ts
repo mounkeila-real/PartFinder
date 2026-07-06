@@ -193,8 +193,15 @@ router.get('/models/:makeName', async (req: express.Request, res: express.Respon
         const makes = await prisma.vehicleMake.findMany();
         let makeObj = makes.find(m => m.name.toLowerCase() === makeName.toLowerCase());
 
-        if (!makeObj) {
-            console.log(`Make "${makeName}" not found in DB. Fetching from NHTSA...`);
+        // Nombre de modeles deja en cache pour cette marque
+        let existingModelCount = 0;
+        if (makeObj) {
+            existingModelCount = await prisma.vehicleModel.count({ where: { makeId: makeObj.id } });
+        }
+
+        // On charge depuis NHTSA si la marque est absente OU si aucun modele n'est en cache
+        if (!makeObj || existingModelCount === 0) {
+            console.log(`Chargement des modeles pour "${makeName}" depuis NHTSA...`);
             const nhtsaUrl = `https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMake/${encodeURIComponent(makeName)}?format=json`;
             try {
                 const response = await axios.get(nhtsaUrl, { timeout: 8000 });
@@ -235,7 +242,8 @@ router.get('/models/:makeName', async (req: express.Request, res: express.Respon
 
                     try {
                         await prisma.vehicleModel.createMany({
-                            data: modelInserts
+                            data: modelInserts,
+                            skipDuplicates: true
                         });
                     } catch (dbErr) {
                         // Ignore duplicate key errors on SQLite
