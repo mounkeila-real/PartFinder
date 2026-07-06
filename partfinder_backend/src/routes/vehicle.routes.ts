@@ -199,6 +199,13 @@ router.get('/models/:makeName', async (req: express.Request, res: express.Respon
             existingModelCount = await prisma.vehicleModel.count({ where: { makeId: makeObj.id } });
         }
 
+        // ?refresh=1 : vide le cache modeles de la marque pour forcer un rechargement propre
+        const forceRefresh = req.query.refresh === '1' || req.query.refresh === 'true';
+        if (makeObj && forceRefresh) {
+            await prisma.vehicleModel.deleteMany({ where: { makeId: makeObj.id } });
+            existingModelCount = 0;
+        }
+
         // On charge depuis NHTSA si la marque est absente OU si aucun modele n'est en cache
         if (!makeObj || existingModelCount === 0) {
             console.log(`Chargement des modeles pour "${makeName}" depuis NHTSA...`);
@@ -233,7 +240,14 @@ router.get('/models/:makeName', async (req: express.Request, res: express.Respon
                     }
 
                     // Insert models in bulk
-                    const modelNames = Array.from(new Set(results.map((r: any) => r.Model_Name).filter(Boolean)));
+                    // On ne garde QUE les modeles dont le Make_Name correspond exactement
+                    // (evite la contamination par des modeles d'autres marques renvoyes par NHTSA)
+                    const modelNames = Array.from(new Set(
+                        results
+                            .filter((r: any) => String(r.Make_Name || '').toLowerCase() === String(officialMakeName).toLowerCase())
+                            .map((r: any) => r.Model_Name)
+                            .filter(Boolean)
+                    ));
                     const modelInserts = modelNames.map((name: any) => ({
                         name,
                         makeId: makeObj!.id,
