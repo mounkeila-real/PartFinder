@@ -1141,4 +1141,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         </tbody>
                     </table>
                 </div>
-     
+            </body>
+            </html>
+        `);
+        specWindow.document.close();
+    });
+
+});
