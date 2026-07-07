@@ -56,7 +56,32 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
         const limit = req.body.limit;
 
         const part = await PartAiService.determinePart(vehicle, request);
-        const rawResults = await EbayService.searchParts(part.ebayQuery, { limit });
+
+        // Cascade de requetes : de la plus precise a la plus large.
+        // eBay exige que TOUS les mots correspondent -> une requete trop longue = 0 resultat.
+        const pn = part.partName || request.description || '';
+        const candidatesRaw = [
+            request.oem || null,                                                   // OEM seul (le plus precis)
+            part.ebayQuery,                                                        // requete IA complete
+            [pn, vehicle.make, vehicle.model, vehicle.platform].filter(Boolean).join(' '),
+            [pn, vehicle.make, vehicle.model].filter(Boolean).join(' '),
+            [pn, vehicle.make].filter(Boolean).join(' '),
+        ];
+        const seen = new Set<string>();
+        const candidates = candidatesRaw
+            .map(c => (c || '').trim())
+            .filter(c => c.length > 0 && !seen.has(c.toLowerCase()) && !!seen.add(c.toLowerCase()));
+
+        let rawResults: any[] = [];
+        let usedQuery = part.ebayQuery;
+        for (const q of candidates) {
+            const r = await EbayService.searchParts(q, { limit });
+            if (r && r.length > 0) {
+                rawResults = r;
+                usedQuery = q;
+                break;
+            }
+        }
 
         // Ajoute le prix final (avec marge) tout en gardant le prix source.
         const results = rawResults.map((r) => ({
@@ -67,6 +92,8 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
 
         res.json({
             part,
+            usedQuery,
+            triedQueries: candidates,
             aiConfigured: PartAiService.isConfigured(),
             env: EbayService.currentEnv(),
             ebayConfigured: EbayService.isConfigured(),

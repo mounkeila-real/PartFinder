@@ -715,7 +715,9 @@ document.addEventListener('DOMContentLoaded', () => {
             window.currentSearchResults = resultsToRender;
 
             if (resultsToRender.length === 0) {
-                emptyState.classList.remove('display-none');
+                resultsContent.classList.remove('display-none');
+                const q = data.usedQuery || determined.ebayQuery || '';
+                offersGrid.innerHTML = '<p style="color: var(--text-secondary); padding: 24px; line-height: 1.6;">Aucune offre eBay trouvee pour cette recherche.<br>Requete essayee : <strong>' + q + '</strong>.<br>Essaie une reference OEM, ou une description de piece plus simple.</p>';
             } else {
                 renderResults(resultsToRender);
                 resultsContent.classList.remove('display-none');
@@ -724,7 +726,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Search failed:", error);
             loadingState.classList.add('display-none');
-            emptyState.classList.remove('display-none');
+            resultsContent.classList.remove('display-none');
+            const resTitleErr = document.getElementById('res-part-name');
+            if (resTitleErr) resTitleErr.innerText = 'Erreur de recherche';
+            offersGrid.innerHTML = '<p style="color: #ff6b6b; padding: 24px; line-height: 1.6;">La recherche a echoue (backend injoignable ou erreur eBay). Reessaie dans un instant.</p>';
         } finally {
             // Reset loading UI for next time
             steps.forEach(s => {
