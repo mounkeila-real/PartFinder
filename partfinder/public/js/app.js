@@ -756,9 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const rawDesc = (item.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
             const shortDesc = rawDesc.length > 160 ? rawDesc.slice(0, 160) + '…' : rawDesc;
             const descHtml = shortDesc ? `<p class="offer-desc">${shortDesc}</p>` : '';
-            const linkHtml = item.url
-                ? `<a class="offer-link" href="${item.url}" target="_blank" rel="noopener">Voir la fiche</a>`
-                : '';
+            const linkHtml = `<button type="button" class="offer-link" data-detail="${item.id}">Voir la fiche</button>`;
             const mockBadge = item.isMock ? '<span class="offer-mock" title="Résultat de démonstration">DÉMO</span>' : '';
 
             const card = document.createElement('div');
@@ -794,6 +792,59 @@ document.addEventListener('DOMContentLoaded', () => {
                 addToCart(id);
             });
         });
+
+        // "Voir la fiche" -> page interne (infos eBay, sans lien eBay)
+        document.querySelectorAll('.offer-link[data-detail]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                openItemDetail(e.currentTarget.getAttribute('data-detail'));
+            });
+        });
+    }
+
+    // Ouvre une page interne avec toutes les infos extraites d'eBay (aucun lien eBay)
+    function openItemDetail(itemId) {
+        const win = window.open('', '_blank');
+        if (!win) { alert("Veuillez autoriser les fenetres pop-up pour voir la fiche."); return; }
+        win.document.write('<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Fiche piece</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet"><style>' + detailStyles() + '</style></head><body><div class="wrap"><p class="loading">Chargement de la fiche...</p></div></body></html>');
+        win.document.close();
+
+        fetch(`${API_BASE_URL}/parts/item/${encodeURIComponent(itemId)}`)
+            .then(r => r.ok ? r.json() : Promise.reject(new Error('not found')))
+            .then(d => { const w = win.document.querySelector('.wrap'); if (w) w.innerHTML = detailHtml(d); })
+            .catch(() => { const w = win.document.querySelector('.wrap'); if (w) w.innerHTML = '<p class="loading">Fiche indisponible pour cet article.</p>'; });
+    }
+
+    function detailStyles() {
+        return `
+            * { box-sizing: border-box; }
+            body { margin:0; font-family:'Inter',sans-serif; background:#0f172a; color:#e2e8f0; }
+            .wrap { max-width: 900px; margin: 0 auto; padding: 28px 20px; }
+            .loading { color:#94a3b8; text-align:center; padding:60px 0; }
+            h1 { font-family:'Outfit',sans-serif; font-size:1.5rem; margin:0 0 6px; color:#f8fafc; }
+            .price { font-family:'Outfit',sans-serif; font-size:2rem; font-weight:700; color:#38bdf8; margin:8px 0 4px; }
+            .price span { font-size:1rem; color:#94a3b8; font-weight:400; }
+            .cond { display:inline-block; font-size:.8rem; padding:3px 10px; border-radius:6px; background:#1e293b; color:#cbd5e1; margin-bottom:16px; }
+            .gallery { display:flex; gap:10px; flex-wrap:wrap; margin:16px 0; }
+            .gallery img { width:150px; height:150px; object-fit:cover; border-radius:10px; background:#1e293b; }
+            h2 { font-size:1rem; color:#f8fafc; margin:24px 0 8px; border-bottom:1px solid rgba(255,255,255,.08); padding-bottom:6px; }
+            table { width:100%; border-collapse:collapse; }
+            td { padding:8px 12px; font-size:.9rem; border-bottom:1px solid rgba(255,255,255,.05); vertical-align:top; }
+            td:first-child { color:#94a3b8; width:40%; }
+            .desc { font-size:.9rem; line-height:1.6; color:#cbd5e1; }
+        `;
+    }
+
+    function detailHtml(d) {
+        const cur = d.currency || 'EUR';
+        const price = d.price != null ? '<div class="price">' + Number(d.price).toFixed(2) + ' <span>' + cur + ' TTC</span></div>' : '';
+        const cond = d.condition ? '<span class="cond">' + d.condition + '</span>' : '';
+        const imgs = (d.images || []).slice(0, 8).map(u => '<img src="' + u + '" alt="">').join('');
+        const gallery = imgs ? '<div class="gallery">' + imgs + '</div>' : '';
+        const aspects = (d.aspects || []).map(a => '<tr><td>' + a.name + '</td><td>' + (Array.isArray(a.value) ? a.value.join(', ') : (a.value || '')) + '</td></tr>').join('');
+        const aspectsTable = aspects ? '<h2>Caracteristiques</h2><table>' + aspects + '</table>' : '';
+        const rawDesc = (d.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        const descHtml = rawDesc ? '<h2>Description</h2><p class="desc">' + rawDesc + '</p>' : '';
+        return '<h1>' + (d.title || 'Piece') + '</h1>' + cond + price + gallery + aspectsTable + descHtml;
     }
 
     // --- Cart / Order Logic ---

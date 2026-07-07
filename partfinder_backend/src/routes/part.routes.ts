@@ -107,6 +107,47 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
 });
 
 /**
+ * Détail d'un article eBay pour la fiche interne (SANS lien eBay).
+ * Renvoie: titre, prix TTC (marge), état, images, description complète, caractéristiques.
+ */
+router.get('/item/:itemId', async (req: express.Request, res: express.Response) => {
+    try {
+        const detail: any = await EbayService.getItem(req.params.itemId);
+        if (!detail) return res.status(404).json({ error: 'Article introuvable' });
+
+        const price = detail.price?.value != null ? parseFloat(detail.price.value) : null;
+        const finalPrice = price != null ? Math.round(price * MARGIN_MULTIPLIER * 100) / 100 : null;
+
+        const images: string[] = [];
+        if (detail.image?.imageUrl) images.push(detail.image.imageUrl);
+        if (Array.isArray(detail.additionalImages)) {
+            for (const im of detail.additionalImages) if (im?.imageUrl) images.push(im.imageUrl);
+        }
+
+        const aspects: { name: string; value: any }[] = [];
+        if (Array.isArray(detail.localizedAspects)) {
+            for (const a of detail.localizedAspects) if (a?.name) aspects.push({ name: a.name, value: a.value });
+        }
+
+        // On n'expose volontairement PAS itemWebUrl / la source eBay.
+        res.json({
+            itemId: detail.itemId,
+            title: detail.title || '',
+            price: finalPrice,
+            currency: detail.price?.currency || 'EUR',
+            condition: detail.condition || null,
+            images,
+            description: detail.description || detail.shortDescription || '',
+            aspects,
+            brand: detail.brand || null,
+            mpn: detail.mpn || null,
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
  * Prix final d'un article (marge appliquée). Passe le prix source via ?base=XX.XX
  */
 router.get('/:id/prices', async (req: express.Request, res: express.Response) => {
