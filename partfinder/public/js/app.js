@@ -482,6 +482,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initMakes();
     refreshPartLock(); // section piece verrouillee au demarrage
 
+    // Champs vehicule editables par defaut (mode manuel). Le decodage VIN les reverrouille.
+    setManualFieldsDisabled(false);
+    modelInput.disabled = true; // le modele se charge apres selection d'une marque
+
     // Fetch models when make changes
     makeSelect.addEventListener('change', async () => {
         handleManualInput();
