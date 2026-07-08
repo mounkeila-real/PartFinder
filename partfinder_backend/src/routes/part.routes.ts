@@ -112,7 +112,7 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
  */
 router.get('/item/:itemId', async (req: express.Request, res: express.Response) => {
     try {
-        const detail: any = await EbayService.getItem(req.params.itemId);
+        const detail: any = await EbayService.getItem(String(req.params.itemId));
         if (!detail) return res.status(404).json({ error: 'Article introuvable' });
 
         const price = detail.price?.value != null ? parseFloat(detail.price.value) : null;
