@@ -192,6 +192,34 @@ export class EbayService {
         }
     }
 
+    // Diagnostic: renvoie la reponse eBay brute (image / thumbnailImages) des premiers items.
+    static async debugSearch(query: string): Promise<any> {
+        const token = await this.getAccessToken();
+        if (token === 'mock_ebay_token') return { mock: true };
+        const response = await axios.get(
+            `${API_BASE}/buy/browse/v1/item_summary/search`,
+            {
+                params: { q: query, category_ids: DEFAULT_CATEGORY_ID, limit: 3 },
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'X-EBAY-C-MARKETPLACE-ID': EBAY_MARKETPLACE_ID,
+                },
+                timeout: 20000,
+            }
+        );
+        const items = response.data?.itemSummaries || [];
+        return {
+            total: response.data?.total,
+            count: items.length,
+            first: items.slice(0, 2).map((s: any) => ({
+                keys: Object.keys(s),
+                title: s.title,
+                image: s.image,
+                thumbnailImages: s.thumbnailImages,
+            })),
+        };
+    }
+
     private static normalizeSummary(s: any): NormalizedPart {
         const priceValue = s.price?.value != null ? parseFloat(s.price.value) : null;
         return {

@@ -1118,7 +1118,10 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         const vin = state.vehicle.data.vin || '';
         
-        const specWindow = window.open('', '_blank');
+        const _sw = 940;
+        const _sh = Math.min(900, (window.screen && window.screen.availHeight ? window.screen.availHeight - 80 : 900));
+        const _sl = (window.screen && window.screen.availWidth) ? Math.max(0, Math.round((window.screen.availWidth - _sw) / 2)) : 120;
+        const specWindow = window.open('', 'partfinderVehicule', `width=${_sw},height=${_sh},left=${_sl},top=40,scrollbars=yes,resizable=yes`);
         if (!specWindow) {
             alert("Veuillez autoriser les fenêtres pop-up pour voir les détails.");
             return;

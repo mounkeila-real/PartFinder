@@ -138,6 +138,19 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
 });
 
 /**
+ * Diagnostic: montre la reponse eBay brute (pour verifier les images).
+ */
+router.get('/debug-search', async (req: express.Request, res: express.Response) => {
+    try {
+        const q = String(req.query.q || 'alternateur');
+        const raw = await EbayService.debugSearch(q);
+        res.json({ query: q, env: EbayService.currentEnv(), configured: EbayService.isConfigured(), raw });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message, ebay: e.response?.data });
+    }
+});
+
+/**
  * Détail d'un article eBay pour la fiche interne (SANS lien eBay).
  * Renvoie: titre, prix TTC (marge), état, images, description complète, caractéristiques.
  */
