@@ -807,7 +807,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Ouvre une page interne avec toutes les infos extraites d'eBay (aucun lien eBay)
     function openItemDetail(itemId) {
-        const win = window.open('', '_blank');
+        // Fenetre popup dimensionnee et centree (pas en plein ecran)
+        const w = 940;
+        const h = Math.min(900, (window.screen && window.screen.availHeight ? window.screen.availHeight - 80 : 900));
+        const left = (window.screen && window.screen.availWidth) ? Math.max(0, Math.round((window.screen.availWidth - w) / 2)) : 120;
+        const top = 40;
+        const win = window.open('', 'partfinderFiche', `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`);
         if (!win) { alert("Veuillez autoriser les fenetres pop-up pour voir la fiche."); return; }
         win.document.write('<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Fiche piece</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet"><style>' + detailStyles() + '</style></head><body><div class="wrap"><p class="loading">Chargement de la fiche...</p></div></body></html>');
         win.document.close();
@@ -821,34 +826,52 @@ document.addEventListener('DOMContentLoaded', () => {
     function detailStyles() {
         return `
             * { box-sizing: border-box; }
-            body { margin:0; font-family:'Inter',sans-serif; background:#0f172a; color:#e2e8f0; }
-            .wrap { max-width: 900px; margin: 0 auto; padding: 28px 20px; }
-            .loading { color:#94a3b8; text-align:center; padding:60px 0; }
-            h1 { font-family:'Outfit',sans-serif; font-size:1.5rem; margin:0 0 6px; color:#f8fafc; }
-            .price { font-family:'Outfit',sans-serif; font-size:2rem; font-weight:700; color:#38bdf8; margin:8px 0 4px; }
-            .price span { font-size:1rem; color:#94a3b8; font-weight:400; }
-            .cond { display:inline-block; font-size:.8rem; padding:3px 10px; border-radius:6px; background:#1e293b; color:#cbd5e1; margin-bottom:16px; }
-            .gallery { display:flex; gap:10px; flex-wrap:wrap; margin:16px 0; }
-            .gallery img { width:150px; height:150px; object-fit:cover; border-radius:10px; background:#1e293b; }
-            h2 { font-size:1rem; color:#f8fafc; margin:24px 0 8px; border-bottom:1px solid rgba(255,255,255,.08); padding-bottom:6px; }
-            table { width:100%; border-collapse:collapse; }
-            td { padding:8px 12px; font-size:.9rem; border-bottom:1px solid rgba(255,255,255,.05); vertical-align:top; }
-            td:first-child { color:#94a3b8; width:40%; }
-            .desc { font-size:.9rem; line-height:1.6; color:#cbd5e1; }
+            body { margin:0; font-family:'Inter',sans-serif; background:#0B0F19; color:#E2E8F0; }
+            .wrap { max-width: 1000px; margin: 0 auto; padding: 32px 24px 64px; }
+            .loading { color:#94A3B8; text-align:center; padding:80px 0; }
+            .head { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:4px; }
+            h1 { font-family:'Outfit',sans-serif; font-size:1.4rem; line-height:1.3; margin:0; color:#F8FAFC; flex:1; min-width:260px; }
+            .pricebox { text-align:right; white-space:nowrap; }
+            .price { font-family:'Outfit',sans-serif; font-size:2rem; font-weight:700; color:#38BDF8; }
+            .price span { font-size:.95rem; color:#94A3B8; font-weight:400; }
+            .chip { display:inline-block; font-size:.78rem; padding:4px 12px; border-radius:99px; background:#132033; color:#7DD3FC; border:1px solid rgba(56,189,248,.25); margin-top:8px; }
+            .gallery { margin:24px 0 8px; }
+            .main-img { width:100%; max-height:420px; object-fit:contain; background:#131A2A; border:1px solid rgba(255,255,255,.06); border-radius:14px; }
+            .thumbs { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+            .thumbs img { width:72px; height:72px; object-fit:cover; border-radius:10px; background:#131A2A; border:1px solid rgba(255,255,255,.08); cursor:pointer; transition:border-color .15s; }
+            .thumbs img:hover { border-color:#38BDF8; }
+            h2 { font-family:'Outfit',sans-serif; font-size:1.05rem; color:#F8FAFC; margin:32px 0 12px; }
+            .specs { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.06); border-radius:12px; overflow:hidden; }
+            .spec { display:flex; justify-content:space-between; gap:12px; padding:12px 16px; background:#0F1626; font-size:.9rem; }
+            .spec .k { color:#94A3B8; }
+            .spec .v { color:#F1F5F9; text-align:right; font-weight:500; word-break:break-word; }
+            .spec.oem { background:#10233b; }
+            .spec.oem .v { color:#7DD3FC; }
+            .desc { font-size:.92rem; line-height:1.7; color:#CBD5E1; background:#0F1626; border:1px solid rgba(255,255,255,.06); border-radius:12px; padding:18px 20px; white-space:pre-line; }
+            @media (max-width:640px){ .specs{ grid-template-columns:1fr; } .price{ font-size:1.6rem; } .head{ flex-direction:column; } .pricebox{ text-align:left; } }
         `;
     }
 
     function detailHtml(d) {
         const cur = d.currency || 'EUR';
-        const price = d.price != null ? '<div class="price">' + Number(d.price).toFixed(2) + ' <span>' + cur + ' TTC</span></div>' : '';
-        const cond = d.condition ? '<span class="cond">' + d.condition + '</span>' : '';
-        const imgs = (d.images || []).slice(0, 8).map(u => '<img src="' + u + '" alt="">').join('');
-        const gallery = imgs ? '<div class="gallery">' + imgs + '</div>' : '';
-        const aspects = (d.aspects || []).map(a => '<tr><td>' + a.name + '</td><td>' + (Array.isArray(a.value) ? a.value.join(', ') : (a.value || '')) + '</td></tr>').join('');
-        const aspectsTable = aspects ? '<h2>Caracteristiques</h2><table>' + aspects + '</table>' : '';
+        const priceStr = d.price != null ? Number(d.price).toFixed(2) + ' <span>' + cur + ' TTC</span>' : '&mdash;';
+        const cond = d.condition ? '<div class="chip">' + d.condition + '</div>' : '';
+        const imgs = (d.images || []).filter(Boolean);
+        let gallery = '';
+        if (imgs.length) {
+            const thumbs = imgs.slice(0, 8).map(u => '<img src="' + u + '" onerror="this.style.display=\'none\'" onclick="var m=document.getElementById(\'mainImg\'); if(m){m.src=this.src;m.style.display=\'block\';}">').join('');
+            gallery = '<div class="gallery"><img id="mainImg" class="main-img" src="' + imgs[0] + '" onerror="this.style.display=\'none\'"><div class="thumbs">' + thumbs + '</div></div>';
+        }
+        const aspects = (d.aspects || []).map(a => ({ name: a.name, value: Array.isArray(a.value) ? a.value.join(', ') : (a.value || '') }));
+        const specsHtml = aspects.length
+            ? '<h2>Caractéristiques</h2><div class="specs">' + aspects.map(a => {
+                const isOem = /(oe|oem|référence|reference|part)/i.test(a.name);
+                return '<div class="spec' + (isOem ? ' oem' : '') + '"><span class="k">' + a.name + '</span><span class="v">' + a.value + '</span></div>';
+            }).join('') + '</div>'
+            : '';
         const rawDesc = (d.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-        const descHtml = rawDesc ? '<h2>Description</h2><p class="desc">' + rawDesc + '</p>' : '';
-        return '<h1>' + (d.title || 'Piece') + '</h1>' + cond + price + gallery + aspectsTable + descHtml;
+        const descHtml = rawDesc ? '<h2>Description</h2><div class="desc">' + rawDesc + '</div>' : '';
+        return '<div class="head"><h1>' + (d.title || 'Pièce') + '</h1><div class="pricebox"><div class="price">' + priceStr + '</div>' + cond + '</div></div>' + gallery + specsHtml + descHtml;
     }
 
     // --- Cart / Order Logic ---
