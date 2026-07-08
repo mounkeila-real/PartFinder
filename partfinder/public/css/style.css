@@ -1139,3 +1139,54 @@ textarea:focus {
     color: var(--text-primary);
     box-shadow: var(--shadow-glow);
 }
+
+/* ======================================================================
+   RESPONSIVE MOBILE-FIRST (<= 1023px) — Etape 1 : shell + layout
+   Le desktop (>=1024px) reste inchange ; on adapte uniquement le mobile.
+   ====================================================================== */
+@media (max-width: 1023px) {
+    /* App shell : empilement vertical */
+    .app-container { flex-direction: column; height: auto; min-height: 100vh; }
+
+    /* Sidebar -> barre de navigation fixe en bas */
+    .sidebar {
+        position: fixed; bottom: 0; left: 0; right: 0;
+        width: 100%; height: 58px;
+        flex-direction: row; align-items: center;
+        border-right: none; border-top: 1px solid var(--border-color);
+    }
+    .sidebar .logo, .sidebar-footer { display: none; }
+    .sidebar nav { flex-direction: row; justify-content: space-around; width: 100%; padding: 0; gap: 0; }
+    .nav-item {
+        flex-direction: column; gap: 2px; padding: 6px 4px;
+        font-size: 0.68rem; text-align: center;
+        min-height: 44px; justify-content: center; flex: 1;
+    }
+    .nav-item i { font-size: 1.35rem; }
+    .nav-item .badge { position: static; right: auto; margin-left: 4px; }
+
+    /* Contenu principal : place pour la bottom-nav */
+    .main-content { height: auto; padding-bottom: 58px; }
+    .topbar { position: sticky; top: 0; z-index: 20; height: 56px; padding: 0 16px; }
+    .topbar h1 { font-size: 1rem; }
+
+    /* Colonnes recherche + resultats -> empilees pleine largeur */
+    .search-layout { flex-direction: column; overflow: visible; }
+    .search-panel {
+        width: 100%; border-right: none;
+        border-bottom: 1px solid var(--border-color); padding: 20px 16px;
+    }
+    .results-panel { width: 100%; padding: 20px 16px; }
+
+    /* Grilles -> 1 colonne */
+    .offers-grid { grid-template-columns: 1fr; }
+    .input-row { grid-template-columns: 1fr; }
+
+    /* Panier -> plein ecran ; chat -> pleine largeur au-dessus de la bottom-nav */
+    .cart-panel { width: 100%; }
+    .chat-widget { left: 12px; right: 12px; width: auto; bottom: 70px; }
+
+    /* Cibles tactiles + inputs >=16px (evite le zoom auto iOS) */
+    input[type="text"], input[type="number"], select, textarea { font-size: 16px; }
+    .btn-primary, .btn-secondary, .btn-icon, .btn-scan { min-height: 44px; }
+}
