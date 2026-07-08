@@ -1190,3 +1190,26 @@ textarea:focus {
     input[type="text"], input[type="number"], select, textarea { font-size: 16px; }
     .btn-primary, .btn-secondary, .btn-icon, .btn-scan { min-height: 44px; }
 }
+
+/* ======================================================================
+   RESPONSIVE MOBILE — Etape 2 : composants (resultats, panier, actions)
+   ====================================================================== */
+@media (max-width: 1023px) {
+    /* Panier -> overlay plein ecran */
+    .cart-panel {
+        position: fixed; inset: 0;
+        width: 100%; height: 100%;
+        z-index: 200; border-left: none;
+    }
+
+    /* En-tete resultat + tuiles compacts */
+    .part-info-card { padding: 16px; margin-bottom: 20px; }
+    .part-header { flex-wrap: wrap; gap: 10px; }
+    .offers-header { margin-bottom: 16px; }
+    .offer-img { height: 190px; }
+
+    /* Actions formulaire : bouton principal bien visible */
+    .form-actions { gap: 12px; }
+    .form-actions .btn-primary { flex: 1; justify-content: center; }
+    .form-actions .btn-secondary { flex: 0 0 auto; }
+}
