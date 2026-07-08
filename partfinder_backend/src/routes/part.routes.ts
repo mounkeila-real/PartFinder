@@ -7,6 +7,37 @@ const router = express.Router();
 // Marge appliquée sur le prix source (33% par défaut, surchargée par env).
 const MARGIN_MULTIPLIER = Number(process.env.PART_MARGIN_MULTIPLIER || '1.33');
 
+// Nettoie une description HTML eBay : retire le CSS/scripts/boilerplate vendeur, garde le texte utile.
+function cleanEbayDescription(html: string): string {
+    if (!html) return '';
+    let t = String(html);
+    t = t.replace(/<style[\s\S]*?<\/style>/gi, ' ');
+    t = t.replace(/<script[\s\S]*?<\/script>/gi, ' ');
+    t = t.replace(/<!--[\s\S]*?-->/g, ' ');
+    t = t.replace(/<\s*br\s*\/?>/gi, '\n');
+    t = t.replace(/<\/\s*(p|div|li|tr|h[1-6]|ul|ol|table|section)\s*>/gi, '\n');
+    t = t.replace(/<[^>]+>/g, ' ');
+    const entities: Record<string, string> = {
+        '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'",
+        '&eacute;': 'é', '&egrave;': 'è', '&agrave;': 'à', '&ccedil;': 'ç', '&ocirc;': 'ô',
+        '&ldquo;': '"', '&rdquo;': '"', '&rsquo;': "'"
+    };
+    t = t.replace(/&[a-z#0-9]+;/gi, (m) => entities[m.toLowerCase()] ?? ' ');
+    // Retire les lignes de CSS residuel
+    t = t.split('\n').map(l => l.trim())
+        .filter(l => l && !/[{}]/.test(l) && !/^[.#@][\w-]/.test(l))
+        .join('\n');
+    // Coupe au premier marqueur de pied de page vendeur
+    const markers = ['procédure d', 'modes de paiement', 'tous droits réservés', '© 20'];
+    const low = t.toLowerCase();
+    let cut = t.length;
+    for (const m of markers) { const i = low.indexOf(m); if (i > 60 && i < cut) cut = i; }
+    t = t.slice(0, cut);
+    t = t.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+    if (t.length > 1600) t = t.slice(0, 1600).replace(/\s+\S*$/, '') + '…';
+    return t;
+}
+
 /**
  * Détermine la pièce par IA à partir du véhicule + demande client.
  * body: { vehicle: {...}, request: { description?, oem? } }
@@ -137,7 +168,7 @@ router.get('/item/:itemId', async (req: express.Request, res: express.Response) 
             currency: detail.price?.currency || 'EUR',
             condition: detail.condition || null,
             images,
-            description: detail.description || detail.shortDescription || '',
+            description: cleanEbayDescription(detail.description || detail.shortDescription || ''),
             aspects,
             brand: detail.brand || null,
             mpn: detail.mpn || null,
