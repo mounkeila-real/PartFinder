@@ -769,7 +769,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="offer-img">
                     <span class="offer-condition cond-${item.condition}">${item.condition === 'new' ? 'Neuf' : 'Occasion'}</span>
                     ${mockBadge}
-                    <img src="${item.img}" alt="${item.name}" onerror="this.src='${'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&q=80&w=400'}'">
+                    <img src="${item.img}" alt="${item.name}" referrerpolicy="no-referrer" onerror="this.src='${'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&q=80&w=400'}'">
                 </div>
                 <div class="offer-body">
                     <span class="offer-brand">${item.brand}</span>
@@ -859,8 +859,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const imgs = (d.images || []).filter(Boolean);
         let gallery = '';
         if (imgs.length) {
-            const thumbs = imgs.slice(0, 8).map(u => '<img src="' + u + '" onerror="this.style.display=\'none\'" onclick="var m=document.getElementById(\'mainImg\'); if(m){m.src=this.src;m.style.display=\'block\';}">').join('');
-            gallery = '<div class="gallery"><img id="mainImg" class="main-img" src="' + imgs[0] + '" onerror="this.style.display=\'none\'"><div class="thumbs">' + thumbs + '</div></div>';
+            const thumbs = imgs.slice(0, 8).map(u => '<img src="' + u + '" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'" onclick="var m=document.getElementById(\'mainImg\'); if(m){m.src=this.src;m.style.display=\'block\';}">').join('');
+            gallery = '<div class="gallery"><img id="mainImg" class="main-img" referrerpolicy="no-referrer" src="' + imgs[0] + '" onerror="this.style.display=\'none\'"><div class="thumbs">' + thumbs + '</div></div>';
         }
         const aspects = (d.aspects || []).map(a => ({ name: a.name, value: Array.isArray(a.value) ? a.value.join(', ') : (a.value || '') }));
         const specsHtml = aspects.length
