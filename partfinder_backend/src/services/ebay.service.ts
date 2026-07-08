@@ -141,19 +141,30 @@ export class EbayService {
             const summaries = response.data?.itemSummaries || [];
             let results: NormalizedPart[] = summaries.map((s: any) => this.normalizeSummary(s));
 
-            // Enrichit les premiers résultats avec la description complète.
-            if (withDescriptions && results.length > 0) {
-                const n = Math.min(descriptionCount, results.length);
+            // Enrichissement via getItem :
+            //  - IMAGE pour TOUS les resultats qui n'en ont pas (la recherche eBay ne renvoie pas
+            //    toujours l'image ; getItem la fournit de facon fiable).
+            //  - DESCRIPTION complete pour les N premiers.
+            if (results.length > 0) {
+                const n = withDescriptions ? Math.min(descriptionCount, results.length) : 0;
                 await Promise.all(
-                    results.slice(0, n).map(async (part) => {
+                    results.map(async (part, idx) => {
+                        const needImage = !part.image;
+                        const needDesc = idx < n;
+                        if (!needImage && !needDesc) return;
                         try {
                             const detail = await this.getItem(part.itemId, token, marketplaceId);
                             if (detail) {
-                                part.fullDescription = detail.description || part.shortDescription;
-                                if (!part.image && detail.image?.imageUrl) part.image = detail.image.imageUrl;
+                                if (needImage) {
+                                    part.image = detail.image?.imageUrl
+                                        || detail.additionalImages?.[0]?.imageUrl
+                                        || part.image;
+                                    if (!part.thumbnail) part.thumbnail = part.image;
+                                }
+                                if (needDesc) part.fullDescription = detail.description || part.shortDescription;
                             }
                         } catch {
-                            // Description optionnelle : on ignore les échecs individuels.
+                            // Enrichissement optionnel : on ignore les echecs individuels.
                         }
                     })
                 );
