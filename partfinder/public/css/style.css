@@ -1202,7 +1202,10 @@ textarea:focus {
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
     z-index: 1000;
-    display: flex;
+    /* Assistant Pieces masque pour l'instant (on verra plus tard comment l'utiliser).
+       Le code (HTML + app.js) reste en place : pour le reactiver, remettre
+       display: flex ci-dessous. */
+    display: none;
     flex-direction: column;
     transition: transform 0.3s ease;
 }
