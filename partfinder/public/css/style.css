@@ -332,16 +332,30 @@ textarea {
 
 @media (max-width: 1023px) {
     .hero-band {
-        padding: 20px 16px 16px;
+        padding: 28px 20px 24px;
     }
 
     .hero-band h2 {
-        font-size: 1.15rem;
+        font-size: 1.5rem;
+        line-height: 1.25;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        margin-bottom: 18px;
     }
 
     .hero-badges {
         flex-direction: column;
-        gap: 6px;
+        gap: 12px;
+    }
+
+    .hero-badge {
+        font-size: 0.95rem;
+    }
+
+    .hero-badge .check {
+        width: 22px;
+        height: 22px;
+        font-size: 0.8rem;
     }
 }
 
@@ -1372,52 +1386,70 @@ textarea:focus {
     /* Sidebar -> barre de navigation fixe en bas */
     .sidebar {
         position: fixed; bottom: 0; left: 0; right: 0;
-        width: 100%; height: 58px;
+        width: 100%; height: 64px;
         flex-direction: row; align-items: center;
         border-right: none; border-top: 1px solid var(--border-color);
+        box-shadow: 0 -4px 16px rgba(26, 43, 69, 0.06);
     }
     .sidebar .logo, .sidebar-footer { display: none; }
     .sidebar nav { flex-direction: row; justify-content: space-around; width: 100%; padding: 0; gap: 0; }
     .nav-item {
-        flex-direction: column; gap: 2px; padding: 6px 4px;
-        font-size: 0.68rem; text-align: center;
-        min-height: 44px; justify-content: center; flex: 1;
+        flex-direction: column; gap: 3px; padding: 8px 4px;
+        font-size: 0.72rem; font-weight: 500; text-align: center;
+        min-height: 48px; justify-content: center; flex: 1;
     }
-    .nav-item i { font-size: 1.35rem; }
+    .nav-item i { font-size: 1.5rem; }
     .nav-item .badge { position: static; right: auto; margin-left: 4px; }
 
     /* Contenu principal : place pour la bottom-nav */
-    .main-content { height: auto; padding-bottom: 58px; }
-    .topbar { position: sticky; top: 0; z-index: 20; height: 56px; padding: 0 16px; }
-    .topbar h1 { font-size: 1rem; }
+    .main-content { height: auto; padding-bottom: 64px; }
+    .topbar { position: sticky; top: 0; z-index: 20; height: 58px; padding: 0 18px; }
+    .topbar h1 { font-size: 1.1rem; font-weight: 700; }
+    .topbar .actions { gap: 6px; }
 
-    /* Pile de saisie + resultats -> pleine largeur, marges reduites */
-    .search-stack { padding: 16px 12px 32px; gap: 14px; max-width: none; }
-    .search-band { padding: 18px 16px; }
-    .results-band { padding: 18px 16px; }
+    /* Pile de saisie + resultats -> pleine largeur, respiration */
+    .search-stack { padding: 16px 14px 36px; gap: 16px; max-width: none; }
+    .search-band { padding: 22px 18px; border-radius: 14px; }
+    .results-band { padding: 20px 16px; border-radius: 14px; }
 
-    /* Onglets vehicule : icone au-dessus du libelle, tiennent sur une ligne a 375px */
-    .veh-tabs { gap: 2px; }
+    /* En-tetes de section plus lisibles */
+    .section-header { margin-bottom: 20px; }
+    .step-num { width: 32px; height: 32px; font-size: 0.95rem; }
+    .section-header h2 { font-size: 1.2rem; }
+
+    /* Libelles + champs confortables (>=16px evite le zoom auto iOS) */
+    label { font-size: 0.95rem; margin-bottom: 2px; }
+    input[type="text"], input[type="number"], select, textarea { font-size: 16px; }
+    input[type="text"], input[type="number"], select { height: 54px; }
+    .input-group { gap: 10px; margin-bottom: 18px; }
+
+    /* Onglets vehicule : plus grands, plus lisibles (icone au-dessus du libelle) */
+    .veh-tabs { gap: 4px; margin-bottom: 22px; }
     .veh-tab {
-        flex: 1; flex-direction: column; gap: 2px;
-        padding: 8px 4px; font-size: 0.72rem; text-align: center;
-        justify-content: center;
+        flex: 1; flex-direction: column; gap: 4px;
+        padding: 12px 4px; font-size: 0.82rem; font-weight: 600; text-align: center;
+        justify-content: center; min-height: 56px;
     }
-    .veh-tab i { font-size: 1.25rem; }
+    .veh-tab i { font-size: 1.5rem; }
+    .veh-tab.active { background: rgba(31, 95, 214, 0.06); border-radius: 10px 10px 0 0; }
     .cg-actions { flex-direction: column; }
-    .btn-cg { width: 100%; justify-content: center; }
+    .btn-cg { width: 100%; justify-content: center; height: 52px; font-size: 0.95rem; }
+
+    /* Boutons principaux : pleine largeur, hauts, bien visibles */
+    .btn-primary, .btn-secondary { height: 54px; font-size: 1rem; }
+    .btn-icon, .btn-scan { min-height: 44px; }
 
     /* Grilles -> 1 colonne */
     .offers-grid { grid-template-columns: 1fr; }
     .input-row { grid-template-columns: 1fr; }
 
+    /* Zone d'upload photo plus aeree */
+    .upload-area { padding: 28px 18px; }
+    .upload-area p { font-size: 0.95rem; }
+
     /* Panier -> plein ecran ; chat -> pleine largeur au-dessus de la bottom-nav */
     .cart-panel { width: 100%; }
-    .chat-widget { left: 12px; right: 12px; width: auto; bottom: 70px; }
-
-    /* Cibles tactiles + inputs >=16px (evite le zoom auto iOS) */
-    input[type="text"], input[type="number"], select, textarea { font-size: 16px; }
-    .btn-primary, .btn-secondary, .btn-icon, .btn-scan { min-height: 44px; }
+    .chat-widget { left: 12px; right: 12px; width: auto; bottom: 76px; }
 }
 
 /* ======================================================================
@@ -1431,11 +1463,21 @@ textarea:focus {
         z-index: 200; border-left: none;
     }
 
-    /* En-tete resultat + tuiles compacts */
-    .part-info-card { padding: 16px; margin-bottom: 20px; }
+    /* En-tete resultat */
+    .part-info-card { padding: 18px; margin-bottom: 20px; }
     .part-header { flex-wrap: wrap; gap: 10px; }
-    .offers-header { margin-bottom: 16px; }
-    .offer-img { height: 190px; }
+    .part-titles h2 { font-size: 1.3rem; }
+    .offers-header { margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
+    .offers-header h3 { font-size: 1.15rem; }
+    .filters select { height: 44px; font-size: 0.95rem; }
+
+    /* Tuiles d'offres plus lisibles */
+    .offer-img { height: 200px; }
+    .offer-title { font-size: 1.05rem; }
+    .offer-desc { font-size: 0.9rem; }
+    .offer-price { font-size: 1.7rem; }
+    .btn-add { width: 44px; height: 44px; }
+    .offer-link { font-size: 0.9rem; }
 
     /* Actions formulaire : bouton principal bien visible */
     .form-actions { gap: 12px; }
