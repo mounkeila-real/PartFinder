@@ -345,26 +345,135 @@ textarea {
     }
 }
 
-/* Layout for Search & Results */
-.search-layout {
-    display: flex;
+/* ======================================================================
+   Layout empilé façon bpart : bandes de saisie en haut, résultats en bas
+   (le conteneur scrolle verticalement ; plus de colonnes gauche/droite)
+   ====================================================================== */
+.search-stack {
     flex: 1;
-    overflow: hidden;
-}
-
-/* Search Form Panel */
-.search-panel {
-    width: 450px;
-    background-color: var(--bg-surface);
-    border-right: 1px solid var(--border-color);
     overflow-y: auto;
-    padding: 32px;
+    padding: 24px 32px 40px;
+    background-color: var(--bg-dark);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+    max-width: 1080px;
+    margin: 0 auto;
 }
 
 .adaptive-form {
     display: flex;
     flex-direction: column;
-    gap: 32px;
+    gap: 20px;
+}
+
+/* Une bande de saisie (véhicule, pièce) = carte blanche */
+.search-band {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Bande résultats (en bas, pleine largeur) */
+.results-band {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Onglets d'identification véhicule (VIN / Carte grise / Modèle) */
+.veh-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 20px;
+}
+
+.veh-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 0.9rem;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+    min-height: 44px;
+}
+
+.veh-tab i {
+    font-size: 1.15rem;
+}
+
+.veh-tab:hover:not(.active) {
+    color: var(--text-primary);
+}
+
+.veh-tab.active {
+    color: var(--accent-electric);
+    border-bottom-color: var(--accent-electric);
+    font-weight: 600;
+}
+
+/* Boutons d'import carte grise */
+.cg-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.btn-cg {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 18px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    background: var(--overlay-soft);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.btn-cg:hover {
+    border-color: var(--accent-electric);
+    color: var(--accent-electric);
+    background: rgba(31, 95, 214, 0.06);
+}
+
+.btn-cg i {
+    font-size: 1.2rem;
+}
+
+.cg-hint {
+    margin-top: 10px;
+    font-size: 0.82rem;
+    color: var(--text-tertiary);
+}
+
+/* Ligne de retour VIN/OCR + bouton fiche véhicule (partagée entre onglets) */
+.veh-feedback-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.veh-feedback-row .field-feedback {
+    margin-top: 0;
 }
 
 .form-section {
@@ -631,17 +740,10 @@ textarea:focus {
     background: var(--overlay-soft);
 }
 
-/* Results Panel */
-.results-panel {
-    flex: 1;
-    padding: 32px;
-    overflow-y: auto;
-    background: var(--bg-dark);
-    position: relative;
-}
-
+/* Results (bande en bas) */
 .empty-state {
-    height: 100%;
+    flex: 1;
+    min-height: 200px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -691,7 +793,8 @@ textarea:focus {
 
 /* Loading State */
 .loading-state {
-    height: 100%;
+    flex: 1;
+    min-height: 200px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1259,13 +1362,21 @@ textarea:focus {
     .topbar { position: sticky; top: 0; z-index: 20; height: 56px; padding: 0 16px; }
     .topbar h1 { font-size: 1rem; }
 
-    /* Colonnes recherche + resultats -> empilees pleine largeur */
-    .search-layout { flex-direction: column; overflow: visible; }
-    .search-panel {
-        width: 100%; border-right: none;
-        border-bottom: 1px solid var(--border-color); padding: 20px 16px;
+    /* Pile de saisie + resultats -> pleine largeur, marges reduites */
+    .search-stack { padding: 16px 12px 32px; gap: 14px; max-width: none; }
+    .search-band { padding: 18px 16px; }
+    .results-band { padding: 18px 16px; }
+
+    /* Onglets vehicule : icone au-dessus du libelle, tiennent sur une ligne a 375px */
+    .veh-tabs { gap: 2px; }
+    .veh-tab {
+        flex: 1; flex-direction: column; gap: 2px;
+        padding: 8px 4px; font-size: 0.72rem; text-align: center;
+        justify-content: center;
     }
-    .results-panel { width: 100%; padding: 20px 16px; }
+    .veh-tab i { font-size: 1.25rem; }
+    .cg-actions { flex-direction: column; }
+    .btn-cg { width: 100%; justify-content: center; }
 
     /* Grilles -> 1 colonne */
     .offers-grid { grid-template-columns: 1fr; }

@@ -69,42 +69,59 @@
                 </div>
             </div>
 
-            <div class="search-layout">
-                <!-- Search Form Column -->
-                <div class="search-panel">
-                    <form id="search-form" class="adaptive-form">
+            <div class="search-stack">
+                <form id="search-form" class="adaptive-form">
 
-                        <!-- Section 1: Vehicle Identification -->
-                        <section class="form-section" id="section-vehicle">
-                            <div class="section-header">
-                                <span class="step-num">1</span>
-                                <h2>Identification Véhicule</h2>
-                            </div>
+                    <!-- ═══ BANDE 1 : Identification Véhicule (onglets VIN / Carte grise / Modèle) ═══ -->
+                    <section class="search-band form-section" id="section-vehicle">
+                        <div class="section-header">
+                            <span class="step-num">1</span>
+                            <h2>Identification Véhicule</h2>
+                        </div>
 
+                        <div class="veh-tabs" role="tablist">
+                            <button type="button" class="veh-tab active" data-veh-tab="vin">
+                                <i class="ph ph-barcode"></i> VIN
+                            </button>
+                            <button type="button" class="veh-tab" data-veh-tab="cg">
+                                <i class="ph ph-identification-card"></i> Carte grise
+                            </button>
+                            <button type="button" class="veh-tab" data-veh-tab="model">
+                                <i class="ph ph-car-profile"></i> Modèle
+                            </button>
+                        </div>
+
+                        <!-- Onglet VIN -->
+                        <div class="veh-panel" data-veh-panel="vin">
                             <div class="input-group">
                                 <label for="vin">N° de Châssis (VIN)</label>
                                 <div class="input-wrapper">
                                     <i class="ph ph-barcode"></i>
                                     <input type="text" id="vin" placeholder="Ex: VF1XXXXXXXXXXXXXX" maxlength="17">
-                                    <button type="button" class="btn-scan" id="btn-scan-cg" title="Importer une carte grise">
-                                        <i class="ph ph-image"></i>
-                                    </button>
-                                    <button type="button" class="btn-scan" id="btn-scan-camera" title="Prendre une photo">
-                                        <i class="ph ph-camera"></i>
-                                    </button>
-                                    <input type="file" id="cg-image" accept="image/*" class="display-none">
-                                    <input type="file" id="cg-camera" accept="image/*" capture="environment" class="display-none">
-                                </div>
-                                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; width: 100%;">
-                                    <div class="field-feedback" id="vin-feedback" style="margin-top: 4px;"></div>
-                                    <button type="button" class="btn-more-info display-none" id="btn-more-info">
-                                        <i class="ph ph-info"></i> Plus d'infos
-                                    </button>
                                 </div>
                             </div>
+                        </div>
 
-                            <div class="divider-text"><span>OU MANUELLEMENT</span></div>
+                        <!-- Onglet Carte grise -->
+                        <div class="veh-panel display-none" data-veh-panel="cg">
+                            <div class="input-group">
+                                <label>Photo de la carte grise</label>
+                                <div class="cg-actions">
+                                    <button type="button" class="btn-cg" id="btn-scan-cg">
+                                        <i class="ph ph-image"></i> Importer une image
+                                    </button>
+                                    <button type="button" class="btn-cg" id="btn-scan-camera">
+                                        <i class="ph ph-camera"></i> Prendre une photo
+                                    </button>
+                                </div>
+                                <input type="file" id="cg-image" accept="image/*" class="display-none">
+                                <input type="file" id="cg-camera" accept="image/*" capture="environment" class="display-none">
+                                <p class="cg-hint">Le VIN (champ E) est extrait automatiquement puis décodé.</p>
+                            </div>
+                        </div>
 
+                        <!-- Onglet Modèle (saisie manuelle) -->
+                        <div class="veh-panel display-none" data-veh-panel="model">
                             <div class="manual-vehicle" id="manual-vehicle-fields">
                                 <div class="input-row">
                                     <div class="input-group">
@@ -140,45 +157,53 @@
                                     </div>
                                 </div>
                             </div>
-                        </section>
+                        </div>
 
-                        <!-- Section 2: Part Identification -->
-                        <section class="form-section" id="section-part">
-                            <div class="section-header">
-                                <span class="step-num">2</span>
-                                <h2>Identification Pièce</h2>
+                        <!-- Retour VIN/OCR + fiche véhicule (partagé, visible sur tous les onglets) -->
+                        <div class="veh-feedback-row">
+                            <div class="field-feedback" id="vin-feedback"></div>
+                            <button type="button" class="btn-more-info display-none" id="btn-more-info">
+                                <i class="ph ph-info"></i> Plus d'infos
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- ═══ BANDE 2 : Identification Pièce ═══ -->
+                    <section class="search-band form-section" id="section-part">
+                        <div class="section-header">
+                            <span class="step-num">2</span>
+                            <h2>Identification Pièce</h2>
+                        </div>
+
+                        <div class="input-group primary-input">
+                            <label for="part-number">Référence Constructeur (OEM / IAM)</label>
+                            <div class="input-wrapper">
+                                <i class="ph ph-hash"></i>
+                                <input type="text" id="part-number" placeholder="Ex: 7701477023 ou 0986424794">
                             </div>
+                        </div>
 
-                            <div class="input-group primary-input">
-                                <label for="part-number">Référence Constructeur (OEM / IAM)</label>
-                                <div class="input-wrapper">
-                                    <i class="ph ph-hash"></i>
-                                    <input type="text" id="part-number" placeholder="Ex: 7701477023 ou 0986424794">
-                                </div>
+                        <div class="divider-text"><span>OU</span></div>
+
+                        <div class="input-group file-upload-group" id="part-photo-group">
+                            <label>Photo de la pièce (Recherche IA)</label>
+                            <div class="upload-area" id="drop-zone">
+                                <i class="ph ph-upload-simple"></i>
+                                <p>Glissez une image ici ou <span>cliquez pour parcourir</span></p>
+                                <input type="file" id="part-image" accept="image/*" hidden>
                             </div>
-
-                            <div class="divider-text"><span>OU</span></div>
-
-                            <div class="input-group file-upload-group" id="part-photo-group">
-                                <label>Photo de la pièce (Recherche IA)</label>
-                                <div class="upload-area" id="drop-zone">
-                                    <i class="ph ph-upload-simple"></i>
-                                    <p>Glissez une image ici ou <span>cliquez pour parcourir</span></p>
-                                    <input type="file" id="part-image" accept="image/*" hidden>
-                                </div>
-                                <div class="file-preview display-none" id="file-preview">
-                                    <img src="" alt="Preview" id="preview-img">
-                                    <button type="button" class="btn-remove-img" id="btn-remove-img"><i
-                                            class="ph ph-x"></i></button>
-                                </div>
+                            <div class="file-preview display-none" id="file-preview">
+                                <img src="" alt="Preview" id="preview-img">
+                                <button type="button" class="btn-remove-img" id="btn-remove-img"><i
+                                        class="ph ph-x"></i></button>
                             </div>
+                        </div>
 
-                            <div class="input-group">
-                                <label for="part-desc">Description (si pas de réf/photo)</label>
-                                <textarea id="part-desc" rows="2"
-                                    placeholder="Ex: Plaquettes de frein avant pour Clio 4 1.5 dCi"></textarea>
-                            </div>
-                        </section>
+                        <div class="input-group">
+                            <label for="part-desc">Description (si pas de réf/photo)</label>
+                            <textarea id="part-desc" rows="2"
+                                placeholder="Ex: Plaquettes de frein avant pour Clio 4 1.5 dCi"></textarea>
+                        </div>
 
                         <div class="form-actions">
                             <button type="button" class="btn-secondary" id="btn-reset">Réinitialiser</button>
@@ -187,17 +212,17 @@
                                 Rechercher
                             </button>
                         </div>
-                    </form>
-                </div>
+                    </section>
+                </form>
 
-                <!-- Results Column -->
-                <div class="results-panel">
+                <!-- ═══ RÉSULTATS (en bas, pleine largeur) ═══ -->
+                <section class="results-band">
                     <div class="empty-state" id="empty-state">
                         <div class="pulsing-circle">
                             <i class="ph ph-engine"></i>
                         </div>
                         <h3>Prêt à chercher</h3>
-                        <p>Renseignez les infos à gauche. Le système s'adaptera automatiquement à ce que vous saisissez.
+                        <p>Renseignez le véhicule et la pièce ci-dessus. Le système s'adaptera automatiquement à ce que vous saisissez.
                         </p>
                     </div>
 
@@ -243,7 +268,7 @@
                             <!-- Offers will be injected here by JS -->
                         </div>
                     </div>
-                </div>
+                </section>
             </div>
         </main>
 
@@ -296,6 +321,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/ui-tabs.js"></script>
 </body>
 
 </html>
