@@ -131,6 +131,19 @@ document.addEventListener('DOMContentLoaded', () => {
         setPartSectionEnabled(isVehicleDescribed());
     }
 
+    // Une fois le vehicule identifie : amener l'utilisateur sur la recherche de piece.
+    // Ne se declenche qu'une fois par identification (remis a zero au reset).
+    let vehicleFocusDone = false;
+    function focusPartSection() {
+        if (vehicleFocusDone) return;
+        vehicleFocusDone = true;
+        const band = document.getElementById('section-part');
+        if (band) band.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(function () {
+            if (partDescInput && !partDescInput.disabled) partDescInput.focus();
+        }, 450);
+    }
+
     async function syncManualFields(data) {
         if (data.make) {
             makeSelect.value = data.make;
@@ -378,6 +391,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         // On n'ouvre plus automatiquement : on signale juste le bouton par une animation.
                         btnMoreInfo.classList.remove('display-none');
                         btnMoreInfo.classList.add('pulse');
+
+                        // Vehicule identifie -> focus sur la recherche de piece
+                        focusPartSection();
                     } else {
                         throw new Error('No useful data returned');
                     }
@@ -523,7 +539,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    modelInput.addEventListener('change', handleManualInput);
+    modelInput.addEventListener('change', () => {
+        handleManualInput();
+        if (modelInput.value) focusPartSection(); // modele choisi -> focus recherche piece
+    });
     yearInput.addEventListener('input', handleManualInput);
     engineInput.addEventListener('input', handleManualInput);
     platformInput.addEventListener('input', handleManualInput);
@@ -533,13 +552,12 @@ document.addEventListener('DOMContentLoaded', () => {
     partNumberInput.addEventListener('input', (e) => {
         if (e.target.value.length > 0) {
             document.getElementById('part-photo-group').style.opacity = '0.3';
-            partDescInput.style.opacity = '0.3';
             state.part.method = 'number';
         } else {
             document.getElementById('part-photo-group').style.opacity = '1';
-            partDescInput.style.opacity = '1';
             state.part.method = null;
         }
+        // La description reste toujours modifiable (champ principal).
     });
 
     // Photo Upload (Drag & Drop)
@@ -576,19 +594,54 @@ document.addEventListener('DOMContentLoaded', () => {
                 dropZone.classList.add('display-none');
                 filePreview.classList.remove('display-none');
 
-                // Adaptive logic
-                partNumberInput.style.opacity = '0.3';
-                partDescInput.style.opacity = '0.3';
                 state.part.method = 'photo';
                 state.part.hasPhoto = true;
 
-                // Simulate AI Assistant pop opening automatically
-                setTimeout(() => {
-                    chatWidget.classList.remove('collapsed');
-                    addChatMessage('ai', "J'analyse votre photo... Je vois ce qui ressemble à des plaquettes de frein. Avez-vous une référence inscrite au dos ?");
-                }, 800);
+                // La description reste modifiable : l'IA va y consolider desc + ref.
+                partDescInput.style.opacity = '1';
+                identifyPartFromPhoto(file);
             }
             reader.readAsDataURL(file);
+        }
+    }
+
+    // Envoie la photo a l'IA (Gemini via server.js) avec le contexte vehicule,
+    // et remplit le champ Description (modifiable) avec la piece identifiee + sa reference.
+    async function identifyPartFromPhoto(file) {
+        const prevPlaceholder = partDescInput.placeholder;
+        partDescInput.placeholder = '⏳ Identification de la pièce par IA...';
+        try {
+            const fd = new FormData();
+            fd.append('image', file);
+            // Contexte vehicule -> l'IA identifie la piece pour CE modele
+            fd.append('make', (state.vehicle.data.make || makeSelect.value || '').trim());
+            fd.append('model', (state.vehicle.data.model || modelInput.value || '').trim());
+            fd.append('year', (state.vehicle.data.year || yearInput.value || '').toString().trim());
+            fd.append('engine', (state.vehicle.data.engine || engineInput.value || '').trim());
+
+            // Endpoint servi par le serveur frontend (meme origine), pas le backend.
+            const resp = await fetch('/api/identify-part', { method: 'POST', body: fd });
+            if (!resp.ok) throw new Error('identify failed (' + resp.status + ')');
+            const data = await resp.json();
+
+            const desc = (data && data.description ? String(data.description) : '').trim();
+            const oem = (data && data.oem ? String(data.oem) : '').trim();
+
+            if (desc || oem) {
+                let combined = desc;
+                if (oem && oem.toLowerCase() !== 'null') {
+                    combined += (combined ? ' — ' : '') + 'Réf: ' + oem;
+                    if (!partNumberInput.value.trim()) partNumberInput.value = oem;
+                }
+                partDescInput.value = combined;
+                state.part.number = oem || null;
+                refreshPartLock();
+            }
+            partDescInput.placeholder = prevPlaceholder;
+        } catch (err) {
+            console.error('identify-part:', err);
+            // Echec gracieux : la description reste editable, l'utilisateur complete a la main.
+            partDescInput.placeholder = prevPlaceholder;
         }
     }
 
@@ -1081,6 +1134,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Revenir a l'onglet VIN (etat de depart)
         var vinTab = document.querySelector('.veh-tab[data-veh-tab="vin"]');
         if (vinTab) vinTab.click();
+
+        // Reautoriser le focus auto vers la piece a la prochaine identification
+        vehicleFocusDone = false;
 
         // Remonter en haut de la page (conteneur scrollable + fenetre pour le mobile)
         var stack = document.querySelector('.search-stack');

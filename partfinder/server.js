@@ -67,6 +67,50 @@ app.post('/api/extract-carte-grise', upload.single('image'), async (req, res) =>
     }
 });
 
+// Identification d'une piece a partir d'une photo (Gemini Vision), en tenant
+// compte du vehicule identifie pour ne pas proposer une piece incompatible.
+app.post('/api/identify-part', upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: "No image provided" });
+        if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: "API Key missing" });
+
+        const { make, model, year, engine } = req.body || {};
+        const vehicleLine = [make, model, year, engine].filter(Boolean).join(' ') || 'non precise';
+
+        const aiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        const prompt = `Tu es un expert en pieces detachees automobiles.
+Voici la photo d'une piece auto. Le vehicule concerne est : ${vehicleLine}.
+Identifie la piece EN TENANT COMPTE de ce vehicule (ne propose pas une piece incompatible avec ce modele).
+Reponds UNIQUEMENT au format JSON strict, sans aucun texte avant ou apres :
+{
+  "description": "description courte et precise (type de piece + position + vehicule si pertinent)",
+  "oem": "reference constructeur OEM si lisible sur la piece, sinon null",
+  "category": "categorie (ex: freinage, filtration, distribution, suspension...)"
+}
+Si la piece est illisible ou non identifiable, mets "description" a null.`;
+
+        const image = {
+            inlineData: {
+                data: req.file.buffer.toString("base64"),
+                mimeType: req.file.mimetype
+            }
+        };
+
+        const result = await aiModel.generateContent([prompt, image]);
+        const responseText = result.response.text();
+
+        const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) || responseText.match(/({[\s\S]*})/);
+        const jsonString = jsonMatch ? jsonMatch[1] : responseText;
+
+        const data = JSON.parse(jsonString);
+        res.json(data);
+    } catch (error) {
+        console.error("Error identify-part:", error);
+        res.status(500).json({ error: "Erreur lors de l'identification de la piece." });
+    }
+});
+
 app.post('/api/chat', async (req, res) => {
     try {
         const { text, context } = req.body;
