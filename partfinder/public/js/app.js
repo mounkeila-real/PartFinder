@@ -374,9 +374,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         vinInput.disabled = true;
                         vinInput.style.opacity = '0.5';
 
-                        // Toujours proposer la fiche (specs Vincario si dispo, sinon infos de base)
+                        // Proposer la fiche (specs Vincario si dispo, sinon infos de base)
+                        // On n'ouvre plus automatiquement : on signale juste le bouton par une animation.
                         btnMoreInfo.classList.remove('display-none');
-                        setTimeout(() => btnMoreInfo.click(), 150); // Ouvre auto la fiche
+                        btnMoreInfo.classList.add('pulse');
                     } else {
                         throw new Error('No useful data returned');
                     }
@@ -1075,6 +1076,16 @@ document.addEventListener('DOMContentLoaded', () => {
         form.reset();
         vinFeedback.style.display = 'none';
         btnMoreInfo.classList.add('display-none');
+        btnMoreInfo.classList.remove('pulse');
+
+        // Revenir a l'onglet VIN (etat de depart)
+        var vinTab = document.querySelector('.veh-tab[data-veh-tab="vin"]');
+        if (vinTab) vinTab.click();
+
+        // Remonter en haut de la page (conteneur scrollable + fenetre pour le mobile)
+        var stack = document.querySelector('.search-stack');
+        if (stack) stack.scrollTo({ top: 0, behavior: 'smooth' });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
 
         // Reset manual fields UI
         makeSelect.disabled = false;
@@ -1105,7 +1116,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Plus d'infos btn (Detailed specs window)
     btnMoreInfo.addEventListener('click', () => {
-        
+        btnMoreInfo.classList.remove('pulse'); // l'utilisateur a vu la fiche : on stoppe le signal
+
         const d = state.vehicle.data || {};
         const specs = state.vehicle.specifications || {
             'Marque': d.make || '—',

@@ -1332,6 +1332,32 @@ textarea:focus {
     box-shadow: var(--shadow-glow);
 }
 
+/* Signal d'attention quand la fiche vehicule devient disponible
+   (elle ne s'ouvre plus automatiquement — on invite au clic). */
+.btn-more-info.pulse {
+    animation: moreInfoPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes moreInfoPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(31, 95, 214, 0.45);
+        transform: scale(1);
+    }
+    60% {
+        box-shadow: 0 0 0 10px rgba(31, 95, 214, 0);
+        transform: scale(1.04);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(31, 95, 214, 0);
+        transform: scale(1);
+    }
+}
+
+/* Respect des preferences de mouvement reduit */
+@media (prefers-reduced-motion: reduce) {
+    .btn-more-info.pulse { animation: none; }
+}
+
 /* ======================================================================
    RESPONSIVE MOBILE-FIRST (<= 1023px) — Etape 1 : shell + layout
    Le desktop (>=1024px) reste inchange ; on adapte uniquement le mobile.
