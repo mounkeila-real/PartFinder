@@ -1055,6 +1055,29 @@ textarea:focus {
     border-radius: 4px;
 }
 
+/* Étiquette source (eBay / AliExpress) — info discrète, même carte */
+.offer-source {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    color: #fff;
+    background: rgba(26, 43, 69, 0.78);
+    backdrop-filter: blur(4px);
+}
+
+.offer-source.src-aliexpress {
+    background: rgba(226, 107, 29, 0.92); /* orange AliExpress-like, cohérent avec l'accent */
+}
+
+.offer-source.src-ebay {
+    background: rgba(31, 95, 214, 0.92); /* bleu acier */
+}
+
 .offer-footer {
     display: flex;
     justify-content: space-between;

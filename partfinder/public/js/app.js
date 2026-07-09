@@ -805,6 +805,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     condition: isUsed ? 'used' : 'new',
                     description: item.fullDescription || item.shortDescription || '',
                     url: item.itemWebUrl || null,
+                    source: item.source || 'ebay',
                     isMock: !!item.isMock
                 };
             });
@@ -890,12 +891,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const descHtml = shortDesc ? `<p class="offer-desc">${shortDesc}</p>` : '';
             const linkHtml = `<button type="button" class="offer-link" data-detail="${item.id}">Voir la fiche</button>`;
             const mockBadge = item.isMock ? '<span class="offer-mock" title="Résultat de démonstration">DÉMO</span>' : '';
+            const sourceLabel = item.source === 'aliexpress' ? 'AliExpress' : 'eBay';
+            const sourceBadge = `<span class="offer-source src-${item.source || 'ebay'}">${sourceLabel}</span>`;
 
             const card = document.createElement('div');
             card.className = 'offer-card';
             card.innerHTML = `
                 <div class="offer-img">
                     <span class="offer-condition cond-${item.condition}">${item.condition === 'new' ? 'Neuf' : 'Occasion'}</span>
+                    ${sourceBadge}
                     ${mockBadge}
                     <img src="${item.img}" alt="${item.name}" referrerpolicy="no-referrer" onerror="this.src='${'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&q=80&w=400'}'">
                 </div>

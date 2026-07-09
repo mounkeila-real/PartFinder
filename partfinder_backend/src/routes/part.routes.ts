@@ -1,5 +1,6 @@
 import express from 'express';
 import { EbayService } from '../services/ebay.service';
+import { AliexpressService } from '../services/aliexpress.service';
 import { PartAiService, VehicleContext, PartRequest } from '../services/part_ai.service';
 
 const router = express.Router();
@@ -103,6 +104,11 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
             .map(c => (c || '').trim())
             .filter(c => c.length > 0 && !seen.has(c.toLowerCase()) && !!seen.add(c.toLowerCase()));
 
+        // Requête AliExpress : la plus parlante (nom pièce + véhicule), lancée EN PARALLÈLE
+        // de la cascade eBay pour ne pas ralentir. Renvoie [] si non configuré / échec.
+        const aeQuery = [pn, vehicle.make, vehicle.model].filter(Boolean).join(' ') || request.oem || part.ebayQuery || '';
+        const aliexpressPromise = AliexpressService.searchProducts(aeQuery, limit || 20);
+
         let rawResults: any[] = [];
         let usedQuery = part.ebayQuery;
         for (const q of candidates) {
@@ -114,22 +120,35 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
             }
         }
 
-        // Ajoute le prix final (avec marge) tout en gardant le prix source.
-        const results = rawResults.map((r) => ({
+        const aliexpressResults = await aliexpressPromise;
+
+        // Applique la marge (prix final) en gardant le prix source, et tague la source.
+        const withMargin = (r: any, source: string) => ({
             ...r,
+            source,
             sourcePrice: r.price,
             finalPrice: r.price != null ? Math.round(r.price * MARGIN_MULTIPLIER * 100) / 100 : null,
-        }));
+        });
+
+        // Résultats fusionnés : eBay puis AliExpress, dans une seule liste homogène.
+        const results = [
+            ...rawResults.map((r) => withMargin(r, 'ebay')),
+            ...aliexpressResults.map((r) => withMargin(r, 'aliexpress')),
+        ];
 
         res.json({
             part,
             usedQuery,
+            aliexpressQuery: aeQuery,
             triedQueries: candidates,
             aiConfigured: PartAiService.isConfigured(),
             env: EbayService.currentEnv(),
             ebayConfigured: EbayService.isConfigured(),
+            aliexpressConfigured: AliexpressService.isConfigured(),
             marginMultiplier: MARGIN_MULTIPLIER,
             count: results.length,
+            countEbay: rawResults.length,
+            countAliexpress: aliexpressResults.length,
             results,
         });
     } catch (error: any) {
