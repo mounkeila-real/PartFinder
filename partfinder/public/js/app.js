@@ -499,6 +499,59 @@ document.addEventListener('DOMContentLoaded', () => {
     initMakes();
     refreshPartLock(); // section piece verrouillee au demarrage
 
+    // --- Autocompletion Marque (remplace le datalist natif, illisible sur Android) ---
+    (function setupMakeAutocomplete() {
+        const group = makeSelect.parentElement;
+        if (!group) return;
+        group.style.position = 'relative';
+
+        const list = document.createElement('div');
+        list.className = 'make-ac hidden';
+        list.id = 'make-ac';
+        group.appendChild(list);
+
+        const labelOf = m => (typeof m === 'object' ? (m.make || m.name) : m) || '';
+        const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        function hide() { list.classList.add('hidden'); list.innerHTML = ''; }
+
+        function choose(val) {
+            makeSelect.value = val;
+            hide();
+            // Reutilise toute la logique existante (chargement des modeles, etc.)
+            makeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        function render(q) {
+            const ql = (q || '').trim().toLowerCase();
+            if (!ql) { hide(); return; }
+            const all = (cachedMakes || []).map(labelOf).filter(Boolean);
+            const starts = [], incl = [];
+            for (const name of all) {
+                const nl = name.toLowerCase();
+                if (nl.startsWith(ql)) starts.push(name);
+                else if (nl.includes(ql)) incl.push(name);
+            }
+            const matches = starts.concat(incl).slice(0, 30);
+            if (!matches.length) {
+                list.innerHTML = '<div class="make-ac-empty">Aucune marque — saisie libre acceptée</div>';
+                list.classList.remove('hidden');
+                return;
+            }
+            list.innerHTML = matches.map(n => `<div class="make-ac-item" role="option">${esc(n)}</div>`).join('');
+            list.classList.remove('hidden');
+        }
+
+        makeSelect.addEventListener('input', () => render(makeSelect.value));
+        makeSelect.addEventListener('focus', () => { if (makeSelect.value) render(makeSelect.value); });
+        // mousedown (avant le blur de l'input) pour que la selection soit prise en compte
+        list.addEventListener('mousedown', (e) => {
+            const item = e.target.closest('.make-ac-item');
+            if (item) { e.preventDefault(); choose(item.textContent); }
+        });
+        makeSelect.addEventListener('blur', () => setTimeout(hide, 150));
+    })();
+
     // Champs vehicule editables par defaut (mode manuel). Le decodage VIN les reverrouille.
     setManualFieldsDisabled(false);
     modelInput.disabled = true; // le modele se charge apres selection d'une marque

@@ -1311,6 +1311,55 @@ textarea:focus {
     background: var(--accent-electric-hover);
 }
 
+/* Autocompletion Marque maison (remplace le datalist natif illisible sur Android) */
+.make-ac {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    z-index: 60;
+    margin-top: 4px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    max-height: 300px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.make-ac.hidden {
+    display: none;
+}
+
+.make-ac-item {
+    padding: 13px 16px;
+    font-size: 1rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.make-ac-item:last-child {
+    border-bottom: none;
+}
+
+.make-ac-item:hover,
+.make-ac-item.active {
+    background: rgba(31, 95, 214, 0.08);
+}
+
+.make-ac-empty {
+    padding: 13px 16px;
+    font-size: 0.9rem;
+    color: var(--text-tertiary);
+}
+
+@media (max-width: 1023px) {
+    .make-ac-item { padding: 16px; font-size: 1.05rem; }
+    .make-ac { max-height: 50vh; }
+}
+
 /* Field Feedback */
 .field-feedback {
     font-size: 0.8rem;
