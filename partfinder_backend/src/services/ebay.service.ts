@@ -141,27 +141,27 @@ export class EbayService {
             const summaries = response.data?.itemSummaries || [];
             let results: NormalizedPart[] = summaries.map((s: any) => this.normalizeSummary(s));
 
-            // Enrichissement via getItem :
-            //  - IMAGE pour TOUS les resultats qui n'en ont pas (la recherche eBay ne renvoie pas
-            //    toujours l'image ; getItem la fournit de facon fiable).
-            //  - DESCRIPTION complete pour les N premiers.
-            if (results.length > 0) {
-                const n = withDescriptions ? Math.min(descriptionCount, results.length) : 0;
+            // Enrichissement via getItem — VOLONTAIREMENT limite aux N premiers seulement,
+            // pour maitriser la consommation du quota eBay (1 getItem = 1 appel).
+            //  - L'image vient deja de la recherche (image / thumbnailImages, cf. normalizeSummary) ;
+            //    on n'appelle donc PLUS getItem juste pour une image. Les rares annonces sans
+            //    miniature afficheront une image de repli cote frontend, et l'image reelle se
+            //    charge a la demande au clic (route /parts/item -> getItem unitaire).
+            //  - On recupere la description complete uniquement pour les N premiers (apercu).
+            if (results.length > 0 && withDescriptions) {
+                const n = Math.min(descriptionCount, results.length);
                 await Promise.all(
-                    results.map(async (part, idx) => {
-                        const needImage = !part.image;
-                        const needDesc = idx < n;
-                        if (!needImage && !needDesc) return;
+                    results.slice(0, n).map(async (part) => {
                         try {
                             const detail = await this.getItem(part.itemId, token, marketplaceId);
                             if (detail) {
-                                if (needImage) {
+                                part.fullDescription = detail.description || part.shortDescription;
+                                if (!part.image) {
                                     part.image = detail.image?.imageUrl
                                         || detail.additionalImages?.[0]?.imageUrl
                                         || part.image;
                                     if (!part.thumbnail) part.thumbnail = part.image;
                                 }
-                                if (needDesc) part.fullDescription = detail.description || part.shortDescription;
                             }
                         } catch {
                             // Enrichissement optionnel : on ignore les echecs individuels.

@@ -717,7 +717,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${API_BASE_URL}/parts/find`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ vehicle: vehicleCtx, request: partRequest, limit: 8 })
+                body: JSON.stringify({ vehicle: vehicleCtx, request: partRequest, limit: 50 })
             });
 
             if (!response.ok) throw new Error('Search failed');
@@ -771,6 +771,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  `;
 
             window.currentSearchResults = resultsToRender;
+            if (sortSelect) sortSelect.value = 'relevance'; // nouvelle recherche -> ordre eBay
 
             if (resultsToRender.length === 0) {
                 resultsContent.classList.remove('display-none');
@@ -801,6 +802,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Results Rendering ---
     const MARGIN_MULTIPLIER = 1.33; // 33% markup
+
+    // Prix affiche d'une offre (sert au tri) — meme calcul que renderResults.
+    function offerPrice(item) {
+        return item.finalPrice != null ? item.finalPrice : (item.sourcePrice || 0) * MARGIN_MULTIPLIER;
+    }
+
+    // Tri cote client (aucun appel eBay) : reordonne les resultats deja recus.
+    const sortSelect = document.getElementById('sort-select');
+    if (sortSelect) {
+        sortSelect.addEventListener('change', () => {
+            const arr = (window.currentSearchResults || []).slice();
+            switch (sortSelect.value) {
+                case 'price-asc':  arr.sort((a, b) => offerPrice(a) - offerPrice(b)); break;
+                case 'price-desc': arr.sort((a, b) => offerPrice(b) - offerPrice(a)); break;
+                case 'cond-new':   arr.sort((a, b) => (a.condition === 'new' ? 0 : 1) - (b.condition === 'new' ? 0 : 1)); break;
+                default: break; // 'relevance' = ordre eBay d'origine
+            }
+            renderResults(arr);
+        });
+    }
 
     function renderResults(results) {
         offersGrid.innerHTML = '';
