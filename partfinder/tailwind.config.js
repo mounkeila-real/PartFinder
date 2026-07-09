@@ -4,18 +4,19 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        bg: '#0B0F19',
-        surface: '#131A2A',
-        elevated: '#1C263B',
-        txt: '#F8FAFC',
-        'txt-2': '#94A3B8',
-        'txt-3': '#64748B',
-        electric: { DEFAULT: '#3B82F6', hover: '#2563EB' },
-        neon: '#F97316',
-        success: '#10B981',
-        warning: '#F59E0B',
-        danger: '#EF4444',
-        line: 'rgba(255,255,255,0.08)',
+        // Palette « Atelier Mécanique » — clair, bleu acier + orange sécurité
+        bg: '#EEF1F6',
+        surface: '#FFFFFF',
+        elevated: '#E7ECF3',
+        txt: '#1A2B45',
+        'txt-2': '#4C5F7A',
+        'txt-3': '#7E8EA6',
+        electric: { DEFAULT: '#1F5FD6', hover: '#174AAB' },
+        neon: '#F26B1D',
+        success: '#178A5B',
+        warning: '#DB930B',
+        danger: '#D64040',
+        line: 'rgba(26,43,69,0.12)',
       },
       fontFamily: {
         heading: ['Outfit', 'sans-serif'],
@@ -23,8 +24,8 @@ module.exports = {
       },
       borderRadius: { sm: '6px', md: '10px', lg: '16px' },
       boxShadow: {
-        glow: '0 0 15px rgba(59,130,246,0.3)',
-        card: '0 10px 15px -3px rgba(0,0,0,0.4)',
+        glow: '0 0 0 3px rgba(31,95,214,0.15)',
+        card: '0 10px 24px -6px rgba(26,43,69,0.18)',
       },
     },
   },

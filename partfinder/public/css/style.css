@@ -3,33 +3,44 @@
  */
 
 :root {
-    /* Color Palette */
-    --bg-dark: #0B0F19;
-    /* Very deep blue/black */
-    --bg-surface: #131A2A;
-    /* Surface level 1 */
-    --bg-surface-elevated: #1C263B;
-    /* Surface level 2 */
+    /* ============================================================
+       Palette « Atelier Mécanique » — clair façon bpart
+       Bleu acier (outillage pro) + orange sécurité (signalétique)
+       ============================================================ */
+    --bg-dark: #EEF1F6;
+    /* Fond page : gris-bleu atelier clair */
+    --bg-surface: #FFFFFF;
+    /* Cartes / panneaux */
+    --bg-surface-elevated: #E7ECF3;
+    /* Zones en creux / vignettes */
 
-    --text-primary: #F8FAFC;
-    --text-secondary: #94A3B8;
-    --text-tertiary: #64748B;
+    --text-primary: #1A2B45;
+    /* Bleu acier très foncé */
+    --text-secondary: #4C5F7A;
+    --text-tertiary: #7E8EA6;
 
     /* Accents */
-    --accent-electric: #3B82F6;
-    /* Energetic Blue */
-    --accent-electric-hover: #2563EB;
-    --accent-neon: #F97316;
-    /* Warning/Action Orange */
+    --accent-electric: #1F5FD6;
+    /* Bleu acier profond (bpart, version outillage) */
+    --accent-electric-hover: #174AAB;
+    --accent-neon: #F26B1D;
+    /* Orange sécurité (prix, actions, badges) */
 
     /* Semantic */
-    --success: #10B981;
-    --warning: #F59E0B;
-    --danger: #EF4444;
+    --success: #178A5B;
+    --warning: #DB930B;
+    --danger: #D64040;
 
     /* Borders & Elements */
-    --border-color: rgba(255, 255, 255, 0.08);
-    --border-highlight: rgba(255, 255, 255, 0.15);
+    --border-color: rgba(26, 43, 69, 0.12);
+    --border-highlight: rgba(26, 43, 69, 0.22);
+
+    /* Overlays neutres (remplacent les voiles blancs du thème sombre) */
+    --overlay-soft: rgba(26, 43, 69, 0.04);
+    --overlay: rgba(26, 43, 69, 0.07);
+
+    /* Hero dégradé bleu acier (façon bpart) */
+    --hero-gradient: linear-gradient(135deg, #143A78 0%, #1F5FD6 60%, #2E77E8 100%);
 
     /* Typography */
     --font-heading: 'Outfit', sans-serif;
@@ -41,10 +52,10 @@
     --radius-lg: 16px;
     --radius-round: 99px;
 
-    /* Shadows */
-    --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
-    --shadow-glow: 0 0 15px rgba(59, 130, 246, 0.3);
+    /* Shadows — adoucies pour thème clair */
+    --shadow-sm: 0 2px 6px -1px rgba(26, 43, 69, 0.10);
+    --shadow-md: 0 10px 24px -6px rgba(26, 43, 69, 0.18);
+    --shadow-glow: 0 0 0 3px rgba(31, 95, 214, 0.15);
 }
 
 /* Reset & Base */
@@ -155,12 +166,12 @@ textarea {
 
 .nav-item:hover {
     color: var(--text-primary);
-    background-color: rgba(255, 255, 255, 0.03);
+    background-color: var(--overlay-soft);
 }
 
 .nav-item.active {
     color: var(--accent-electric);
-    background-color: rgba(59, 130, 246, 0.1);
+    background-color: rgba(31, 95, 214, 0.10);
 }
 
 .nav-item .badge {
@@ -195,6 +206,7 @@ textarea {
     justify-content: center;
     font-weight: 600;
     font-size: 0.9rem;
+    color: #fff;
 }
 
 .user-info {
@@ -227,7 +239,7 @@ textarea {
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid var(--border-color);
-    background-color: rgba(11, 15, 25, 0.8);
+    background-color: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(10px);
     z-index: 10;
 }
@@ -254,6 +266,83 @@ textarea {
     color: var(--text-primary);
     border-color: var(--border-highlight);
     background: var(--bg-surface-elevated);
+}
+
+/* ======================================================================
+   HERO — bandeau dégradé bleu acier façon bpart (accroche + réassurance)
+   Purement décoratif : aucun hook JS.
+   ====================================================================== */
+.hero-band {
+    background: var(--hero-gradient);
+    padding: 28px 32px 24px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Grille de points « plan technique » en filigrane */
+.hero-band::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.14) 1px, transparent 1px);
+    background-size: 26px 26px;
+    pointer-events: none;
+}
+
+.hero-band h2 {
+    position: relative;
+    color: #fff;
+    font-size: 1.45rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-bottom: 12px;
+}
+
+.hero-band h2 .hero-accent {
+    color: #FFB380;
+}
+
+.hero-badges {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+}
+
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.hero-badge .check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.18);
+    font-size: 0.7rem;
+    flex-shrink: 0;
+}
+
+@media (max-width: 1023px) {
+    .hero-band {
+        padding: 20px 16px 16px;
+    }
+
+    .hero-band h2 {
+        font-size: 1.15rem;
+    }
+
+    .hero-badges {
+        flex-direction: column;
+        gap: 6px;
+    }
 }
 
 /* Layout for Search & Results */
@@ -299,7 +388,7 @@ textarea {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--overlay-soft);
     border: 1px solid var(--border-color);
     display: flex;
     align-items: center;
@@ -351,7 +440,7 @@ input[type="number"],
 select,
 textarea {
     width: 100%;
-    background-color: rgba(0, 0, 0, 0.2);
+    background-color: #F5F7FB;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     color: var(--text-primary);
@@ -381,7 +470,7 @@ textarea:focus {
     outline: none;
     border-color: var(--accent-electric);
     box-shadow: var(--shadow-glow);
-    background-color: rgba(0, 0, 0, 0.4);
+    background-color: #FFFFFF;
 }
 
 .btn-scan {
@@ -390,7 +479,7 @@ textarea:focus {
     width: 32px;
     height: 32px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--overlay);
     color: var(--text-secondary);
     display: flex;
     align-items: center;
@@ -439,13 +528,13 @@ textarea:focus {
     text-align: center;
     cursor: pointer;
     transition: all 0.2s ease;
-    background: rgba(0, 0, 0, 0.1);
+    background: var(--overlay-soft);
 }
 
 .upload-area:hover,
 .upload-area.dragover {
     border-color: var(--accent-electric);
-    background: rgba(59, 130, 246, 0.05);
+    background: rgba(31, 95, 214, 0.06);
 }
 
 .upload-area i {
@@ -522,13 +611,13 @@ textarea:focus {
     flex: 2;
     background: var(--accent-electric);
     color: white;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 4px 12px rgba(31, 95, 214, 0.25);
 }
 
 .btn-primary:hover {
     background: var(--accent-electric-hover);
     transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 6px 16px rgba(31, 95, 214, 0.35);
 }
 
 .btn-secondary {
@@ -539,7 +628,7 @@ textarea:focus {
 }
 
 .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--overlay-soft);
 }
 
 /* Results Panel */
@@ -565,8 +654,8 @@ textarea:focus {
     width: 80px;
     height: 80px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--overlay-soft);
+    border: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -578,15 +667,15 @@ textarea:focus {
 
 @keyframes pulse {
     0% {
-        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.05);
+        box-shadow: 0 0 0 0 rgba(31, 95, 214, 0.12);
     }
 
     70% {
-        box-shadow: 0 0 0 20px rgba(255, 255, 255, 0);
+        box-shadow: 0 0 0 20px rgba(31, 95, 214, 0);
     }
 
     100% {
-        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+        box-shadow: 0 0 0 0 rgba(31, 95, 214, 0);
     }
 }
 
@@ -612,7 +701,7 @@ textarea:focus {
 .spinner {
     width: 48px;
     height: 48px;
-    border: 3px solid rgba(59, 130, 246, 0.2);
+    border: 3px solid rgba(31, 95, 214, 0.2);
     border-top-color: var(--accent-electric);
     border-radius: 50%;
     animation: spin 1s linear infinite;
@@ -697,15 +786,15 @@ textarea:focus {
 }
 
 .tag-oem {
-    background: rgba(59, 130, 246, 0.15);
-    color: #60A5FA;
-    border: 1px solid rgba(59, 130, 246, 0.3);
+    background: rgba(31, 95, 214, 0.10);
+    color: var(--accent-electric);
+    border: 1px solid rgba(31, 95, 214, 0.30);
 }
 
 .tag-vehicle {
-    background: rgba(245, 158, 11, 0.15);
-    color: #FBBF24;
-    border: 1px solid rgba(245, 158, 11, 0.3);
+    background: rgba(242, 107, 29, 0.10);
+    color: #B44E0E;
+    border: 1px solid rgba(242, 107, 29, 0.30);
 }
 
 /* Offers Grid */
@@ -734,8 +823,8 @@ textarea:focus {
 }
 
 .offer-card {
-    background: var(--bg-surface-elevated);
-    border: 1px solid var(--border-highlight);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     overflow: hidden;
     transition: transform 0.2s, box-shadow 0.2s;
@@ -746,12 +835,12 @@ textarea:focus {
 .offer-card:hover {
     transform: translateY(-4px);
     box-shadow: var(--shadow-md);
-    border-color: rgba(255, 255, 255, 0.3);
+    border-color: var(--border-highlight);
 }
 
 .offer-img {
     height: 160px;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--bg-surface-elevated);
     position: relative;
     display: flex;
     align-items: center;
@@ -873,7 +962,7 @@ textarea:focus {
     width: 36px;
     height: 36px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--overlay);
     color: var(--text-primary);
     display: flex;
     align-items: center;
@@ -893,7 +982,7 @@ textarea:focus {
     display: flex;
     flex-direction: column;
     z-index: 90;
-    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+    box-shadow: -10px 0 30px rgba(26, 43, 69, 0.18);
 }
 
 .cart-header {
@@ -930,7 +1019,7 @@ textarea:focus {
     width: 60px;
     height: 60px;
     border-radius: var(--radius-sm);
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--bg-surface-elevated);
     overflow: hidden;
 }
 
@@ -975,7 +1064,7 @@ textarea:focus {
 .cart-footer {
     padding: 24px;
     border-top: 1px solid var(--border-color);
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--overlay-soft);
 }
 
 .cart-total {
@@ -992,7 +1081,7 @@ textarea:focus {
 .cart-total strong {
     font-size: 1.5rem;
     font-family: var(--font-heading);
-    color: white;
+    color: var(--accent-neon);
 }
 
 .cart-footer .btn-primary {
@@ -1027,7 +1116,7 @@ textarea:focus {
     gap: 12px;
     border-bottom: 1px solid var(--border-color);
     cursor: pointer;
-    background: rgba(59, 130, 246, 0.05);
+    background: rgba(31, 95, 214, 0.06);
 }
 
 .chat-header span {
@@ -1063,15 +1152,15 @@ textarea:focus {
 }
 
 .chat-msg.ai {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--bg-surface);
     border: 1px solid var(--border-color);
     align-self: flex-start;
     border-bottom-left-radius: 4px;
 }
 
 .chat-msg.user {
-    background: rgba(59, 130, 246, 0.2);
-    border: 1px solid rgba(59, 130, 246, 0.3);
+    background: var(--accent-electric);
+    border: 1px solid var(--accent-electric);
     color: white;
     align-self: flex-end;
     border-bottom-right-radius: 4px;
@@ -1122,9 +1211,9 @@ textarea:focus {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: rgba(59, 130, 246, 0.12);
+    background: rgba(31, 95, 214, 0.10);
     border: 1px solid var(--accent-electric);
-    color: var(--text-primary);
+    color: var(--accent-electric);
     padding: 6px 12px;
     font-size: 0.85rem;
     font-weight: 500;
@@ -1136,7 +1225,7 @@ textarea:focus {
 
 .btn-more-info:hover {
     background: var(--accent-electric);
-    color: var(--text-primary);
+    color: #fff;
     box-shadow: var(--shadow-glow);
 }
 
