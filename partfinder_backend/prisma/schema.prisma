@@ -29,12 +29,31 @@ model PartCatalog {
   updatedAt   DateTime @updatedAt
 }
 
+// Comptes utilisateurs (B2B — garages / professionnels)
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String
+  companyName  String                        // Raison sociale
+  contactName  String?                       // Nom du contact
+  phone        String?
+  vatNumber    String?                       // N° TVA intracom / SIRET
+  role         String   @default("CUSTOMER") // CUSTOMER | ADMIN
+  status       String   @default("ACTIVE")   // ACTIVE | SUSPENDED
+  orders       Order[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 // User purchase intents
 model Order {
   id          Int         @id @default(autoincrement())
   status      String      @default("PENDING")
   totalAmount Float
   contactInfo String?
+  userId      Int?                            // Lien vers le compte (null = commande invité / héritée)
+  user        User?       @relation(fields: [userId], references: [id])
+  shippingAddress String?                     // Adresse de livraison (Phase 2)
   items       OrderItem[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

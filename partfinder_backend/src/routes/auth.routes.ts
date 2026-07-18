@@ -1,0 +1,127 @@
+import express from 'express';
+import { PrismaClient } from '@prisma/client';
+import { AuthService } from '../services/auth.service';
+import { requireAuth, AuthedRequest } from '../middleware/auth.middleware';
+
+const router = express.Router();
+const prisma = new PrismaClient();
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Champs publics d'un utilisateur (jamais le passwordHash).
+function publicUser(u: any) {
+    return {
+        id: u.id,
+        email: u.email,
+        companyName: u.companyName,
+        contactName: u.contactName,
+        phone: u.phone,
+        vatNumber: u.vatNumber,
+        role: u.role,
+        status: u.status,
+        createdAt: u.createdAt,
+    };
+}
+
+/**
+ * POST /api/auth/register — inscription d'un compte pro (B2B).
+ * body: { email, password, companyName, contactName?, phone?, vatNumber? }
+ */
+router.post('/register', async (req: express.Request, res: express.Response) => {
+    try {
+        const { email, password, companyName, contactName, phone, vatNumber } = req.body || {};
+
+        if (!email || !EMAIL_RE.test(email)) {
+            return res.status(400).json({ error: 'Email invalide.' });
+        }
+        if (!password || String(password).length < 8) {
+            return res.status(400).json({ error: 'Le mot de passe doit faire au moins 8 caractères.' });
+        }
+        if (!companyName || !String(companyName).trim()) {
+            return res.status(400).json({ error: 'La raison sociale est obligatoire.' });
+        }
+
+        const normalizedEmail = String(email).trim().toLowerCase();
+        const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+        if (existing) {
+            return res.status(409).json({ error: 'Un compte existe déjà avec cet email.' });
+        }
+
+        const passwordHash = await AuthService.hashPassword(String(password));
+        const user = await prisma.user.create({
+            data: {
+                email: normalizedEmail,
+                passwordHash,
+                companyName: String(companyName).trim(),
+                contactName: contactName ? String(contactName).trim() : null,
+                phone: phone ? String(phone).trim() : null,
+                vatNumber: vatNumber ? String(vatNumber).trim() : null,
+            },
+        });
+
+        const token = AuthService.signToken({ userId: user.id, role: user.role });
+        res.status(201).json({ token, user: publicUser(user) });
+    } catch (error: any) {
+        console.error('[auth] register:', error.message);
+        res.status(500).json({ error: 'Erreur lors de l\'inscription.' });
+    }
+});
+
+/**
+ * POST /api/auth/login — connexion.
+ * body: { email, password }
+ */
+router.post('/login', async (req: express.Request, res: express.Response) => {
+    try {
+        const { email, password } = req.body || {};
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email et mot de passe requis.' });
+        }
+
+        const normalizedEmail = String(email).trim().toLowerCase();
+        const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+        // Message identique que l'email existe ou non (anti-enumeration).
+        if (!user) {
+            return res.status(401).json({ error: 'Email ou mot de passe incorrect.' });
+        }
+        if (user.status === 'SUSPENDED') {
+            return res.status(403).json({ error: 'Ce compte est suspendu. Contactez le support.' });
+        }
+
+        const ok = await AuthService.verifyPassword(String(password), user.passwordHash);
+        if (!ok) {
+            return res.status(401).json({ error: 'Email ou mot de passe incorrect.' });
+        }
+
+        const token = AuthService.signToken({ userId: user.id, role: user.role });
+        res.json({ token, user: publicUser(user) });
+    } catch (error: any) {
+        console.error('[auth] login:', error.message);
+        res.status(500).json({ error: 'Erreur lors de la connexion.' });
+    }
+});
+
+/**
+ * GET /api/auth/me — profil de l'utilisateur connecté.
+ */
+router.get('/me', requireAuth, async (req: AuthedRequest, res: express.Response) => {
+    try {
+        const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+        if (!user) return res.status(404).json({ error: 'Compte introuvable.' });
+        res.json({ user: publicUser(user) });
+    } catch (error: any) {
+        console.error('[auth] me:', error.message);
+        res.status(500).json({ error: 'Erreur.' });
+    }
+});
+
+/**
+ * POST /api/auth/logout — pour un JWT Bearer, la déconnexion se fait côté client
+ * (suppression du token). Endpoint fourni par convention.
+ */
+router.post('/logout', (_req: express.Request, res: express.Response) => {
+    res.json({ ok: true });
+});
+
+export default router;
