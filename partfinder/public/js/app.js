@@ -1008,6 +1008,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Cart / Order Logic ---
     function addToCart(id) {
+        // Le panier demande un compte : invité -> ouvre la connexion.
+        if (window.pfIsLoggedIn && !window.pfIsLoggedIn()) {
+            if (window.pfOpenAuth) window.pfOpenAuth('login');
+            return;
+        }
+
         const allItems = window.currentSearchResults || [];
         const item = allItems.find(r => r.id === id);
         if (!item) return;
@@ -1088,6 +1094,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // La commande demande un compte.
+        if (window.pfIsLoggedIn && !window.pfIsLoggedIn()) {
+            if (window.pfOpenAuth) window.pfOpenAuth('login');
+            return;
+        }
+
         const contact = prompt("Entrez les coordonnées du client pour cette commande :", "client@example.com");
         if (contact === null) return; // User cancelled
 
@@ -1104,7 +1116,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const response = await fetch(`${API_BASE_URL}/orders`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: Object.assign(
+                    { 'Content-Type': 'application/json' },
+                    (window.pfAuthHeader ? window.pfAuthHeader() : {})
+                ),
                 body: JSON.stringify({ contactInfo: contact, items })
             });
 

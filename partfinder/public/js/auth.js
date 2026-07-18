@@ -41,6 +41,9 @@
         function openModal(tab) { clearError(); switchTab(tab || 'login'); overlay.classList.remove('display-none'); }
         function closeModal() { overlay.classList.add('display-none'); }
 
+        // Exposé pour les autres modules (ex: panier gate l'ajout si non connecté).
+        window.pfOpenAuth = openModal;
+
         function switchTab(name) {
             tabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-auth-tab') === name));
             panels.forEach(p => p.classList.toggle('display-none', p.getAttribute('data-auth-panel') !== name));
