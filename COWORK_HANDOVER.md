@@ -107,3 +107,28 @@ Run these commands in separate terminal shells to launch the environment:
   npm run dev
   ```
   *(Launches backend api at http://localhost:3001)*
+
+---
+
+## 7. B2B Authentication & Password Reset Flow (Phase 4)
+We have implemented the forgot and reset password mechanisms for B2B users using the **Resend** transactional email API.
+
+### Technical Implementation:
+* **Prisma schema update:** Added `resetToken` and `resetTokenExpiry` to the `User` model.
+* **Email Service (`email.service.ts`):** Sends styled, professional HTML emails containing the recovery URL.
+  * *Local Debugging:* If `RESEND_API_KEY` is not defined in `.env`, the service will output the reset link directly in the console backend logs instead of crashing, allowing full local verification.
+* **Backend API routes (`auth.routes.ts`):**
+  * `POST /api/auth/forgot-password`: Normalized email check, cryptographically secure 32-byte hex token generation, 1-hour expiration timestamping, and dispatch of the Resend transactional recovery email.
+  * `POST /api/auth/reset-password`: Validates the token against current expiration date/time, updates the hashed password, and clears recovery token fields.
+* **Frontend UI integrations (`index.html` & `auth.js`):**
+  * Added "Mot de passe oublié ?" trigger link in the B2B Login form.
+  * Created dynamic forms in the B2B authentication modal overlay for requesting the recovery link and submitting the new password.
+  * Built URL search parameter checker (`resetToken`) that triggers on DOM ready, automatically showing the modal overlay on the password reset panel.
+
+### Testing and Verification:
+* An integration test script is available at `partfinder_backend/src/test_reset_flow.ts`.
+* Run the test via:
+  ```powershell
+  npx ts-node src/test_reset_flow.ts
+  ```
+
