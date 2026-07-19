@@ -1546,6 +1546,39 @@ textarea:focus {
 
 .acc-logout { width: 100%; margin-top: 18px; }
 
+/* ── Panneau Administration ──────────────────────────────────────── */
+.admin-modal { max-width: 680px; }
+
+.adm-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 12px 14px; margin-bottom: 10px;
+    background: var(--overlay-soft);
+}
+.adm-row-main { min-width: 0; }
+.adm-row-meta { font-size: 0.8rem; color: var(--text-tertiary); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-suspended { opacity: 0.65; }
+.adm-price { color: var(--accent-neon); font-weight: 700; }
+
+.adm-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+.adm-btn {
+    width: 38px; height: 38px; border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    background: var(--overlay); color: var(--text-secondary);
+    font-size: 1.05rem;
+}
+.adm-btn:hover { background: var(--accent-electric); color: #fff; }
+.adm-btn-danger:hover { background: var(--danger); }
+
+.adm-status-select { height: 40px; padding: 0 10px; font-size: 0.85rem; width: auto; }
+
+@media (max-width: 1023px) {
+    .adm-row { flex-direction: column; align-items: stretch; }
+    .adm-actions { justify-content: flex-end; }
+    .adm-row-meta { white-space: normal; }
+}
+
 /* Field Feedback */
 .field-feedback {
     font-size: 0.8rem;

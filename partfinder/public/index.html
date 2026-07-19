@@ -37,6 +37,10 @@
                     <i class="ph ph-list-dashes"></i>
                     <span>Catalogue Historique</span>
                 </a>
+                <a href="#" class="nav-item display-none" id="nav-admin">
+                    <i class="ph ph-shield-star"></i>
+                    <span>Admin</span>
+                </a>
             </nav>
             <div class="sidebar-footer">
                 <div class="user-profile" id="user-profile" role="button" tabindex="0" title="Compte">
@@ -325,6 +329,29 @@
         </div>
     </div>
 
+    <!-- Panneau Administration (rôle ADMIN uniquement) -->
+    <div class="auth-overlay display-none" id="admin-overlay">
+        <div class="auth-modal admin-modal" role="dialog" aria-modal="true">
+            <button class="auth-close" id="admin-close" aria-label="Fermer"><i class="ph ph-x"></i></button>
+            <h2 class="auth-h">Administration</h2>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-adm-tab="clients">Clients</button>
+                <button class="auth-tab" data-adm-tab="orders">Commandes</button>
+            </div>
+
+            <div class="auth-error display-none" id="admin-error"></div>
+            <div class="account-success display-none" id="admin-success"></div>
+
+            <div data-adm-panel="clients">
+                <div id="adm-users"><p class="acc-empty">Chargement…</p></div>
+            </div>
+            <div class="display-none" data-adm-panel="orders">
+                <div id="adm-orders"><p class="acc-empty">Chargement…</p></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Panneau Mon Compte (client connecté) -->
     <div class="auth-overlay display-none" id="account-overlay">
         <div class="auth-modal account-modal" role="dialog" aria-modal="true">
@@ -446,6 +473,7 @@
     <script src="js/ui-tabs.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/account.js"></script>
+    <script src="js/admin.js"></script>
 </body>
 
 </html>

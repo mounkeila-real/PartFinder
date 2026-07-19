@@ -7,6 +7,7 @@ import orderRoutes from './routes/order.routes';
 import ebayNotificationRoutes from './routes/ebay_notifications.routes';
 import aliexpressRoutes from './routes/aliexpress.routes';
 import authRoutes from './routes/auth.routes';
+import adminRoutes from './routes/admin.routes';
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/ebay', ebayNotificationRoutes);
 app.use('/api/aliexpress', aliexpressRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

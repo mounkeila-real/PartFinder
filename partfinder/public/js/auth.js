@@ -83,6 +83,7 @@
                 if (!res.ok) throw new Error();
                 const data = await res.json();
                 reflectLoggedIn(data.user);
+                window.dispatchEvent(new CustomEvent('pf-auth-changed', { detail: { user: data.user } }));
             } catch {
                 clearToken(); // token invalide/expiré
                 reflectLoggedOut();
