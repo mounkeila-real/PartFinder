@@ -1,6 +1,7 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthService } from '../services/auth.service';
+import { requireAuth, AuthedRequest } from '../middleware/auth.middleware';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -55,6 +56,26 @@ router.post('/', async (req: express.Request, res: express.Response) => {
 
     } catch (error: any) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * GET /api/orders/mine — commandes du compte connecté (récentes d'abord).
+ * "En cours" = statut != DELIVERED/CANCELLED ; l'historique complet est renvoyé,
+ * le tri par statut se fait côté client.
+ */
+router.get('/mine', requireAuth, async (req: AuthedRequest, res: express.Response) => {
+    try {
+        const orders = await prisma.order.findMany({
+            where: { userId: req.user!.userId },
+            include: { items: true },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+        });
+        res.json({ orders });
+    } catch (error: any) {
+        console.error('[orders] mine:', error.message);
+        res.status(500).json({ error: 'Erreur lors du chargement des commandes.' });
     }
 });
 

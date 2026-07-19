@@ -99,12 +99,8 @@
         // --- Points d'entrée ---
         function accountClick() {
             if (currentUser) {
-                // Déjà connecté : proposer la déconnexion (simple pour la Phase 1).
-                if (confirm('Connecté en tant que ' + (currentUser.companyName || currentUser.email) + '.\nSe déconnecter ?')) {
-                    clearToken();
-                    reflectLoggedOut();
-                    window.dispatchEvent(new CustomEvent('pf-auth-changed', { detail: { user: null } }));
-                }
+                // Connecté : ouvre l'espace client (commandes, profil, sécurité).
+                if (window.pfOpenAccount) window.pfOpenAccount(currentUser);
             } else {
                 openModal('login');
             }

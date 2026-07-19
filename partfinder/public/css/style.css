@@ -1482,6 +1482,70 @@ textarea:focus {
     .auth-row { grid-template-columns: 1fr; }
 }
 
+/* ── Espace client (panneau Mon compte) ──────────────────────────── */
+.account-modal { max-width: 560px; }
+
+.account-success {
+    background: rgba(23, 138, 91, 0.10);
+    border: 1px solid rgba(23, 138, 91, 0.30);
+    color: var(--success);
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    font-size: 0.88rem;
+    margin-bottom: 16px;
+}
+
+.acc-sub { font-size: 0.95rem; color: var(--text-secondary); margin: 14px 0 10px; }
+.acc-empty { color: var(--text-tertiary); padding: 24px 0; text-align: center; }
+
+.acc-order {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    background: var(--overlay-soft);
+}
+.acc-order-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.acc-order-meta { font-size: 0.8rem; color: var(--text-tertiary); margin: 2px 0 10px; }
+.acc-order-item {
+    display: flex; justify-content: space-between; gap: 12px;
+    font-size: 0.88rem; color: var(--text-secondary);
+    padding: 4px 0; border-bottom: 1px dashed var(--border-color);
+}
+.acc-order-total {
+    display: flex; justify-content: space-between; margin-top: 10px;
+    font-size: 0.95rem;
+}
+.acc-order-total strong { color: var(--accent-neon); }
+
+.acc-status {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.4px;
+    padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+}
+.acc-status.st-pending  { background: rgba(219, 147, 11, 0.12); color: #9A6605; }
+.acc-status.st-progress { background: rgba(31, 95, 214, 0.10);  color: var(--accent-electric); }
+.acc-status.st-done     { background: rgba(23, 138, 91, 0.12);  color: var(--success); }
+.acc-status.st-cancel   { background: rgba(214, 64, 64, 0.10);  color: var(--danger); }
+
+.acc-danger {
+    margin-top: 26px; padding: 16px;
+    border: 1px solid rgba(214, 64, 64, 0.35);
+    border-radius: var(--radius-md);
+    background: rgba(214, 64, 64, 0.05);
+}
+.acc-danger h3 { font-size: 0.95rem; color: var(--danger); margin-bottom: 6px; }
+.acc-danger p { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px; }
+
+.btn-danger {
+    height: 44px; padding: 0 18px;
+    border-radius: var(--radius-md);
+    background: var(--danger); color: #fff;
+    font-weight: 600; font-size: 0.9rem;
+}
+.btn-danger:hover { filter: brightness(1.1); }
+
+.acc-logout { width: 100%; margin-top: 18px; }
+
 /* Field Feedback */
 .field-feedback {
     font-size: 0.8rem;

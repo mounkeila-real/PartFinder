@@ -124,4 +124,85 @@ router.post('/logout', (_req: express.Request, res: express.Response) => {
     res.json({ ok: true });
 });
 
+/**
+ * PATCH /api/auth/profile — mise à jour du profil (hors email/mot de passe).
+ * body: { companyName?, contactName?, phone?, vatNumber? }
+ */
+router.patch('/profile', requireAuth, async (req: AuthedRequest, res: express.Response) => {
+    try {
+        const { companyName, contactName, phone, vatNumber } = req.body || {};
+        if (companyName !== undefined && !String(companyName).trim()) {
+            return res.status(400).json({ error: 'La raison sociale ne peut pas être vide.' });
+        }
+        const user = await prisma.user.update({
+            where: { id: req.user!.userId },
+            data: {
+                ...(companyName !== undefined ? { companyName: String(companyName).trim() } : {}),
+                ...(contactName !== undefined ? { contactName: String(contactName).trim() || null } : {}),
+                ...(phone !== undefined ? { phone: String(phone).trim() || null } : {}),
+                ...(vatNumber !== undefined ? { vatNumber: String(vatNumber).trim() || null } : {}),
+            },
+        });
+        res.json({ user: publicUser(user) });
+    } catch (error: any) {
+        console.error('[auth] profile:', error.message);
+        res.status(500).json({ error: 'Erreur lors de la mise à jour du profil.' });
+    }
+});
+
+/**
+ * POST /api/auth/change-password
+ * body: { currentPassword, newPassword }
+ */
+router.post('/change-password', requireAuth, async (req: AuthedRequest, res: express.Response) => {
+    try {
+        const { currentPassword, newPassword } = req.body || {};
+        if (!newPassword || String(newPassword).length < 8) {
+            return res.status(400).json({ error: 'Le nouveau mot de passe doit faire au moins 8 caractères.' });
+        }
+        const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+        if (!user) return res.status(404).json({ error: 'Compte introuvable.' });
+
+        const ok = await AuthService.verifyPassword(String(currentPassword || ''), user.passwordHash);
+        if (!ok) return res.status(401).json({ error: 'Mot de passe actuel incorrect.' });
+
+        const passwordHash = await AuthService.hashPassword(String(newPassword));
+        await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+        res.json({ ok: true });
+    } catch (error: any) {
+        console.error('[auth] change-password:', error.message);
+        res.status(500).json({ error: 'Erreur lors du changement de mot de passe.' });
+    }
+});
+
+/**
+ * DELETE /api/auth/account — désinscription (droit à l'effacement RGPD).
+ * body: { password }  (confirmation obligatoire)
+ * Les commandes sont CONSERVÉES (traçabilité comptable) mais ANONYMISÉES :
+ * détachées du compte et contact remplacé.
+ */
+router.delete('/account', requireAuth, async (req: AuthedRequest, res: express.Response) => {
+    try {
+        const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+        if (!user) return res.status(404).json({ error: 'Compte introuvable.' });
+
+        const ok = await AuthService.verifyPassword(String(req.body?.password || ''), user.passwordHash);
+        if (!ok) return res.status(401).json({ error: 'Mot de passe incorrect.' });
+
+        await prisma.$transaction([
+            prisma.order.updateMany({
+                where: { userId: user.id },
+                data: { userId: null, contactInfo: '[compte supprimé]', shippingAddress: null },
+            }),
+            prisma.user.delete({ where: { id: user.id } }),
+        ]);
+
+        console.log('[auth] compte supprimé (RGPD):', user.email);
+        res.json({ ok: true });
+    } catch (error: any) {
+        console.error('[auth] delete account:', error.message);
+        res.status(500).json({ error: 'Erreur lors de la suppression du compte.' });
+    }
+});
+
 export default router;

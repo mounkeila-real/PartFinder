@@ -325,6 +325,70 @@
         </div>
     </div>
 
+    <!-- Panneau Mon Compte (client connecté) -->
+    <div class="auth-overlay display-none" id="account-overlay">
+        <div class="auth-modal account-modal" role="dialog" aria-modal="true">
+            <button class="auth-close" id="account-close" aria-label="Fermer"><i class="ph ph-x"></i></button>
+            <h2 class="auth-h" id="account-title">Mon compte</h2>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-acc-tab="orders">Mes commandes</button>
+                <button class="auth-tab" data-acc-tab="profile">Profil</button>
+                <button class="auth-tab" data-acc-tab="security">Sécurité</button>
+            </div>
+
+            <div class="auth-error display-none" id="account-error"></div>
+            <div class="account-success display-none" id="account-success"></div>
+
+            <!-- Commandes -->
+            <div data-acc-panel="orders">
+                <div class="acc-orders" id="acc-orders">
+                    <p class="acc-empty">Chargement…</p>
+                </div>
+            </div>
+
+            <!-- Profil -->
+            <form class="auth-form display-none" id="acc-profile-form" data-acc-panel="profile">
+                <label>Raison sociale *
+                    <input type="text" id="acc-company" required>
+                </label>
+                <div class="auth-row">
+                    <label>Nom du contact
+                        <input type="text" id="acc-contact">
+                    </label>
+                    <label>Téléphone
+                        <input type="tel" id="acc-phone">
+                    </label>
+                </div>
+                <label>N° TVA / SIRET
+                    <input type="text" id="acc-vat">
+                </label>
+                <button type="submit" class="btn-primary auth-submit">Enregistrer</button>
+            </form>
+
+            <!-- Sécurité -->
+            <div class="display-none" data-acc-panel="security">
+                <form class="auth-form" id="acc-password-form">
+                    <label>Mot de passe actuel
+                        <input type="password" id="acc-pwd-current" autocomplete="current-password" required>
+                    </label>
+                    <label>Nouveau mot de passe <span class="auth-hint">(8 caractères min.)</span>
+                        <input type="password" id="acc-pwd-new" autocomplete="new-password" minlength="8" required>
+                    </label>
+                    <button type="submit" class="btn-primary auth-submit">Changer le mot de passe</button>
+                </form>
+
+                <div class="acc-danger">
+                    <h3>Zone dangereuse</h3>
+                    <p>Supprimer définitivement votre compte. Vos commandes passées sont conservées de façon anonyme (obligations comptables).</p>
+                    <button type="button" class="btn-danger" id="acc-delete">Supprimer mon compte</button>
+                </div>
+
+                <button type="button" class="btn-secondary acc-logout" id="acc-logout">Se déconnecter</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modale Authentification (Connexion / Inscription) -->
     <div class="auth-overlay display-none" id="auth-overlay">
         <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
@@ -381,6 +445,7 @@
     <script src="js/app.js"></script>
     <script src="js/ui-tabs.js"></script>
     <script src="js/auth.js"></script>
+    <script src="js/account.js"></script>
 </body>
 
 </html>
