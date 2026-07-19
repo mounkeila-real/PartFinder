@@ -9,6 +9,7 @@ import aliexpressRoutes from './routes/aliexpress.routes';
 import authRoutes from './routes/auth.routes';
 import adminRoutes from './routes/admin.routes';
 import garageRoutes from './routes/garage.routes';
+import checkoutRoutes, { stripeWebhookHandler } from './routes/checkout.routes';
 
 dotenv.config();
 
@@ -17,6 +18,10 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
+
+// Webhook Stripe : nécessite le corps BRUT (signature) -> AVANT express.json.
+app.post('/api/checkout/webhook', express.raw({ type: 'application/json' }), stripeWebhookHandler);
+
 app.use(express.json());
 
 // Routes
@@ -28,6 +33,7 @@ app.use('/api/aliexpress', aliexpressRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/garage', garageRoutes);
+app.use('/api/checkout', checkoutRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

@@ -338,6 +338,30 @@
         </div>
     </div>
 
+    <!-- Modale Checkout (livraison + paiement Stripe) -->
+    <div class="auth-overlay display-none" id="checkout-overlay">
+        <div class="auth-modal" role="dialog" aria-modal="true">
+            <button class="auth-close" id="checkout-close" aria-label="Fermer"><i class="ph ph-x"></i></button>
+            <h2 class="auth-h">Finaliser la commande</h2>
+            <div class="auth-error display-none" id="checkout-error"></div>
+
+            <div class="checkout-summary" id="checkout-summary"></div>
+
+            <form class="auth-form" id="checkout-form">
+                <label>Adresse de livraison *
+                    <textarea id="co-address" rows="3" required placeholder="Raison sociale, rue, code postal, ville, pays"></textarea>
+                </label>
+                <label>Référence / bon de commande <span class="auth-hint">(optionnel)</span>
+                    <input type="text" id="co-poref" placeholder="Ex: dossier client #1234">
+                </label>
+                <button type="submit" class="btn-primary auth-submit" id="co-pay">
+                    <i class="ph ph-lock-simple"></i> Payer <span id="co-total"></span>
+                </button>
+                <p class="checkout-secure"><i class="ph ph-shield-check"></i> Paiement sécurisé par Stripe — vous serez redirigé.</p>
+            </form>
+        </div>
+    </div>
+
     <!-- Panneau Mon Garage -->
     <div class="auth-overlay display-none" id="garage-overlay">
         <div class="auth-modal account-modal" role="dialog" aria-modal="true">
@@ -521,6 +545,7 @@
     <script src="js/account.js"></script>
     <script src="js/admin.js"></script>
     <script src="js/garage.js"></script>
+    <script src="js/checkout.js"></script>
 </body>
 
 </html>

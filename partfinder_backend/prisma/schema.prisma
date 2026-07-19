@@ -71,7 +71,10 @@ model Order {
   contactInfo String?
   userId      Int?                            // Lien vers le compte (null = commande invité / héritée)
   user        User?       @relation(fields: [userId], references: [id])
-  shippingAddress String?                     // Adresse de livraison (Phase 2)
+  shippingAddress String?                     // Adresse de livraison
+  poReference String?                         // Bon de commande / réf interne garage
+  paymentStatus String    @default("UNPAID")  // UNPAID | PAID | FAILED
+  stripeSessionId String?                     // Session Stripe Checkout
   items       OrderItem[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

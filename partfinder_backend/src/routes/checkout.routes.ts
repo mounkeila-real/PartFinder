@@ -1,0 +1,128 @@
+import express from 'express';
+import Stripe from 'stripe';
+import { PrismaClient } from '@prisma/client';
+import { requireAuth, AuthedRequest } from '../middleware/auth.middleware';
+
+/**
+ * Tunnel d'achat — Stripe Checkout (page de paiement hébergée par Stripe).
+ * Le client paie sur Stripe ; le paiement est confirmé côté serveur via webhook.
+ *
+ * Variables d'environnement (Railway backend) :
+ *   STRIPE_SECRET_KEY      : clé secrète Stripe (sk_...)
+ *   STRIPE_WEBHOOK_SECRET  : secret de signature du webhook (whsec_...)
+ *   FRONTEND_URL           : base des URLs de retour (sinon origin de la requête)
+ */
+
+const router = express.Router();
+const prisma = new PrismaClient();
+
+const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY || '';
+const stripe = STRIPE_SECRET ? new Stripe(STRIPE_SECRET) : null;
+
+function frontendBase(req: express.Request): string {
+    return process.env.FRONTEND_URL
+        || (req.headers.origin as string)
+        || 'https://partfinder-production.up.railway.app';
+}
+
+/**
+ * POST /api/checkout/session — crée la commande (UNPAID) + une session Stripe,
+ * renvoie l'URL de paiement. body: { items, shippingAddress?, poReference? }
+ */
+router.post('/session', requireAuth, async (req: AuthedRequest, res: express.Response) => {
+    try {
+        if (!stripe) return res.status(503).json({ error: 'Paiement non configuré (STRIPE_SECRET_KEY manquant).' });
+
+        const { items, shippingAddress, poReference } = req.body || {};
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ error: 'Panier vide.' });
+        }
+
+        const totalAmount = items.reduce((s: number, i: any) => s + Number(i.priceSold) * Number(i.quantity || 1), 0);
+
+        const order = await prisma.order.create({
+            data: {
+                userId: req.user!.userId,
+                totalAmount,
+                status: 'PENDING',
+                paymentStatus: 'UNPAID',
+                shippingAddress: shippingAddress ? String(shippingAddress) : null,
+                poReference: poReference ? String(poReference) : null,
+                items: {
+                    create: items.map((i: any) => ({
+                        partOem: i.partOem || '—',
+                        partName: i.partName,
+                        quantity: Number(i.quantity) || 1,
+                        priceSold: Number(i.priceSold),
+                    })),
+                },
+            },
+        });
+
+        const base = frontendBase(req);
+        const session = await stripe.checkout.sessions.create({
+            mode: 'payment',
+            line_items: items.map((i: any) => ({
+                quantity: Number(i.quantity) || 1,
+                price_data: {
+                    currency: 'eur',
+                    unit_amount: Math.round(Number(i.priceSold) * 100),
+                    product_data: {
+                        name: String(i.partName).slice(0, 250),
+                        metadata: { oem: i.partOem || '' },
+                    },
+                },
+            })),
+            success_url: `${base}/?paid=1&order=${order.id}`,
+            cancel_url: `${base}/?canceled=1&order=${order.id}`,
+            client_reference_id: String(order.id),
+            metadata: { orderId: String(order.id) },
+        });
+
+        await prisma.order.update({ where: { id: order.id }, data: { stripeSessionId: session.id } });
+        res.json({ url: session.url, orderId: order.id });
+    } catch (e: any) {
+        console.error('[checkout] session:', e.message);
+        res.status(500).json({ error: 'Erreur lors de la création du paiement.' });
+    }
+});
+
+/**
+ * Webhook Stripe — corps BRUT requis (monté avec express.raw dans index.ts,
+ * AVANT express.json). Confirme le paiement et passe la commande en PAID/CONFIRMED.
+ */
+export async function stripeWebhookHandler(req: express.Request, res: express.Response) {
+    if (!stripe) return res.status(503).end();
+
+    const sig = req.headers['stripe-signature'] as string;
+    const secret = process.env.STRIPE_WEBHOOK_SECRET || '';
+    let event: Stripe.Event;
+    try {
+        event = secret
+            ? stripe.webhooks.constructEvent(req.body, sig, secret)
+            : JSON.parse((req.body as Buffer).toString()); // fallback si secret non configuré (dev)
+    } catch (e: any) {
+        console.error('[checkout] webhook signature:', e.message);
+        return res.status(400).send(`Webhook Error: ${e.message}`);
+    }
+
+    if (event.type === 'checkout.session.completed') {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const orderId = Number(session.metadata?.orderId || session.client_reference_id);
+        if (orderId) {
+            try {
+                await prisma.order.update({
+                    where: { id: orderId },
+                    data: { paymentStatus: 'PAID', status: 'CONFIRMED' },
+                });
+                console.log('[checkout] commande payée #', orderId);
+            } catch (e: any) {
+                console.error('[checkout] webhook update:', e.message);
+            }
+        }
+    }
+
+    res.json({ received: true });
+}
+
+export default router;

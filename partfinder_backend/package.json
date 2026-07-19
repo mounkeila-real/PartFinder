@@ -25,6 +25,7 @@
     "jsonwebtoken": "^9.0.3",
     "prisma": "^5.22.0",
     "resend": "^6.17.2",
+    "stripe": "^22.3.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },

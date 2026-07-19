@@ -1100,9 +1100,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const contact = prompt("Entrez les coordonnées du client pour cette commande :", "client@example.com");
-        if (contact === null) return; // User cancelled
-
         const items = state.cart.map(item => ({
             partOem: item.oem || 'OEM-REF',
             partName: item.name,
@@ -1110,37 +1107,11 @@ document.addEventListener('DOMContentLoaded', () => {
             priceSold: item.displayPrice
         }));
 
-        try {
-            btnCheckout.disabled = true;
-            btnCheckout.textContent = "Validation en cours...";
-
-            const response = await fetch(`${API_BASE_URL}/orders`, {
-                method: 'POST',
-                headers: Object.assign(
-                    { 'Content-Type': 'application/json' },
-                    (window.pfAuthHeader ? window.pfAuthHeader() : {})
-                ),
-                body: JSON.stringify({ contactInfo: contact, items })
-            });
-
-            if (!response.ok) throw new Error('Order creation failed');
-
-            const orderData = await response.json();
-            alert(`✓ Commande enregistrée ! ID Commande : ${orderData.order.id}`);
-
-            // Clear cart
-            state.cart = [];
-            updateCartUI();
-
-            // Close cart panel
-            closeCartBtn.click();
-
-        } catch (error) {
-            console.error("Checkout failed:", error);
-            alert("Une erreur est survenue lors de l'enregistrement de la commande.");
-        } finally {
-            btnCheckout.disabled = false;
-            btnCheckout.textContent = "Valider la demande";
+        // Ouvre le tunnel de paiement Stripe (livraison + redirection).
+        if (window.pfCheckout) {
+            window.pfCheckout(items);
+        } else {
+            alert("Le module de paiement n'est pas disponible.");
         }
     });
 
