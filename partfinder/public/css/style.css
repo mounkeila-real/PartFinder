@@ -1567,6 +1567,7 @@ textarea:focus {
     display: flex; align-items: center; justify-content: center;
     background: var(--overlay); color: var(--text-secondary);
     font-size: 1.05rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .adm-btn:hover { background: var(--accent-electric); color: #fff; }
 .adm-btn-danger:hover { background: var(--danger); }
