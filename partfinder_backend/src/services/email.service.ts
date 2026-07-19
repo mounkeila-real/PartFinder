@@ -10,8 +10,9 @@ export class EmailService {
      * Sends a password reset link to the B2B user.
      * If the API key is missing, it falls back to printing the link to the console for local debugging.
      */
-    static async sendPasswordResetEmail(email: string, token: string): Promise<boolean> {
-        const resetLink = `${FRONTEND_URL}/index.html?tab=auth&resetToken=${token}`;
+    static async sendPasswordResetEmail(email: string, token: string, frontendUrl?: string): Promise<boolean> {
+        const baseUrl = frontendUrl || FRONTEND_URL;
+        const resetLink = `${baseUrl}/index.html?tab=auth&resetToken=${token}`;
 
         const htmlContent = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">

@@ -235,7 +235,16 @@ router.post('/forgot-password', async (req: express.Request, res: express.Respon
                 },
             });
 
-            await EmailService.sendPasswordResetEmail(user.email, token);
+            let frontendUrl = 'http://localhost:3000';
+            if (req.headers.referer) {
+                try {
+                    frontendUrl = new URL(req.headers.referer).origin;
+                } catch (e) {}
+            } else if (req.headers.origin) {
+                frontendUrl = String(req.headers.origin);
+            }
+
+            await EmailService.sendPasswordResetEmail(user.email, token, frontendUrl);
         }
 
         res.json({ message: successMsg });
