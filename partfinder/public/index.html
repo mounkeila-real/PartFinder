@@ -37,6 +37,10 @@
                     <i class="ph ph-list-dashes"></i>
                     <span>Catalogue Historique</span>
                 </a>
+                <a href="#" class="nav-item" id="nav-garage">
+                    <i class="ph ph-garage"></i>
+                    <span>Mon garage</span>
+                </a>
                 <a href="#" class="nav-item display-none" id="nav-admin">
                     <i class="ph ph-shield-star"></i>
                     <span>Admin</span>
@@ -167,9 +171,14 @@
                         <!-- Retour VIN/OCR + fiche véhicule (partagé, visible sur tous les onglets) -->
                         <div class="veh-feedback-row">
                             <div class="field-feedback" id="vin-feedback"></div>
-                            <button type="button" class="btn-more-info display-none" id="btn-more-info">
-                                <i class="ph ph-info"></i> Plus d'infos
-                            </button>
+                            <div class="veh-feedback-actions">
+                                <button type="button" class="btn-save-vehicle" id="btn-save-vehicle" title="Enregistrer dans mon garage">
+                                    <i class="ph ph-garage"></i> Enregistrer
+                                </button>
+                                <button type="button" class="btn-more-info display-none" id="btn-more-info">
+                                    <i class="ph ph-info"></i> Plus d'infos
+                                </button>
+                            </div>
                         </div>
                     </section>
 
@@ -326,6 +335,16 @@
             <div class="modal-body" id="modal-offer-body">
                 <!-- Injected via JS -->
             </div>
+        </div>
+    </div>
+
+    <!-- Panneau Mon Garage -->
+    <div class="auth-overlay display-none" id="garage-overlay">
+        <div class="auth-modal account-modal" role="dialog" aria-modal="true">
+            <button class="auth-close" id="garage-close" aria-label="Fermer"><i class="ph ph-x"></i></button>
+            <h2 class="auth-h">Mon garage</h2>
+            <div class="auth-error display-none" id="garage-error"></div>
+            <div id="garage-list"><p class="acc-empty">Chargement…</p></div>
         </div>
     </div>
 
@@ -501,6 +520,7 @@
     <script src="js/auth.js"></script>
     <script src="js/account.js"></script>
     <script src="js/admin.js"></script>
+    <script src="js/garage.js"></script>
 </body>
 
 </html>
