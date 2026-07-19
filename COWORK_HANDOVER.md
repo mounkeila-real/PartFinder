@@ -117,6 +117,7 @@ We have implemented the forgot and reset password mechanisms for B2B users using
 * **Prisma schema update:** Added `resetToken` and `resetTokenExpiry` to the `User` model.
 * **Email Service (`email.service.ts`):** Sends styled, professional HTML emails containing the recovery URL.
   * *Local Debugging:* If `RESEND_API_KEY` is not defined in `.env`, the service will output the reset link directly in the console backend logs instead of crashing, allowing full local verification.
+  * *Dynamic Frontend URL Resolution:* The base URL for the password recovery link is dynamically extracted from request headers (`Referer` or `Origin`). This guarantees that it correctly points back to whichever host the B2B user is accessing the app from (e.g. `http://localhost:3000` locally, or `https://partfinder-production-xxxx.up.railway.app` on Railway) without needing hardcoded domain environment variables.
 * **Backend API routes (`auth.routes.ts`):**
   * `POST /api/auth/forgot-password`: Normalized email check, cryptographically secure 32-byte hex token generation, 1-hour expiration timestamping, and dispatch of the Resend transactional recovery email.
   * `POST /api/auth/reset-password`: Validates the token against current expiration date/time, updates the hashed password, and clears recovery token fields.
