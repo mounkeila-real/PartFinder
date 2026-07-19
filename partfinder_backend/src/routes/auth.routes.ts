@@ -1,7 +1,9 @@
 import express from 'express';
+import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { AuthService } from '../services/auth.service';
 import { requireAuth, AuthedRequest } from '../middleware/auth.middleware';
+import { EmailService } from '../services/email.service';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -202,6 +204,91 @@ router.delete('/account', requireAuth, async (req: AuthedRequest, res: express.R
     } catch (error: any) {
         console.error('[auth] delete account:', error.message);
         res.status(500).json({ error: 'Erreur lors de la suppression du compte.' });
+    }
+});
+
+/**
+ * POST /api/auth/forgot-password — demande de réinitialisation.
+ * body: { email }
+ */
+router.post('/forgot-password', async (req: express.Request, res: express.Response) => {
+    try {
+        const { email } = req.body || {};
+        const successMsg = 'Si un compte existe pour cet email, un lien de réinitialisation a été envoyé.';
+
+        if (!email || !EMAIL_RE.test(email)) {
+            return res.json({ message: successMsg }); // Pas d'erreur explicite pour préserver l'anonymat
+        }
+
+        const normalizedEmail = String(email).trim().toLowerCase();
+        const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+        if (user) {
+            const token = crypto.randomBytes(32).toString('hex');
+            const expiry = new Date(Date.now() + 3600000); // 1 heure
+
+            await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    resetToken: token,
+                    resetTokenExpiry: expiry,
+                },
+            });
+
+            await EmailService.sendPasswordResetEmail(user.email, token);
+        }
+
+        res.json({ message: successMsg });
+    } catch (error: any) {
+        console.error('[auth] forgot-password error:', error.message);
+        res.status(500).json({ error: 'Erreur lors de la demande de réinitialisation.' });
+    }
+});
+
+/**
+ * POST /api/auth/reset-password — réinitialisation effective avec le token.
+ * body: { token, newPassword }
+ */
+router.post('/reset-password', async (req: express.Request, res: express.Response) => {
+    try {
+        const { token, newPassword } = req.body || {};
+
+        if (!token || !String(token).trim()) {
+            return res.status(400).json({ error: 'Le jeton de réinitialisation est requis.' });
+        }
+        if (!newPassword || String(newPassword).length < 8) {
+            return res.status(400).json({ error: 'Le nouveau mot de passe doit faire au moins 8 caractères.' });
+        }
+
+        // Trouver l'utilisateur ayant le token non expiré
+        const user = await prisma.user.findFirst({
+            where: {
+                resetToken: token,
+                resetTokenExpiry: {
+                    gt: new Date(),
+                },
+            },
+        });
+
+        if (!user) {
+            return res.status(400).json({ error: 'Le lien de réinitialisation est invalide ou a expiré.' });
+        }
+
+        const passwordHash = await AuthService.hashPassword(String(newPassword));
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                passwordHash,
+                resetToken: null,
+                resetTokenExpiry: null,
+            },
+        });
+
+        res.json({ message: 'Votre mot de passe a été réinitialisé avec succès. Vous pouvez maintenant vous connecter.' });
+    } catch (error: any) {
+        console.error('[auth] reset-password error:', error.message);
+        res.status(500).json({ error: 'Erreur lors de la réinitialisation du mot de passe.' });
     }
 });
 

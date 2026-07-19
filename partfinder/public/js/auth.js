@@ -45,6 +45,11 @@
         window.pfOpenAuth = openModal;
 
         function switchTab(name) {
+            const isTabHeaderVisible = (name === 'login' || name === 'register');
+            const tabHeader = document.querySelector('#auth-overlay .auth-tabs');
+            if (tabHeader) {
+                tabHeader.style.display = isTabHeaderVisible ? '' : 'none';
+            }
             tabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-auth-tab') === name));
             panels.forEach(p => p.classList.toggle('display-none', p.getAttribute('data-auth-panel') !== name));
             clearError();
@@ -160,7 +165,111 @@
             }
         });
 
+        // --- Mot de passe oublié ---
+        const forgotLink = document.getElementById('auth-forgot-link');
+        const backToLogin = document.getElementById('auth-back-to-login');
+        const forgotForm = document.getElementById('auth-forgot-form');
+        const forgotSuccess = document.getElementById('auth-forgot-success');
+
+        if (forgotLink) {
+            forgotLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (forgotSuccess) forgotSuccess.classList.add('display-none');
+                switchTab('forgot');
+            });
+        }
+        if (backToLogin) {
+            backToLogin.addEventListener('click', (e) => {
+                e.preventDefault();
+                switchTab('login');
+            });
+        }
+
+        if (forgotForm) {
+            forgotForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                clearError();
+                if (forgotSuccess) forgotSuccess.classList.add('display-none');
+                const emailInput = document.getElementById('forgot-email');
+                const btn = document.getElementById('forgot-submit');
+                
+                btn.disabled = true;
+                btn.textContent = 'Envoi en cours…';
+                try {
+                    const res = await api('/auth/forgot-password', { email: emailInput.value });
+                    if (forgotSuccess) {
+                        forgotSuccess.textContent = res.message || 'Lien envoyé avec succès.';
+                        forgotSuccess.classList.remove('display-none');
+                    }
+                    emailInput.value = '';
+                } catch (err) {
+                    showError(err.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Envoyer le lien';
+                }
+            });
+        }
+
+        // --- Réinitialisation du mot de passe ---
+        const resetForm = document.getElementById('auth-reset-pwd-form');
+        const resetSuccess = document.getElementById('auth-reset-success');
+
+        if (resetForm) {
+            resetForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                clearError();
+                if (resetSuccess) resetSuccess.classList.add('display-none');
+                const tokenInput = document.getElementById('reset-token');
+                const pwdInput = document.getElementById('reset-new-password');
+                const btn = document.getElementById('reset-pwd-submit');
+
+                btn.disabled = true;
+                btn.textContent = 'Modification en cours…';
+                try {
+                    const res = await api('/auth/reset-password', {
+                        token: tokenInput.value,
+                        newPassword: pwdInput.value
+                    });
+                    if (resetSuccess) {
+                        resetSuccess.textContent = res.message || 'Mot de passe modifié avec succès.';
+                        resetSuccess.classList.remove('display-none');
+                    }
+                    pwdInput.value = '';
+                    setTimeout(() => {
+                        closeModal();
+                        switchTab('login');
+                        // Nettoyer l'URL
+                        const newUrl = window.location.pathname;
+                        window.history.pushState({}, document.title, newUrl);
+                    }, 3000);
+                } catch (err) {
+                    showError(err.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Mettre à jour le mot de passe';
+                }
+            });
+        }
+
+        // --- Vérification du jeton dans l'URL au démarrage ---
+        function checkUrlResetToken() {
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('resetToken');
+            if (token) {
+                // Remplir le token
+                const tokenInput = document.getElementById('reset-token');
+                if (tokenInput) tokenInput.value = token;
+                
+                // Ouvrir la modale directement sur le panneau reset
+                setTimeout(() => {
+                    openModal('reset');
+                }, 500);
+            }
+        }
+
         // Etat initial
         loadMe();
+        checkUrlResetToken();
     });
 })();

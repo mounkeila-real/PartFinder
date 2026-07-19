@@ -8,3 +8,7 @@ dev.db-journal
 
 tmp_vehicle_data/
 tmp_vin_decoder/
+partfinder_spec.zip
+partfinder_spec_extracted/
+spec_text.txt
+temp_spec/

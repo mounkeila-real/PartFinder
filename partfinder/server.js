@@ -333,6 +333,9 @@ const proxyToBackend = async (req, res) => {
 app.use('/api/vehicle', proxyToBackend);
 app.use('/api/parts', proxyToBackend);
 app.use('/api/orders', proxyToBackend);
+app.use('/api/auth', proxyToBackend);
+app.use('/api/admin', proxyToBackend);
+app.use('/api/aliexpress', proxyToBackend);
 
 app.get('/api/decode-vin/:vin', async (req, res) => {
     try {

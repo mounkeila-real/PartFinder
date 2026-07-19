@@ -437,6 +437,9 @@
                 <label>Mot de passe
                     <input type="password" id="login-password" autocomplete="current-password" required placeholder="••••••••">
                 </label>
+                <div style="text-align: right; margin-bottom: 15px;">
+                    <a href="#" id="auth-forgot-link" style="font-size: 13px; color: #1a56db; text-decoration: none;">Mot de passe oublié ?</a>
+                </div>
                 <button type="submit" class="btn-primary auth-submit" id="login-submit">Se connecter</button>
             </form>
 
@@ -448,8 +451,6 @@
                 </label>
                 <label>Email professionnel *
                     <input type="email" id="reg-email" autocomplete="email" required placeholder="contact@garage.fr">
-                </label>
-                <label>Mot de passe * <span class="auth-hint">(8 caractères min.)</span>
                     <input type="password" id="reg-password" autocomplete="new-password" required minlength="8" placeholder="••••••••">
                 </label>
                 <div class="auth-row">
@@ -464,6 +465,32 @@
                     <input type="text" id="reg-vat" placeholder="LU12345678">
                 </label>
                 <button type="submit" class="btn-primary auth-submit" id="reg-submit">Créer mon compte</button>
+            </form>
+
+            <!-- Mot de passe oublié -->
+            <form class="auth-form display-none" id="auth-forgot-form" data-auth-panel="forgot">
+                <h2 class="auth-h">Mot de passe oublié</h2>
+                <div class="account-success display-none" id="auth-forgot-success" style="margin-bottom:15px; color:#057a55; background-color:#def7ec; padding:10px; border-radius:4px; font-size:13px;"></div>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Saisissez votre adresse email. Nous vous enverrons un lien pour réinitialiser votre mot de passe.</p>
+                <label>Email professionnel
+                    <input type="email" id="forgot-email" required placeholder="contact@garage.fr">
+                </label>
+                <button type="submit" class="btn-primary auth-submit" id="forgot-submit">Envoyer le lien</button>
+                <div style="text-align: center; margin-top: 15px;">
+                    <a href="#" id="auth-back-to-login" style="font-size: 13px; color: #1a56db; text-decoration: none;">Retour à la connexion</a>
+                </div>
+            </form>
+
+            <!-- Réinitialiser le mot de passe -->
+            <form class="auth-form display-none" id="auth-reset-pwd-form" data-auth-panel="reset">
+                <h2 class="auth-h">Nouveau mot de passe</h2>
+                <div class="account-success display-none" id="auth-reset-success" style="margin-bottom:15px; color:#057a55; background-color:#def7ec; padding:10px; border-radius:4px; font-size:13px;"></div>
+                <p style="font-size: 13px; color: #666; margin-bottom: 15px;">Choisissez un nouveau mot de passe sécurisé pour votre compte.</p>
+                <input type="hidden" id="reset-token">
+                <label>Nouveau mot de passe <span class="auth-hint">(8 caractères min.)</span>
+                    <input type="password" id="reset-new-password" minlength="8" required placeholder="••••••••">
+                </label>
+                <button type="submit" class="btn-primary auth-submit" id="reset-pwd-submit">Mettre à jour le mot de passe</button>
             </form>
         </div>
     </div>

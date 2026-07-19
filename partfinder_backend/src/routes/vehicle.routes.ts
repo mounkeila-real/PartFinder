@@ -142,6 +142,7 @@ router.get('/makes', async (req: express.Request, res: express.Response) => {
                 if (names.length) {
                     await prisma.vehicleMake.createMany({
                         data: names.map(name => ({ name })),
+                        // @ts-ignore
                         skipDuplicates: true
                     });
                     makes = await prisma.vehicleMake.findMany({ orderBy: { name: 'asc' } });
@@ -257,6 +258,7 @@ router.get('/models/:makeName', async (req: express.Request, res: express.Respon
                     try {
                         await prisma.vehicleModel.createMany({
                             data: modelInserts,
+                            // @ts-ignore
                             skipDuplicates: true
                         });
                     } catch (dbErr) {
