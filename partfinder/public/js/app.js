@@ -2,6 +2,19 @@
  * PartFinder Prototype Logic (Phase 1)
  */
 
+// Visuel de repli : SVG embarqué, aucune requête réseau. Un repli hébergé
+// ailleurs (Unsplash & co) tombe dès que le réseau du client filtre ce domaine —
+// exactement le problème que l'on corrige ici.
+window.PF_FALLBACK_IMG = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">' +
+    '<rect width="400" height="300" fill="#E4E9F2"/>' +
+    '<g fill="none" stroke="#9AA8BF" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="200" cy="150" r="46"/>' +
+    '<circle cx="200" cy="150" r="15"/>' +
+    '<path d="M200 88v-22M200 234v-22M262 150h22M116 150h22M244 106l16-16M140 194l-16 16M244 194l16 16M140 106l-16-16"/>' +
+    '</g></svg>'
+);
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- Configuration ---
@@ -763,7 +776,7 @@ document.addEventListener('DOMContentLoaded', () => {
             description: partDescInput.value.trim() || null,
             oem: partNumberInput.value.trim() || null,
         };
-        const FALLBACK_IMG = 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&q=80&w=400';
+        const FALLBACK_IMG = window.PF_FALLBACK_IMG;
 
         try {
             // Flux complet : l'IA determine la piece PUIS les offres sont recuperees.
@@ -919,7 +932,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="offer-condition cond-${item.condition}">${item.condition === 'new' ? 'Neuf' : 'Occasion'}</span>
                     ${sourceBadge}
                     ${mockBadge}
-                    <img src="${item.img}" alt="${item.name}" referrerpolicy="no-referrer" onerror="this.src='${'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&q=80&w=400'}'">
+                    <img src="${item.img}" alt="${item.name}" loading="lazy" onerror="this.onerror=null;this.src=window.PF_FALLBACK_IMG">
                 </div>
                 <div class="offer-body">
                     <span class="offer-brand">${item.brand}</span>

@@ -1,4 +1,5 @@
 import express from 'express';
+import axios from 'axios';
 import { EbayService } from '../services/ebay.service';
 import { AliexpressService } from '../services/aliexpress.service';
 import { PartAiService, VehicleContext, PartRequest } from '../services/part_ai.service';
@@ -39,6 +40,75 @@ function cleanEbayDescription(html: string): string {
     if (t.length > 1600) t = t.slice(0, 1600).replace(/\s+\S*$/, '') + '…';
     return t;
 }
+
+/* ── Relais d'images ──────────────────────────────────────────────
+ * Les visuels des annonces sont servis PAR NOUS, jamais chargés depuis le
+ * domaine du fournisseur : le navigateur du client ne doit jamais émettre de
+ * requête vers un domaine de marketplace (l'URL trahirait la source, et ces
+ * CDN sont parfois bloqués par les filtrages réseau d'entreprise).
+ *
+ * Liste blanche STRICTE d'hôtes + HTTPS obligatoire : sans cela, la route
+ * serait un proxy ouvert (SSRF) permettant d'atteindre le réseau interne.
+ */
+const IMAGE_HOSTS = new Set([
+    'i.ebayimg.com',
+    'thumbs.ebaystatic.com',
+    'ir.ebaystatic.com',
+    'ae01.alicdn.com',
+    'ae02.alicdn.com',
+    'ae03.alicdn.com',
+    'ae04.alicdn.com',
+    'img.alicdn.com',
+    'ae-pic-a1.aliexpress-media.com',
+]);
+
+/** Réécrit une URL d'image fournisseur en URL neutre servie par ce backend. */
+function proxifyImage(url: string | null | undefined, req: express.Request): string | null {
+    if (!url) return null;
+    try {
+        const u = new URL(url);
+        if (u.protocol !== 'https:' || !IMAGE_HOSTS.has(u.hostname)) return null;
+        const token = Buffer.from(url, 'utf8').toString('base64url');
+        const host = req.get('x-forwarded-host') || req.get('host');
+        const proto = (req.get('x-forwarded-proto') || req.protocol || 'https').split(',')[0];
+        return `${proto}://${host}/api/parts/image/${token}`;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * GET /api/parts/image/:token — sert le visuel d'une annonce (PUBLIC).
+ * Le token est l'URL source encodée en base64url ; l'hôte est revalidé ici.
+ */
+router.get('/image/:token', async (req: express.Request, res: express.Response) => {
+    try {
+        const raw = Buffer.from(String(req.params.token), 'base64url').toString('utf8');
+        const u = new URL(raw);
+        if (u.protocol !== 'https:' || !IMAGE_HOSTS.has(u.hostname)) {
+            return res.status(404).end();
+        }
+
+        const upstream = await axios.get(raw, {
+            responseType: 'arraybuffer',
+            timeout: 10000,
+            maxContentLength: 8 * 1024 * 1024,
+            // Aucun en-tête identifiant notre client n'est transmis en amont.
+            headers: { 'User-Agent': 'PartFinder/1.0' },
+        });
+
+        const type = String(upstream.headers['content-type'] || 'image/jpeg');
+        if (!type.startsWith('image/')) return res.status(404).end();
+
+        res.setHeader('Content-Type', type);
+        res.setHeader('Cache-Control', 'public, max-age=604800, immutable'); // 7 jours
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        return res.send(Buffer.from(upstream.data));
+    } catch {
+        // Visuel indisponible : le frontend affiche son propre repli.
+        return res.status(404).end();
+    }
+});
 
 /**
  * GET /api/parts/shipping-info?zone=OM1 — informations d'acheminement (PUBLIC).
@@ -205,6 +275,14 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
             console.error('[parts] tarification:', e.message);
         }
 
+        // Point de passage OBLIGE : aucune URL fournisseur ne sort d'ici, quel
+        // que soit le chemin emprunté au-dessus (y compris tarification en échec).
+        results = results.map((r: any) => ({
+            ...r,
+            image: proxifyImage(r.image, req),
+            thumbnail: proxifyImage(r.thumbnail, req),
+        }));
+
         res.json({
             part,
             usedQuery,
@@ -250,11 +328,15 @@ router.get('/item/:itemId', async (req: express.Request, res: express.Response) 
         const price = detail.price?.value != null ? parseFloat(detail.price.value) : null;
         const finalPrice = price != null ? Math.round(price * MARGIN_MULTIPLIER * 100) / 100 : null;
 
-        const images: string[] = [];
-        if (detail.image?.imageUrl) images.push(detail.image.imageUrl);
+        // Visuels servis par nous (jamais le domaine du fournisseur).
+        const rawImages: string[] = [];
+        if (detail.image?.imageUrl) rawImages.push(detail.image.imageUrl);
         if (Array.isArray(detail.additionalImages)) {
-            for (const im of detail.additionalImages) if (im?.imageUrl) images.push(im.imageUrl);
+            for (const im of detail.additionalImages) if (im?.imageUrl) rawImages.push(im.imageUrl);
         }
+        const images = rawImages
+            .map((u) => proxifyImage(u, req))
+            .filter((u): u is string => !!u);
 
         const aspects: { name: string; value: any }[] = [];
         if (Array.isArray(detail.localizedAspects)) {
