@@ -338,6 +338,35 @@
         </div>
     </div>
 
+    <!-- Modale : explication des frais d'acheminement outre-mer -->
+    <div class="auth-overlay display-none" id="shipping-info-overlay">
+        <div class="auth-modal account-modal" role="dialog" aria-modal="true">
+            <button class="auth-close" id="shipping-info-close" aria-label="Fermer"><i class="ph ph-x"></i></button>
+            <h2 class="auth-h">Frais d'acheminement outre-mer</h2>
+
+            <p class="ship-intro">
+                Le prix affiché comprend la pièce, son acheminement jusqu'à notre entrepôt en
+                métropole, le contrôle et la préparation. <strong>L'acheminement final vers votre
+                territoire dépend du poids réel du colis</strong>, que nous constatons à la réception.
+            </p>
+            <p class="ship-intro">
+                Vous recevez le <strong>montant définitif tout compris avant tout paiement</strong> —
+                aucun débit n'est effectué sans votre accord.
+            </p>
+
+            <label class="ship-zone-label">Votre territoire
+                <select id="ship-zone">
+                    <option value="OM1">Antilles, Guyane, La Réunion, Mayotte, St-Pierre-et-Miquelon, St-Martin, St-Barthélemy</option>
+                    <option value="OM2">Nouvelle-Calédonie, Polynésie française, Wallis-et-Futuna</option>
+                </select>
+            </label>
+
+            <div id="ship-grid"><p class="acc-empty">Chargement…</p></div>
+
+            <p class="ship-note" id="ship-limits"></p>
+        </div>
+    </div>
+
     <!-- Modale Checkout (livraison + paiement Stripe) -->
     <div class="auth-overlay display-none" id="checkout-overlay">
         <div class="auth-modal" role="dialog" aria-modal="true">
@@ -598,6 +627,7 @@
     <script src="js/admin.js"></script>
     <script src="js/garage.js"></script>
     <script src="js/checkout.js"></script>
+    <script src="js/shipping-info.js"></script>
 </body>
 
 </html>

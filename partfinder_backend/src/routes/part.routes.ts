@@ -2,6 +2,7 @@ import express from 'express';
 import { EbayService } from '../services/ebay.service';
 import { AliexpressService } from '../services/aliexpress.service';
 import { PartAiService, VehicleContext, PartRequest } from '../services/part_ai.service';
+import * as pricing from '../services/pricing';
 
 const router = express.Router();
 
@@ -38,6 +39,37 @@ function cleanEbayDescription(html: string): string {
     if (t.length > 1600) t = t.slice(0, 1600).replace(/\s+\S*$/, '') + '…';
     return t;
 }
+
+/**
+ * GET /api/parts/shipping-info?zone=OM1 — informations d'acheminement (PUBLIC).
+ * Alimente l'explication « pourquoi + frais de port » côté client : grille
+ * d'acheminement outre-mer et limites de colis. Aucune donnée interne
+ * (marge, coût d'acquisition, source d'approvisionnement) n'est exposée.
+ */
+router.get('/shipping-info', async (req: express.Request, res: express.Response) => {
+    try {
+        const zoneReq = String(req.query.zone || 'OM1').toUpperCase();
+        const zone: 'OM1' | 'OM2' = zoneReq === 'OM2' ? 'OM2' : 'OM1';
+        const tranches = await pricing.getTranches(zone);
+        res.json({
+            zone,
+            tranches: tranches.map((t) => ({ jusquAKg: t.poidsMaxKg, prixEur: t.prixEur })),
+            limites: {
+                poidsMaxKg: pricing.MAX_WEIGHT_KG,
+                longueurMaxCm: pricing.MAX_LENGTH_CM,
+                sommeDimsStandardCm: pricing.DIMS_SUM_STANDARD_CM,
+                sommeDimsMaxCm: pricing.DIMS_SUM_MAX_CM,
+            },
+            zones: {
+                OM1: 'Guadeloupe, Martinique, Guyane, La Réunion, Mayotte, Saint-Pierre-et-Miquelon, Saint-Martin, Saint-Barthélemy',
+                OM2: 'Nouvelle-Calédonie, Polynésie française, Wallis-et-Futuna',
+            },
+        });
+    } catch (e: any) {
+        console.error('[parts] shipping-info:', e.message);
+        res.status(500).json({ error: 'Informations d\'acheminement indisponibles.' });
+    }
+});
 
 /**
  * Détermine la pièce par IA à partir du véhicule + demande client.
@@ -131,10 +163,47 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
         });
 
         // Résultats fusionnés : eBay puis AliExpress, dans une seule liste homogène.
-        const results = [
+        const merged = [
             ...rawResults.map((r) => withMargin(r, 'ebay')),
             ...aliexpressResults.map((r) => withMargin(r, 'aliexpress')),
         ];
+
+        // Tarification tout compris (aucun appel IA : interdit sur une liste).
+        // La zone conditionne le port outre-mer ; OM1 par défaut.
+        const zoneReq = String(req.body.zone || 'OM1').toUpperCase();
+        const zone: 'OM1' | 'OM2' = zoneReq === 'OM2' ? 'OM2' : 'OM1';
+
+        let results = merged;
+        try {
+            const quotes = await pricing.quoteMany(
+                merged.map((r: any) => ({
+                    id: String(r.itemId),
+                    prixPieceEur: Number(r.price) || 0,
+                    portVendeurEur: r.shippingCost != null ? Number(r.shippingCost) : null,
+                    titre: r.title,
+                    description: r.shortDescription,
+                    // La catégorie déterminée par l'IA de recherche sert de
+                    // poids de référence si elle correspond au référentiel.
+                    categoryCode: (part as any).categoryCode || null,
+                })),
+                zone,
+            );
+            const byId = new Map(quotes.map((q) => [q.id, q]));
+            results = merged.map((r: any) => {
+                const q = byId.get(String(r.itemId));
+                return {
+                    ...r,
+                    // Prix client : tout compris si calculable, sinon hors port.
+                    prixClientEur: q?.prixClientEur ?? null,
+                    prixHorsPortEur: q?.prixHorsPortEur ?? null,
+                    portInconnu: q?.portInconnu ?? true,
+                    regimePrix: q?.regime ?? 'ESTIME',
+                };
+            });
+        } catch (e: any) {
+            // La tarification ne doit jamais casser la recherche.
+            console.error('[parts] tarification:', e.message);
+        }
 
         res.json({
             part,

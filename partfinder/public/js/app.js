@@ -770,7 +770,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${API_BASE_URL}/parts/find`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ vehicle: vehicleCtx, request: partRequest, limit: 50 })
+                body: JSON.stringify({
+                    vehicle: vehicleCtx,
+                    request: partRequest,
+                    limit: 50,
+                    // Territoire du client : conditionne le tarif d'acheminement.
+                    zone: (window.pfGetZone ? window.pfGetZone() : 'OM1'),
+                })
             });
 
             if (!response.ok) throw new Error('Search failed');
@@ -885,9 +891,17 @@ document.addEventListener('DOMContentLoaded', () => {
         offersGrid.innerHTML = '';
 
         results.forEach(item => {
-            const displayPrice = (item.finalPrice != null
+            // Prix tout compris si calculable, sinon prix hors acheminement
+            // outre-mer (affiché « + frais de port » avec un lien d'explication).
+            const allIn = item.prixClientEur != null ? Number(item.prixClientEur) : null;
+            const horsPort = item.prixHorsPortEur != null ? Number(item.prixHorsPortEur) : null;
+            const fallback = (item.finalPrice != null
                 ? item.finalPrice
-                : (item.sourcePrice || 0) * MARGIN_MULTIPLIER).toFixed(2);
+                : (item.sourcePrice || 0) * MARGIN_MULTIPLIER);
+            const displayPrice = (allIn != null ? allIn : (horsPort != null ? horsPort : fallback)).toFixed(2);
+            const portSuffix = (allIn == null)
+                ? ' <span class="offer-port">+ frais de port <button type="button" class="offer-port-link" data-shipping-info>?</button></span>'
+                : '';
 
             // Description complete, nettoyee du HTML et tronquee.
             const rawDesc = (item.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -912,7 +926,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <h4 class="offer-title">${item.name}</h4>
                     ${descHtml}
                     <div class="offer-footer">
-                        <div class="offer-price">${displayPrice} <span>€ TTC</span></div>
+                        <div class="offer-price">${displayPrice} <span>€ TTC</span>${portSuffix}</div>
                         <div class="offer-actions">
                             ${linkHtml}
                             <button class="btn-add" data-id="${item.id}" title="Ajouter à la commande">

@@ -345,6 +345,112 @@ export async function quote(input: QuoteInput): Promise<QuoteResult> {
     }
 }
 
+/**
+ * Devis pour une LISTE d'articles (résultats de recherche).
+ *
+ * Optimisé : les grilles/paramètres sont chargés UNE fois et les clés de cache
+ * résolues en une seule requête — 4 requêtes au total quel que soit le nombre
+ * d'articles, au lieu d'une poignée par article. Aucun appel IA (jamais en liste).
+ */
+export async function quoteMany(
+    items: Array<{
+        id?: string;
+        prixPieceEur: number;
+        portVendeurEur?: number | null;
+        titre?: string | null;
+        description?: string | null;
+        categoryCode?: string | null;
+        poidsVendeurKg?: number | null;
+    }>,
+    zone: Zone,
+): Promise<Array<{ id?: string; prixClientEur: number | null; prixHorsPortEur: number | null; portInconnu: boolean; regime: 'FERME' | 'ESTIME'; detail: any }>> {
+    if (!items.length) return [];
+
+    const [settings, tranches, feeTiers] = await Promise.all([
+        getSettings(), getTranches(zone), getFeeTiers(),
+    ]);
+
+    // Résolution groupée du cache de classification.
+    const keys = items.map((i) => (i.titre ? aiCacheKey(i.titre, i.description ?? null) : null));
+    const uniqueKeys = [...new Set(keys.filter(Boolean) as string[])];
+    const cacheRows = uniqueKeys.length
+        ? await prisma.aiClassification.findMany({
+            where: { titreNormalise: { in: uniqueKeys } },
+            include: { category: true },
+        })
+        : [];
+    const cacheByKey = new Map(cacheRows.map((r) => [r.titreNormalise, r]));
+
+    // Catégories explicitement demandées.
+    const codes = [...new Set(items.map((i) => i.categoryCode).filter(Boolean) as string[])];
+    const cats = codes.length
+        ? await prisma.partCategory.findMany({ where: { code: { in: codes } } })
+        : [];
+    const catByCode = new Map(cats.map((c) => [c.code, c]));
+
+    return items.map((item, idx) => {
+        // Port vendeur inconnu : rien de fiable à afficher.
+        if (item.portVendeurEur == null) {
+            return { id: item.id, prixClientEur: null, prixHorsPortEur: null, portInconnu: true, regime: 'ESTIME' as const, detail: null };
+        }
+
+        const partial = computePriceWithoutShipping(
+            { prixPieceEur: item.prixPieceEur, portVendeurEur: item.portVendeurEur, settings },
+            feeTiers,
+        );
+
+        // Résolution du poids : vendeur -> catégorie -> cache. Jamais d'IA ici.
+        let poidsKg = 0;
+        let dims: ParcelDims = {};
+        let horsGabarit = false;
+        let source: WeightSource = 'UNKNOWN';
+        let confiance = 0;
+        let valideOp = false;
+
+        if (item.poidsVendeurKg && item.poidsVendeurKg > 0) {
+            poidsKg = item.poidsVendeurKg; source = 'SELLER'; confiance = 1;
+        } else if (item.categoryCode && catByCode.has(item.categoryCode)) {
+            const c = catByCode.get(item.categoryCode)!;
+            poidsKg = Number(c.poidsKg); source = 'CATALOG'; confiance = c.poidsVerifie ? 1 : 0.8;
+            dims = { longueurCm: c.longueurCm, largeurCm: c.largeurCm, hauteurCm: c.hauteurCm };
+            horsGabarit = c.horsGabarit;
+        } else {
+            const k = keys[idx];
+            const cached = k ? cacheByKey.get(k) : undefined;
+            if (cached?.category) {
+                const q = cached.quantite || 1;
+                poidsKg = Number(cached.category.poidsKg) * q;
+                source = 'AI_CACHED'; confiance = Number(cached.confiance);
+                valideOp = cached.valideParOperateur;
+                dims = { longueurCm: cached.category.longueurCm, largeurCm: cached.category.largeurCm, hauteurCm: cached.category.hauteurCm };
+                horsGabarit = cached.category.horsGabarit;
+            }
+        }
+
+        if (poidsKg <= 0 || horsGabarit) {
+            return { id: item.id, prixClientEur: null, prixHorsPortEur: partial.prixHorsPortEur, portInconnu: true, regime: 'ESTIME' as const, detail: partial.detail };
+        }
+
+        try {
+            const full = computeTotalPrice(
+                { prixPieceEur: item.prixPieceEur, portVendeurEur: item.portVendeurEur, poidsKg, tranches, dims, settings },
+                feeTiers,
+            );
+            return {
+                id: item.id,
+                prixClientEur: full.prixClientEur,
+                prixHorsPortEur: partial.prixHorsPortEur,
+                portInconnu: false,
+                regime: getPriceRegime(source, confiance, valideOp),
+                detail: full.detail,
+            };
+        } catch {
+            // Hors gabarit / poids trop élevé : on garde le prix hors port.
+            return { id: item.id, prixClientEur: null, prixHorsPortEur: partial.prixHorsPortEur, portInconnu: true, regime: 'ESTIME' as const, detail: partial.detail };
+        }
+    });
+}
+
 /** Écart entre estimation et pesée réelle (déclenchement d'un appel de fonds). */
 export async function weightDeviation(poidsEstimeKg: number, poidsReelKg: number, zone: Zone) {
     const [tranches, settings] = await Promise.all([getTranches(zone), getSettings()]);

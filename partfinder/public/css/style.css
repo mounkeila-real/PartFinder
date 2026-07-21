@@ -1597,6 +1597,41 @@ textarea:focus {
     .adm-row-meta { white-space: normal; }
 }
 
+/* ── Frais d'acheminement (client) ───────────────────────────────── */
+.offer-port {
+    display: block; font-size: 0.78rem; font-weight: 500;
+    color: var(--text-tertiary); margin-top: 2px;
+}
+.offer-port-link {
+    width: 17px; height: 17px; border-radius: 50%;
+    background: var(--overlay); color: var(--text-secondary);
+    font-size: 0.7rem; font-weight: 700; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    vertical-align: middle; margin-left: 3px;
+}
+.offer-port-link:hover { background: var(--accent-electric); color: #fff; }
+
+.ship-intro { font-size: 0.9rem; line-height: 1.55; color: var(--text-secondary); margin-bottom: 12px; }
+.ship-zone-label {
+    display: flex; flex-direction: column; gap: 6px; margin: 18px 0 14px;
+    font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);
+}
+.ship-zone-label select {
+    height: 44px; padding: 0 12px; font-size: 0.9rem;
+    background: var(--bg-surface); border: 1px solid var(--border-color);
+    border-radius: var(--radius-md); color: var(--text-primary);
+}
+.ship-line {
+    display: flex; justify-content: space-between; gap: 12px;
+    font-size: 0.88rem; color: var(--text-secondary);
+    padding: 7px 0; border-bottom: 1px dashed var(--border-color);
+}
+.ship-note {
+    margin-top: 14px; padding: 12px 14px;
+    background: var(--overlay-soft); border-radius: var(--radius-md);
+    font-size: 0.8rem; line-height: 1.5; color: var(--text-tertiary);
+}
+
 /* ── Admin : Tarification ────────────────────────────────────────── */
 .pr-hint { font-size: 0.78rem; color: var(--text-tertiary); font-weight: 400; }
 
