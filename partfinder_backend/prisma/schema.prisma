@@ -44,6 +44,10 @@ model User {
   resetTokenExpiry DateTime?
   orders       Order[]
   vehicles     SavedVehicle[]
+  addresses    Address[]
+  inboundParcels   InboundParcel[]
+  outboundShipments OutboundShipment[]
+  paymentRequests  PaymentRequest[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -80,6 +84,7 @@ model Order {
   adminNote   String?                         // Explication de l'ajustement (visible client)
   validatedAt DateTime?                       // Date de validation par l'opérateur
   items       OrderItem[]
+  inboundParcels InboundParcel[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 }
@@ -139,4 +144,171 @@ model Vehicle {
   specifications String   // JSON string storing all Vincario parameters
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TARIFICATION TOUT COMPRIS / ENTREPÔT / RÉEXPÉDITION
+// Statuts de commande (Order.status) :
+//   PENDING_VALIDATION, AWAITING_PAYMENT, PENDING, CONFIRMED, PROCESSING,
+//   PENDING_WEIGHT_CONFIRMATION, PENDING_ADDITIONAL_PAYMENT,
+//   RECEIVED_AT_WAREHOUSE, READY_TO_SHIP, SHIPPED, DELIVERED, CANCELLED, ISSUE
+// Tous les montants sont en Decimal (numeric) — jamais de Float.
+// ═══════════════════════════════════════════════════════════════════
+
+// Référentiel des catégories de pièces : poids/dimensions de référence
+// servant à estimer le port avant pesée réelle.
+model PartCategory {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique
+  labelFr      String
+  poidsKg      Decimal  @db.Decimal(6, 2)
+  longueurCm   Int?
+  largeurCm    Int?
+  hauteurCm    Int?
+  poidsVerifie Boolean  @default(false)   // true après pesées réelles concordantes
+  horsGabarit  Boolean  @default(false)   // hors normes Colissimo
+  synonymes    String[] @default([])
+  classifications AiClassification[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// Grille Colissimo Outre-mer, versionnée par dates de validité
+// (mise à jour annuelle sans écraser l'historique).
+model ColissimoRate {
+  id         Int       @id @default(autoincrement())
+  zone       String                              // OM1 | OM2
+  poidsMaxKg Decimal   @db.Decimal(6, 2)
+  prixEur    Decimal   @db.Decimal(10, 2)
+  valideDu   DateTime  @db.Date
+  valideAu   DateTime? @db.Date
+  createdAt  DateTime  @default(now())
+
+  @@index([zone, poidsMaxKg])
+}
+
+// Frais de traitement par tranche de valeur déclarée.
+model ProcessingFeeTier {
+  id           Int      @id @default(autoincrement())
+  valeurMinEur Decimal  @db.Decimal(10, 2)
+  valeurMaxEur Decimal? @db.Decimal(10, 2)      // null = infini
+  fraisEur     Decimal  @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+}
+
+// Paramètres de tarification éditables en admin (sans redéploiement).
+model PricingSetting {
+  key       String   @id
+  value     String
+  type      String   @default("number")          // number | boolean | string
+  label     String?
+  updatedAt DateTime @updatedAt
+}
+
+// Journal des modifications de paramètres (qui, quand, ancienne → nouvelle).
+model PricingSettingLog {
+  id        Int      @id @default(autoincrement())
+  key       String
+  oldValue  String?
+  newValue  String
+  userId    Int?
+  createdAt DateTime @default(now())
+}
+
+// Cache de classification IA : un titre normalisé n'est jamais reclassifié.
+model AiClassification {
+  id                 Int           @id @default(autoincrement())
+  titreNormalise     String        @unique
+  categoryId         Int?
+  category           PartCategory? @relation(fields: [categoryId], references: [id])
+  confiance          Decimal       @db.Decimal(4, 3)
+  valideParOperateur Boolean       @default(false)
+  createdAt          DateTime      @default(now())
+}
+
+// Adresses de livraison du client (la zone pilote le tarif Colissimo).
+model Address {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  destinataire String
+  ligne1       String
+  ligne2       String?
+  codePostal   String
+  ville        String
+  territoire   String                            // GUADELOUPE, REUNION, POLYNESIE...
+  zone         String                            // OM1 | OM2
+  telephone    String?
+  parDefaut    Boolean  @default(false)
+  shipments    OutboundShipment[]
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Colis entrants à l'entrepôt (issus d'une commande, ou réexpédition seule).
+model InboundParcel {
+  id             Int       @id @default(autoincrement())
+  orderId        Int?
+  order          Order?    @relation(fields: [orderId], references: [id])
+  userId         Int
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackingNumber String?
+  transporteur   String?
+  statut         String    @default("EXPECTED")  // EXPECTED|RECEIVED|WEIGHED|ISSUE|CONSOLIDATED|SHIPPED
+  poidsReelKg    Decimal?  @db.Decimal(6, 2)
+  longueurCm     Int?
+  largeurCm      Int?
+  hauteurCm      Int?
+  photos         Json      @default("[]")
+  notesOperateur String?
+  annonce        Boolean   @default(true)        // false = colis non annoncé (supplément)
+  receivedAt     DateTime?
+  weighedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([statut])
+  @@index([trackingNumber])
+}
+
+// Réexpéditions vers le client (Colissimo Outre-mer).
+model OutboundShipment {
+  id                Int       @id @default(autoincrement())
+  userId            Int
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId           Int?
+  inboundParcelIds  Int[]     @default([])
+  addressId         Int?
+  address           Address?  @relation(fields: [addressId], references: [id])
+  zone              String                        // OM1 | OM2
+  poidsFactureKg    Decimal?  @db.Decimal(6, 2)
+  portEur           Decimal?  @db.Decimal(10, 2)
+  assurance         String    @default("STANDARD") // STANDARD | AD_VALOREM
+  valeurDeclareeEur Decimal?  @db.Decimal(10, 2)
+  cn23Data          Json?
+  trackingColissimo String?
+  statut            String    @default("PREPARING") // PREPARING|LABEL_READY|SHIPPED|DELIVERED
+  shippedAt         DateTime?
+  createdAt         DateTime  @default(now())
+
+  @@index([statut])
+}
+
+// Appels de fonds (écart de poids, stockage, suppléments).
+model PaymentRequest {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId         Int?
+  shipmentId      Int?
+  motif           String                          // ECART_POIDS|STOCKAGE|SUPPLEMENT|AUTRE
+  montantEur      Decimal   @db.Decimal(10, 2)
+  detail          String?
+  statut          String    @default("PENDING")   // PENDING | PAID | CANCELLED | REFUSED
+  lienPaiement    String?
+  stripeSessionId String?
+  createdAt       DateTime  @default(now())
+  paidAt          DateTime?
+
+  @@index([statut])
 }
