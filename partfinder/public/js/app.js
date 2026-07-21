@@ -823,7 +823,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     finalPrice: (item.finalPrice != null ? item.finalPrice : null),
                     condition: isUsed ? 'used' : 'new',
                     description: item.fullDescription || item.shortDescription || '',
-                    url: item.itemWebUrl || null,
+                    // Pas de lien vers l'annonce d'origine : la fiche détaillée
+                    // passe par notre backend (bouton « Voir la fiche »).
                     // Donnees d'approvisionnement : INTERNES, jamais affichees au client.
                     // Elles remontent avec la commande pour que l'operateur puisse
                     // arreter le prix definitif en connaissant son cout reel.

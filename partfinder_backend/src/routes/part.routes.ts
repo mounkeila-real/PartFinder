@@ -4,6 +4,7 @@ import { EbayService } from '../services/ebay.service';
 import { AliexpressService } from '../services/aliexpress.service';
 import { PartAiService, VehicleContext, PartRequest } from '../services/part_ai.service';
 import * as pricing from '../services/pricing';
+import { requireAdmin } from '../middleware/auth.middleware';
 
 const router = express.Router();
 
@@ -160,7 +161,12 @@ router.post('/determine', async (req: express.Request, res: express.Response) =>
  * Recherche eBay à partir d'une requête déjà construite.
  * body: { query, limit? }
  */
-router.post('/search', async (req: express.Request, res: express.Response) => {
+/**
+ * RESERVE AUX ADMINS : renvoie les annonces BRUTES du fournisseur (lien vers
+ * l'annonce, vendeur, prix d'achat). Aucun écran client ne l'utilise — le
+ * parcours client passe par /find, qui neutralise ces champs.
+ */
+router.post('/search', requireAdmin, async (req: express.Request, res: express.Response) => {
     try {
         const { query, limit } = req.body;
         if (!query) return res.status(400).json({ error: 'Missing search query' });
@@ -275,13 +281,19 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
             console.error('[parts] tarification:', e.message);
         }
 
-        // Point de passage OBLIGE : aucune URL fournisseur ne sort d'ici, quel
-        // que soit le chemin emprunté au-dessus (y compris tarification en échec).
-        results = results.map((r: any) => ({
-            ...r,
-            image: proxifyImage(r.image, req),
-            thumbnail: proxifyImage(r.thumbnail, req),
-        }));
+        // Point de passage OBLIGE : rien qui désigne le fournisseur ne sort
+        // d'ici, quel que soit le chemin emprunté au-dessus (y compris
+        // tarification en échec, qui retombait sur les résultats bruts).
+        results = results.map((r: any) => {
+            // itemWebUrl (lien direct vers l'annonce) et seller identifient la
+            // source de façon flagrante et ne servent à rien côté client.
+            const { itemWebUrl, seller, ...rest } = r;
+            return {
+                ...rest,
+                image: proxifyImage(r.image, req),
+                thumbnail: proxifyImage(r.thumbnail, req),
+            };
+        });
 
         res.json({
             part,
@@ -304,9 +316,13 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
 });
 
 /**
- * Diagnostic: montre la reponse eBay brute (pour verifier les images).
+ * Diagnostic: montre la reponse brute du fournisseur (pour verifier les images).
+ *
+ * RESERVE AUX ADMINS : cette reponse expose la source d'approvisionnement
+ * (marque du fournisseur, URL d'annonces, prix d'achat). Publique, elle
+ * contournait toute la demarketisation pour qui connaissait l'URL.
  */
-router.get('/debug-search', async (req: express.Request, res: express.Response) => {
+router.get('/debug-search', requireAdmin, async (req: express.Request, res: express.Response) => {
     try {
         const q = String(req.query.q || 'alternateur');
         const raw = await EbayService.debugSearch(q);
