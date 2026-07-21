@@ -556,6 +556,7 @@
             <div class="auth-tabs">
                 <button class="auth-tab active" data-acc-tab="orders">Mes commandes</button>
                 <button class="auth-tab" data-acc-tab="parcels">Mes colis</button>
+                <button class="auth-tab" data-acc-tab="payments">Paiements <span class="pay-badge display-none" id="acc-pay-badge"></span></button>
                 <button class="auth-tab" data-acc-tab="profile">Profil</button>
                 <button class="auth-tab" data-acc-tab="security">Sécurité</button>
             </div>
@@ -573,6 +574,11 @@
             <!-- Suivi des colis -->
             <div class="display-none" data-acc-panel="parcels">
                 <div id="acc-parcels"><p class="acc-empty">Chargement…</p></div>
+            </div>
+
+            <!-- Paiements en attente (appels de fonds) -->
+            <div class="display-none" data-acc-panel="payments">
+                <div id="acc-payments"><p class="acc-empty">Chargement…</p></div>
             </div>
 
             <!-- Profil -->

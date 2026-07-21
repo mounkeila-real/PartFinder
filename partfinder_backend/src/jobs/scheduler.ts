@@ -104,6 +104,36 @@ export async function billStorage(): Promise<void> {
     }
 }
 
+/**
+ * Relances des appels de fonds en attente, à J+3 et J+7.
+ *
+ * Le cron tourne une fois par jour : un paiement est relancé le jour où son
+ * ancienneté atteint exactement 3 puis 7 jours. Pas de champ de suivi des
+ * relances en base — si le process est arrêté ce jour-là, la relance saute
+ * (limitation assumée, sans double envoi possible).
+ */
+export async function remindPaymentRequests(): Promise<void> {
+    const pending = await prisma.paymentRequest.findMany({
+        where: { statut: 'PENDING' },
+        include: { user: { select: { email: true, companyName: true } } },
+    });
+
+    for (const pr of pending) {
+        const ageJours = Math.floor((Date.now() - pr.createdAt.getTime()) / 86_400_000);
+        if (ageJours !== 3 && ageJours !== 7) continue;
+        if (!pr.user?.email) continue;
+
+        await EmailService.sendPaymentReminderEmail(
+            pr.user.email,
+            pr.orderId ?? pr.id,
+            Number(pr.montantEur),
+            pr.detail,
+            ageJours,
+        );
+        console.log(`[cron] relance J+${ageJours} — appel de fonds #${pr.id} (${pr.user.email})`);
+    }
+}
+
 export function startScheduler(): void {
     if (process.env.DISABLE_CRON === '1') {
         console.log('[cron] désactivé (DISABLE_CRON=1)');
@@ -123,6 +153,11 @@ export function startScheduler(): void {
     // Chaque jour à 06h00 : facturation du stockage au-delà de la franchise.
     cron.schedule('0 6 * * *', () => {
         billStorage().catch((e) => console.error('[cron] billStorage:', e.message));
+    }, { timezone: 'Europe/Paris' });
+
+    // Chaque jour à 09h00 : relances des appels de fonds (J+3 et J+7).
+    cron.schedule('0 9 * * *', () => {
+        remindPaymentRequests().catch((e) => console.error('[cron] remindPaymentRequests:', e.message));
     }, { timezone: 'Europe/Paris' });
 
     console.log('[cron] planificateur démarré (grille Colissimo : lundi 08:00 + 2 janvier ; stockage : quotidien 06:00)');

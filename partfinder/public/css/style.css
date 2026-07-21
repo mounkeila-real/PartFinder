@@ -1563,6 +1563,21 @@ textarea:focus {
 
 .acc-logout { width: 100%; margin-top: 18px; }
 
+/* Appels de fonds (client) */
+.pay-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 5px; margin-left: 4px;
+    border-radius: 999px; background: var(--accent-neon); color: #fff;
+    font-size: 0.7rem; font-weight: 700; vertical-align: middle;
+}
+.pr-refuse {
+    display: block; width: 100%; margin-top: 8px; padding: 10px;
+    font-size: 0.85rem; color: var(--text-tertiary);
+    text-decoration: underline; text-align: center;
+}
+.pr-refuse:hover { color: var(--danger); }
+.pr-refuse:disabled { opacity: 0.5; }
+
 /* ── Panneau Administration ──────────────────────────────────────── */
 .admin-modal { max-width: 780px; }
 

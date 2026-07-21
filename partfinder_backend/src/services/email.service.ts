@@ -54,6 +54,47 @@ export class EmailService {
     }
 
     /**
+     * Relance d'un appel de fonds en attente (J+3 puis J+7).
+     * Sans le lien direct (il peut être régénéré), on renvoie vers l'espace client.
+     */
+    static async sendPaymentReminderEmail(
+        email: string,
+        reference: number,
+        montantEur: number,
+        detail: string | null,
+        joursEcoules: number,
+    ): Promise<boolean> {
+        const montant = montantEur.toFixed(2).replace('.', ',') + ' €';
+        const lien = `${FRONTEND_URL}/`;
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                <h2 style="color: #DB930B; text-align: center;">Rappel — paiement en attente</h2>
+                <p>Bonjour,</p>
+                <p>Un complément de <strong>${montant}</strong> concernant votre dossier
+                   <strong>#${reference}</strong> est en attente depuis ${joursEcoules} jours.</p>
+                ${detail ? `<p style="background:#F5F7FB;padding:12px 16px;border-radius:8px;font-size:14px;">${detail}</p>` : ''}
+                <p><strong>Votre colis ne pourra pas être expédié tant que ce paiement n'est pas réglé.</strong></p>
+                <div style="text-align: center; margin: 28px 0;">
+                    <a href="${lien}" style="background-color:#1F5FD6;color:white;padding:12px 24px;text-decoration:none;border-radius:4px;font-weight:bold;display:inline-block">Régler depuis mon espace</a>
+                </div>
+                <p style="font-size:12px;color:#666">Vous pouvez aussi contester ce complément depuis votre espace : notre équipe vous recontactera.</p>
+                <hr style="border:0;border-top:1px solid #eee;margin:20px 0" />
+                <p style="font-size:11px;color:#999;text-align:center">PartFinder — message automatique.</p>
+            </div>`;
+        if (!resend) {
+            console.warn(`[EMAIL BACKUP] Relance J+${joursEcoules} #${reference} (${montant}) pour ${email}`);
+            return true;
+        }
+        try {
+            await resend.emails.send({ from: FROM_EMAIL, to: email, subject: `Rappel : paiement en attente — dossier #${reference}`, html });
+            return true;
+        } catch (error: any) {
+            console.error('[resend] Failed to send reminder:', error.message);
+            return false;
+        }
+    }
+
+    /**
      * Colis expédié : notification client avec le numéro de suivi.
      * Vocabulaire neutre — aucune source d'approvisionnement mentionnée.
      */

@@ -41,7 +41,92 @@
             panels.forEach(p => p.classList.toggle('display-none', p.getAttribute('data-acc-panel') !== name));
             clearMsg();
             if (name === 'parcels') loadParcels();
+            if (name === 'payments') loadPayments();
         }
+
+        // ── Paiements en attente (appels de fonds) ───────────────────
+        async function loadPayments() {
+            const box = document.getElementById('acc-payments');
+            box.innerHTML = '<p class="acc-empty">Chargement…</p>';
+            try {
+                const data = await api('/payment-requests/mine', { method: 'GET' });
+                const all = data.requests || [];
+                updatePayBadge(all);
+
+                if (!all.length) {
+                    box.innerHTML = '<p class="acc-empty">Aucun paiement complémentaire.</p>';
+                    return;
+                }
+
+                const pending = all.filter(r => r.statut === 'PENDING');
+                const others = all.filter(r => r.statut !== 'PENDING');
+                const STATUT_FR = { PAID: 'Réglé', CANCELLED: 'Annulé', REFUSED: 'Contesté' };
+
+                const card = (r) => {
+                    const date = new Date(r.createdAt).toLocaleDateString('fr-FR');
+                    const photos = (r.photos || []).length
+                        ? `<div class="pk-photos">${r.photos.map(u => `<img src="${u}" alt="Photo du colis">`).join('')}</div>` : '';
+                    const actions = r.statut === 'PENDING' ? `
+                        <button class="acc-pay-btn" data-pr-pay="${r.id}">
+                            <i class="ph ph-lock-simple"></i> Régler ${r.montantEur.toFixed(2)} €
+                        </button>
+                        ${r.refusable ? `<button class="pr-refuse" data-pr-refuse="${r.id}">Contester ce complément</button>` : ''}` : '';
+                    return `<div class="acc-order">
+                        <div class="acc-order-head">
+                            <strong>${esc(r.motifLabel)}${r.orderId ? ` — commande #${r.orderId}` : ''}</strong>
+                            <span class="acc-status ${r.statut === 'PENDING' ? 'st-pending' : r.statut === 'PAID' ? 'st-done' : 'st-cancel'}">
+                                ${r.statut === 'PENDING' ? 'À régler' : (STATUT_FR[r.statut] || r.statut)}</span>
+                        </div>
+                        <div class="acc-order-meta">${date}</div>
+                        ${r.detail ? `<p class="acc-order-notice">${esc(r.detail)}</p>` : ''}
+                        ${photos}
+                        <div class="acc-order-total"><span>Montant</span><strong>${r.montantEur.toFixed(2)} €</strong></div>
+                        ${actions}
+                    </div>`;
+                };
+
+                box.innerHTML =
+                    (pending.length ? `<h3 class="acc-sub">À régler (${pending.length})</h3>` + pending.map(card).join('') : '')
+                    + (others.length ? `<h3 class="acc-sub">Historique</h3>` + others.map(card).join('') : '');
+            } catch (e) {
+                box.innerHTML = `<p class="acc-empty">${esc(e.message)}</p>`;
+            }
+        }
+
+        function updatePayBadge(requests) {
+            const badge = document.getElementById('acc-pay-badge');
+            if (!badge) return;
+            const n = (requests || []).filter(r => r.statut === 'PENDING').length;
+            badge.textContent = n;
+            badge.classList.toggle('display-none', n === 0);
+        }
+
+        document.getElementById('acc-payments').addEventListener('click', async (e) => {
+            const payBtn = e.target.closest('[data-pr-pay]');
+            const refuseBtn = e.target.closest('[data-pr-refuse]');
+            clearMsg();
+            try {
+                if (payBtn) {
+                    payBtn.disabled = true;
+                    const data = await api('/payment-requests/' + payBtn.getAttribute('data-pr-pay') + '/pay', {
+                        method: 'POST', body: JSON.stringify({}),
+                    });
+                    if (data.url) window.location.href = data.url; // page de paiement sécurisée
+                } else if (refuseBtn) {
+                    if (!confirm('Contester ce complément ?\nVotre commande passera en traitement manuel : notre équipe vous contactera pour un retour ou un remboursement partiel.')) return;
+                    refuseBtn.disabled = true;
+                    const data = await api('/payment-requests/' + refuseBtn.getAttribute('data-pr-refuse') + '/refuse', {
+                        method: 'POST', body: JSON.stringify({}),
+                    });
+                    showSuccess(data.message || 'Refus enregistré.');
+                    loadPayments();
+                }
+            } catch (err) {
+                showError(err.message);
+                if (payBtn) payBtn.disabled = false;
+                if (refuseBtn) refuseBtn.disabled = false;
+            }
+        });
 
         // ── Suivi des colis (vocabulaire neutre) ─────────────────────
         const ETAPE_FR = {
@@ -132,6 +217,10 @@
             switchTab('orders');
             fillProfile();
             loadOrders();
+            // Badge « paiements en attente » visible dès l'ouverture.
+            api('/payment-requests/mine', { method: 'GET' })
+                .then(d => updatePayBadge(d.requests))
+                .catch(() => {});
             overlay.classList.remove('display-none');
         };
 

@@ -162,6 +162,38 @@ export async function stripeWebhookHandler(req: express.Request, res: express.Re
 
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object as Stripe.Checkout.Session;
+
+        // Cas 1 : appel de fonds (écart de poids, stockage, supplément).
+        const paymentRequestId = Number(session.metadata?.paymentRequestId);
+        if (paymentRequestId) {
+            try {
+                const pr = await prisma.paymentRequest.update({
+                    where: { id: paymentRequestId },
+                    data: { statut: 'PAID', paidAt: new Date() },
+                });
+                console.log('[checkout] appel de fonds payé #', paymentRequestId);
+
+                // Si plus AUCUN paiement en attente sur cette commande, elle
+                // redevient expédiable.
+                if (pr.orderId) {
+                    const encore = await prisma.paymentRequest.count({
+                        where: { orderId: pr.orderId, statut: 'PENDING' },
+                    });
+                    if (encore === 0) {
+                        await prisma.order.updateMany({
+                            where: { id: pr.orderId, status: 'PENDING_ADDITIONAL_PAYMENT' },
+                            data: { status: 'READY_TO_SHIP' },
+                        });
+                        console.log('[checkout] commande #', pr.orderId, 'débloquée -> READY_TO_SHIP');
+                    }
+                }
+            } catch (e: any) {
+                console.error('[checkout] webhook payment-request:', e.message);
+            }
+            return res.json({ received: true });
+        }
+
+        // Cas 2 : paiement d'une commande.
         const orderId = Number(session.metadata?.orderId || session.client_reference_id);
         if (orderId) {
             try {
