@@ -54,6 +54,35 @@ export class EmailService {
     }
 
     /**
+     * Alerte interne (admin) : la grille tarifaire Colissimo doit être vérifiée.
+     * Email opérationnel — jamais envoyé à un client.
+     */
+    static async sendColissimoGridAlert(to: string, message: string): Promise<boolean> {
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                <h2 style="color: #DB930B;">⚠️ Grille Colissimo à vérifier</h2>
+                <p>${message}</p>
+                <p>Les tarifs d'acheminement outre-mer servent au calcul du prix client.
+                   Une grille périmée peut entraîner des <strong>ventes à perte</strong>.</p>
+                <p>Mettez-la à jour depuis <strong>Admin → Tarification → Grille Colissimo</strong>
+                   en indiquant une nouvelle date de validité (l'historique est conservé).</p>
+                <hr style="border:0;border-top:1px solid #eee;margin:20px 0" />
+                <p style="font-size:11px;color:#999">Message automatique — PartFinder.</p>
+            </div>`;
+        if (!resend) {
+            console.warn(`[EMAIL BACKUP] Alerte grille Colissimo pour ${to}: ${message}`);
+            return true;
+        }
+        try {
+            await resend.emails.send({ from: FROM_EMAIL, to, subject: '⚠️ PartFinder — grille Colissimo à vérifier', html });
+            return true;
+        } catch (error: any) {
+            console.error('[resend] Failed to send grid alert:', error.message);
+            return false;
+        }
+    }
+
+    /**
      * Demande de fonds : le prix définitif de la commande a été arrêté,
      * le client est invité à régler via le lien de paiement sécurisé.
      * Vocabulaire neutre — aucune mention d'une source d'approvisionnement.

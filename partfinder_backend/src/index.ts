@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.routes';
 import adminRoutes from './routes/admin.routes';
 import garageRoutes from './routes/garage.routes';
 import checkoutRoutes, { stripeWebhookHandler } from './routes/checkout.routes';
+import { startScheduler } from './jobs/scheduler';
 
 dotenv.config();
 
@@ -42,4 +43,5 @@ app.get('/health', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
+    startScheduler();
 });

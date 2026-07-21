@@ -5,6 +5,8 @@ import { PrismaClient } from '@prisma/client';
 import { AuthService } from '../services/auth.service';
 import { EmailService } from '../services/email.service';
 import { requireAdmin, AuthedRequest } from '../middleware/auth.middleware';
+import { getActiveRates, replaceGrid, checkGridFreshness, activeProvider } from '../services/colissimo.service';
+import { refreshColissimoRates } from '../jobs/scheduler';
 
 /**
  * Administration (Phase 3) — toutes les routes exigent le rôle ADMIN.
@@ -239,6 +241,71 @@ router.post('/orders/:id/payment-link', async (req: AuthedRequest, res: express.
     } catch (e: any) {
         console.error('[admin] payment-link:', e.message);
         res.status(500).json({ error: 'Erreur lors de la création de la demande de paiement.' });
+    }
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   Grille tarifaire Colissimo (versionnée)
+   ══════════════════════════════════════════════════════════════════ */
+
+/** GET /api/admin/pricing/colissimo — grille en vigueur + état de fraîcheur. */
+router.get('/pricing/colissimo', async (_req: AuthedRequest, res: express.Response) => {
+    try {
+        const [rates, freshness] = await Promise.all([getActiveRates(), checkGridFreshness()]);
+        res.json({
+            rates,
+            freshness,
+            provider: activeProvider().name,
+            autoRefresh: activeProvider().name !== 'manuel',
+        });
+    } catch (e: any) {
+        console.error('[admin] colissimo get:', e.message);
+        res.status(500).json({ error: 'Erreur lors du chargement de la grille.' });
+    }
+});
+
+/**
+ * POST /api/admin/pricing/colissimo — publie une NOUVELLE grille.
+ * L'ancienne est clôturée (historique conservé), jamais supprimée.
+ * body: { valideDu: 'YYYY-MM-DD', rates: [{ zone, poidsMaxKg, prixEur }] }
+ */
+router.post('/pricing/colissimo', async (req: AuthedRequest, res: express.Response) => {
+    try {
+        const { valideDu, rates } = req.body || {};
+        if (!Array.isArray(rates) || rates.length === 0) {
+            return res.status(400).json({ error: 'Aucun tarif fourni.' });
+        }
+        const date = valideDu ? new Date(valideDu) : new Date();
+        if (isNaN(date.getTime())) return res.status(400).json({ error: 'Date de validité invalide.' });
+
+        // Validation stricte : une erreur de saisie ici se traduit en vente à perte.
+        const clean = rates.map((r: any, i: number) => {
+            const zone = String(r.zone || '').toUpperCase();
+            const poids = Number(r.poidsMaxKg);
+            const prix = Number(r.prixEur);
+            if (zone !== 'OM1' && zone !== 'OM2') throw new Error(`Ligne ${i + 1} : zone invalide (OM1 ou OM2).`);
+            if (!Number.isFinite(poids) || poids <= 0 || poids > 30) throw new Error(`Ligne ${i + 1} : poids invalide (0 < kg ≤ 30).`);
+            if (!Number.isFinite(prix) || prix <= 0) throw new Error(`Ligne ${i + 1} : prix invalide.`);
+            return { zone: zone as 'OM1' | 'OM2', poidsMaxKg: poids, prixEur: prix };
+        });
+
+        const count = await replaceGrid(clean, date);
+        console.log(`[admin] nouvelle grille Colissimo publiée (${count} tranches) par user #${req.user!.userId}`);
+        res.json({ ok: true, count, valideDu: date });
+    } catch (e: any) {
+        console.error('[admin] colissimo post:', e.message);
+        res.status(400).json({ error: e.message || 'Erreur lors de la publication de la grille.' });
+    }
+});
+
+/** POST /api/admin/pricing/colissimo/refresh — déclenche le contrôle/rafraîchissement à la demande. */
+router.post('/pricing/colissimo/refresh', async (_req: AuthedRequest, res: express.Response) => {
+    try {
+        await refreshColissimoRates();
+        const freshness = await checkGridFreshness();
+        res.json({ ok: true, freshness });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
     }
 });
 
