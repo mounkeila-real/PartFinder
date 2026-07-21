@@ -96,6 +96,9 @@ const SETTINGS: Array<{ key: string; value: string; label: string }> = [
     { key: 'seuil_ecart_tranches', value: '2', label: 'Écart de tranches déclenchant un appel de fonds' },
     { key: 'supplement_gabarit_eur', value: '6', label: 'Supplément hors gabarit (€, somme dims 150–200 cm)' },
     { key: 'indemnisation_standard_eur_kg', value: '23', label: 'Indemnisation Colissimo standard (€/kg)' },
+    // ⚠️ À vérifier sur la grille officielle La Poste (option ad valorem).
+    { key: 'assurance_ad_valorem_pourcent', value: '1', label: 'Assurance ad valorem — % de la valeur déclarée' },
+    { key: 'assurance_ad_valorem_min_eur', value: '1.5', label: 'Assurance ad valorem — coût minimum (€)' },
 ];
 
 async function main() {

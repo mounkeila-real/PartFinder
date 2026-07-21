@@ -7,7 +7,8 @@
     "build": "tsc && npx prisma generate && npx prisma db push && npx ts-node scripts/seed_vin_cache.ts && npx ts-node scripts/seed_pricing.ts",
     "start": "node dist/index.js",
     "dev": "nodemon --exec ts-node src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -34,6 +35,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node-cron": "^3.0.11",
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "vitest": "^4.1.10"
   }
 }
