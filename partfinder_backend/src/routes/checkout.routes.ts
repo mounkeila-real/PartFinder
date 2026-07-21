@@ -2,6 +2,37 @@ import express from 'express';
 import Stripe from 'stripe';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthedRequest } from '../middleware/auth.middleware';
+import { verifyOffer } from '../services/offer_token';
+
+/**
+ * Extrait le coût d'acquisition d'un article depuis son jeton d'offre signé.
+ *
+ * On ne lit JAMAIS sourcePriceEur & co depuis le corps de la requête : ces
+ * champs venaient du navigateur, donc falsifiables (un client pouvait truquer
+ * son coût d'acquisition et fausser la validation opérateur). Signature
+ * invalide ou jeton absent → coûts null + note, la commande passe quand même
+ * (l'opérateur vérifie à la main en validation).
+ */
+function costsFromToken(item: any): {
+    sourcePriceEur: number | null;
+    sourceShippingEur: number | null;
+    sourceShippingType: string | null;
+    note: string | null;
+} {
+    const v = verifyOffer(item?.offerToken);
+    if (!v.ok) {
+        return {
+            sourcePriceEur: null, sourceShippingEur: null, sourceShippingType: null,
+            note: 'COUT NON VERIFIE (jeton absent ou altéré) — contrôler le coût d\'acquisition.',
+        };
+    }
+    return {
+        sourcePriceEur: v.data.sourcePriceEur,
+        sourceShippingEur: v.data.sourceShippingEur,
+        sourceShippingType: v.data.sourceShippingType,
+        note: v.expired ? 'Jeton d\'offre expiré (>72 h) — revérifier le prix fournisseur.' : null,
+    };
+}
 
 /**
  * Tunnel d'achat — Stripe Checkout (page de paiement hébergée par Stripe).
@@ -109,6 +140,10 @@ router.post('/request', requireAuth, async (req: AuthedRequest, res: express.Res
         const estimatedAmount = items.reduce(
             (s: number, i: any) => s + Number(i.priceSold) * Number(i.quantity || 1), 0);
 
+        // Coûts d'acquisition extraits des jetons signés (jamais du corps client).
+        const costs = items.map((i: any) => costsFromToken(i));
+        const notes = costs.map((c, idx) => c.note ? `Article ${idx + 1}: ${c.note}` : null).filter(Boolean);
+
         const order = await prisma.order.create({
             data: {
                 userId: req.user!.userId,
@@ -117,16 +152,17 @@ router.post('/request', requireAuth, async (req: AuthedRequest, res: express.Res
                 paymentStatus: 'UNPAID',
                 shippingAddress: String(shippingAddress),
                 poReference: poReference ? String(poReference) : null,
+                adminNote: notes.length ? notes.join(' | ') : null,
                 items: {
-                    create: items.map((i: any) => ({
+                    create: items.map((i: any, idx: number) => ({
                         partOem: i.partOem || '—',
                         partName: i.partName,
                         quantity: Number(i.quantity) || 1,
                         priceSold: Number(i.priceSold),
                         // Coût d'acquisition conservé pour la validation opérateur (interne).
-                        sourcePriceEur: i.sourcePriceEur != null ? Number(i.sourcePriceEur) : null,
-                        sourceShippingEur: i.sourceShippingEur != null ? Number(i.sourceShippingEur) : null,
-                        sourceShippingType: i.sourceShippingType || null,
+                        sourcePriceEur: costs[idx].sourcePriceEur,
+                        sourceShippingEur: costs[idx].sourceShippingEur,
+                        sourceShippingType: costs[idx].sourceShippingType,
                     })),
                 },
             },

@@ -5,6 +5,7 @@ import { AliexpressService } from '../services/aliexpress.service';
 import { PartAiService, VehicleContext, PartRequest } from '../services/part_ai.service';
 import * as pricing from '../services/pricing';
 import { requireAdmin } from '../middleware/auth.middleware';
+import { signOffer } from '../services/offer_token';
 
 const router = express.Router();
 
@@ -306,9 +307,14 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
         // d'ici, quel que soit le chemin emprunté au-dessus (y compris
         // tarification en échec, qui retombait sur les résultats bruts).
         results = results.map((r: any) => {
-            // itemWebUrl (lien direct vers l'annonce) et seller identifient la
-            // source de façon flagrante et ne servent à rien côté client.
-            const { itemWebUrl, seller, ...rest } = r;
+            // itemWebUrl / seller identifient la source de façon flagrante ;
+            // source / prix / port d'acquisition sont des données INTERNES :
+            // elles voyagent désormais scellées dans offerToken (HMAC), le
+            // client ne peut ni les lire ni les falsifier.
+            const {
+                itemWebUrl, seller, source, price, sourcePrice,
+                shippingCost, shippingType, ...rest
+            } = r;
             return {
                 ...rest,
                 image: proxifyImage(r.image, req),
@@ -317,6 +323,13 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
                 // de toute mention de la source (elles sont affichees au client).
                 shortDescription: r.shortDescription ? cleanEbayDescription(r.shortDescription) : r.shortDescription,
                 fullDescription: r.fullDescription ? cleanEbayDescription(r.fullDescription) : r.fullDescription,
+                offerToken: signOffer({
+                    itemId: String(r.itemId),
+                    source: String(source || ''),
+                    sourcePriceEur: price != null ? Number(price) : null,
+                    sourceShippingEur: shippingCost != null ? Number(shippingCost) : null,
+                    sourceShippingType: shippingType || null,
+                }),
             };
         });
 

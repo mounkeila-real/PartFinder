@@ -811,7 +811,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Normalise les offres pour le renderer.
             let resultsToRender = apiResults.map(item => {
-                const src = item.sourcePrice != null ? item.sourcePrice : (item.price != null ? item.price : 0);
                 const isUsed = item.condition && /USED|OCCAS|REFURB/i.test(item.condition);
                 return {
                     id: item.itemId,
@@ -819,18 +818,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     brand: determined.category || 'Pièce',
                     name: item.title,
                     img: item.image || item.thumbnail || FALLBACK_IMG,
-                    sourcePrice: src,
                     finalPrice: (item.finalPrice != null ? item.finalPrice : null),
+                    prixClientEur: item.prixClientEur != null ? item.prixClientEur : null,
+                    prixHorsPortEur: item.prixHorsPortEur != null ? item.prixHorsPortEur : null,
+                    portInconnu: item.portInconnu !== false,
                     condition: isUsed ? 'used' : 'new',
                     description: item.fullDescription || item.shortDescription || '',
                     // Pas de lien vers l'annonce d'origine : la fiche détaillée
                     // passe par notre backend (bouton « Voir la fiche »).
-                    // Donnees d'approvisionnement : INTERNES, jamais affichees au client.
-                    // Elles remontent avec la commande pour que l'operateur puisse
-                    // arreter le prix definitif en connaissant son cout reel.
-                    source: item.source || null,
-                    sourceShipping: item.shippingCost != null ? item.shippingCost : null,
-                    sourceShippingType: item.shippingType || null,
+                    // Le coût d'acquisition ne transite plus en clair : il est
+                    // scellé dans ce jeton signé par le serveur, renvoyé tel
+                    // quel avec la commande (illisible et infalsifiable ici).
+                    offerToken: item.offerToken || null,
                     isMock: !!item.isMock
                 };
             });
@@ -883,7 +882,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Prix affiche d'une offre (sert au tri) — meme calcul que renderResults.
     function offerPrice(item) {
-        return item.finalPrice != null ? item.finalPrice : (item.sourcePrice || 0) * MARGIN_MULTIPLIER;
+        // Priorité au prix tout compris, puis hors port, puis prix margé.
+        if (item.prixClientEur != null) return Number(item.prixClientEur);
+        if (item.prixHorsPortEur != null) return Number(item.prixHorsPortEur);
+        return item.finalPrice != null ? item.finalPrice : 0;
     }
 
     // Tri cote client (aucun appel reseau) : reordonne les resultats deja recus.
@@ -909,9 +911,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // outre-mer (affiché « + frais de port » avec un lien d'explication).
             const allIn = item.prixClientEur != null ? Number(item.prixClientEur) : null;
             const horsPort = item.prixHorsPortEur != null ? Number(item.prixHorsPortEur) : null;
-            const fallback = (item.finalPrice != null
-                ? item.finalPrice
-                : (item.sourcePrice || 0) * MARGIN_MULTIPLIER);
+            const fallback = (item.finalPrice != null ? item.finalPrice : 0);
             const displayPrice = (allIn != null ? allIn : (horsPort != null ? horsPort : fallback)).toFixed(2);
             const portSuffix = (allIn == null)
                 ? ' <span class="offer-port">+ frais de port <button type="button" class="offer-port-link" data-shipping-info>?</button></span>'
@@ -1057,7 +1057,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const cartItem = {
             ...item,
-            displayPrice: parseFloat((item.finalPrice != null ? item.finalPrice : item.sourcePrice * MARGIN_MULTIPLIER).toFixed(2))
+            // Même logique que l'affichage : tout compris > hors port > margé.
+            displayPrice: parseFloat(offerPrice(item).toFixed(2))
         };
 
         state.cart.push(cartItem);
@@ -1145,9 +1146,9 @@ document.addEventListener('DOMContentLoaded', () => {
             quantity: 1,
             priceSold: item.displayPrice,
             // Cout d'acquisition (interne) transmis pour la validation operateur.
-            sourcePriceEur: item.sourcePrice != null ? item.sourcePrice : null,
-            sourceShippingEur: item.sourceShipping != null ? item.sourceShipping : null,
-            sourceShippingType: item.sourceShippingType || null,
+            // Jeton signé par le serveur : contient le coût d'acquisition,
+            // que le serveur relira lui-même (rien à déclarer côté client).
+            offerToken: item.offerToken || null,
         }));
 
         // Ouvre le tunnel de paiement Stripe (livraison + redirection).
