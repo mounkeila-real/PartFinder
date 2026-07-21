@@ -333,19 +333,15 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
             };
         });
 
+        // Réponse PUBLIQUE : pas de champs de diagnostic — leurs NOMS mêmes
+        // (ebayQuery, countEbay...) désignaient les fournisseurs. Vérifié :
+        // aucun écran ne les consommait ; les requêtes construites restent
+        // visibles dans les logs serveur pour le débogage.
+        const { ebayQuery, source: partSource, ...partPublic } = (part || {}) as any;
         res.json({
-            part,
-            usedQuery,
-            aliexpressQuery: aeQuery,
-            triedQueries: candidates,
+            part: partPublic,
             aiConfigured: PartAiService.isConfigured(),
-            env: EbayService.currentEnv(),
-            ebayConfigured: EbayService.isConfigured(),
-            aliexpressConfigured: AliexpressService.isConfigured(),
-            marginMultiplier: MARGIN_MULTIPLIER,
             count: results.length,
-            countEbay: rawResults.length,
-            countAliexpress: aliexpressResults.length,
             results,
         });
     } catch (error: any) {
