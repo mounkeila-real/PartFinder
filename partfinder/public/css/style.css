@@ -1612,6 +1612,65 @@ textarea:focus {
     .adm-row-meta { white-space: normal; }
 }
 
+/* ── Cookies & pages légales ─────────────────────────────────────── */
+.ck-banner {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 3000;
+    background: var(--bg-surface); border-top: 1px solid var(--border-color);
+    box-shadow: 0 -8px 24px rgba(26, 43, 69, 0.15);
+}
+.ck-inner { max-width: 720px; margin: 0 auto; padding: 18px 16px; }
+.ck-text { font-size: 0.88rem; line-height: 1.5; color: var(--text-secondary); margin-bottom: 12px; }
+.ck-text a { color: var(--accent-electric); text-decoration: underline; }
+.ck-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+/* « Tout accepter » et « Tout refuser » : même taille, même poids visuel (CNIL). */
+.ck-btn {
+    height: 46px; padding: 0 22px; border-radius: var(--radius-md);
+    font-weight: 700; font-size: 0.9rem;
+    background: var(--accent-electric); color: #fff;
+}
+.ck-btn:hover { background: var(--accent-electric-hover); }
+.ck-link { font-size: 0.85rem; color: var(--text-tertiary); text-decoration: underline; }
+.ck-link:hover { color: var(--text-primary); }
+.ck-prefs { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.ck-cat { display: flex; gap: 10px; align-items: flex-start; font-size: 0.85rem; color: var(--text-secondary); }
+.ck-cat input { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
+.ck-cat small { color: var(--text-tertiary); }
+
+.sidebar-legal {
+    padding: 10px 20px; font-size: 0.72rem; color: var(--text-tertiary);
+    border-top: 1px solid var(--border-color);
+}
+.sidebar-legal a { color: var(--text-tertiary); text-decoration: underline; }
+.sidebar-legal a:hover { color: var(--text-primary); }
+
+.acc-legal { margin-top: 16px; text-align: center; font-size: 0.75rem; color: var(--text-tertiary); }
+.acc-legal a { color: var(--text-tertiary); text-decoration: underline; }
+.acc-legal a:hover { color: var(--text-primary); }
+
+.co-cgv { display: flex; gap: 10px; align-items: flex-start; font-size: 0.85rem; color: var(--text-secondary); }
+.co-cgv input { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
+.co-cgv a { color: var(--accent-electric); text-decoration: underline; }
+
+.legal-body { background: var(--bg-dark); overflow-x: hidden; overflow-y: auto; }
+.legal-page {
+    max-width: 760px; margin: 0 auto; padding: 32px 20px 64px;
+    background: var(--bg-surface); min-height: 100vh;
+    line-height: 1.65; font-size: 0.95rem; color: var(--text-secondary);
+}
+.legal-page h1 { font-size: 1.6rem; color: var(--text-primary); margin-bottom: 4px; }
+.legal-page h2 { font-size: 1.05rem; color: var(--text-primary); margin: 26px 0 8px; }
+.legal-page ul { padding-left: 20px; margin: 8px 0; }
+.legal-page li { margin-bottom: 6px; }
+.legal-page a { color: var(--accent-electric); text-decoration: underline; }
+.legal-updated { font-size: 0.8rem; color: var(--text-tertiary); margin-bottom: 18px; }
+.legal-back { display: inline-block; margin-bottom: 18px; font-size: 0.85rem; color: var(--text-tertiary); }
+.legal-back:hover { color: var(--accent-electric); }
+
+@media (max-width: 1023px) {
+    .sidebar-legal { display: none; } /* la sidebar devient une bottom-nav en mobile */
+    .ck-actions .ck-btn { flex: 1; }
+}
+
 /* ── Expéditions & CN23 ──────────────────────────────────────────── */
 .sh-chip {
     height: 40px; padding: 0 14px; border-radius: 999px;

@@ -46,6 +46,11 @@
                     <span>Admin</span>
                 </a>
             </nav>
+            <div class="sidebar-legal">
+                <a href="/cgv.html">CGV</a> ·
+                <a href="/confidentialite.html">Confidentialité</a> ·
+                <a href="#" data-manage-cookies>Gérer mes cookies</a>
+            </div>
             <div class="sidebar-footer">
                 <div class="user-profile" id="user-profile" role="button" tabindex="0" title="Compte">
                     <div class="avatar" id="user-avatar">?</div>
@@ -390,6 +395,10 @@
                 <label>Référence / bon de commande <span class="auth-hint">(optionnel)</span>
                     <input type="text" id="co-poref" placeholder="Ex: dossier client #1234">
                 </label>
+                <label class="co-cgv">
+                    <input type="checkbox" id="co-cgv" required>
+                    <span>J'accepte les <a href="/cgv.html" target="_blank" rel="noopener">Conditions Générales de Vente</a> *</span>
+                </label>
                 <button type="submit" class="btn-primary auth-submit" id="co-pay">
                     <i class="ph ph-paper-plane-tilt"></i> Envoyer ma demande <span id="co-total"></span>
                 </button>
@@ -619,6 +628,12 @@
                 </div>
 
                 <button type="button" class="btn-secondary acc-logout" id="acc-logout">Se déconnecter</button>
+
+                <p class="acc-legal">
+                    <a href="/cgv.html" target="_blank" rel="noopener">CGV</a> ·
+                    <a href="/confidentialite.html" target="_blank" rel="noopener">Confidentialité</a> ·
+                    <a href="#" data-manage-cookies>Gérer mes cookies</a>
+                </p>
             </div>
         </div>
     </div>
@@ -713,6 +728,7 @@
     <script src="js/shipping-info.js"></script>
     <script src="js/warehouse.js"></script>
     <script src="js/shipping.js"></script>
+    <script src="js/cookies.js"></script>
 </body>
 
 </html>
