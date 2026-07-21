@@ -24,19 +24,23 @@ describe('offer_token — le coût d\'acquisition ne fait plus confiance au clie
         }
     });
 
-    it('rejette un jeton dont le payload a été modifié (prix falsifié)', () => {
-        const token = signOffer(OFFRE);
-        const [payload, sig] = [token.slice(0, token.lastIndexOf('.')), token.slice(token.lastIndexOf('.') + 1)];
-        const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-        data.sourcePriceEur = 0.01; // le client « déclare » un coût dérisoire
-        const forged = Buffer.from(JSON.stringify(data), 'utf8').toString('base64url') + '.' + sig;
-        expect(verifyOffer(forged).ok).toBe(false);
+    it('le jeton est chiffré : le contenu n\'est PAS lisible en le décodant', () => {
+        // C'est le cœur de la démarketisation : un jeton seulement signé
+        // laisserait « ebay » et le prix d'achat lisibles en base64.
+        const decoded = Buffer.from(signOffer(OFFRE), 'base64url').toString('latin1');
+        expect(decoded).not.toContain('ebay');
+        expect(decoded).not.toContain('source');
+        expect(decoded).not.toContain('45.9');
     });
 
-    it('rejette une signature altérée', () => {
+    it('rejette un jeton altéré (n\'importe quel octet)', () => {
         const token = signOffer(OFFRE);
-        const flipped = token.slice(0, -2) + (token.slice(-2) === 'AA' ? 'BB' : 'AA');
-        expect(verifyOffer(flipped).ok).toBe(false);
+        const raw = Buffer.from(token, 'base64url');
+        for (const pos of [0, 13, raw.length - 1]) { // iv, tag, contenu
+            const forged = Buffer.from(raw);
+            forged[pos] = forged[pos] ^ 0xff;
+            expect(verifyOffer(forged.toString('base64url')).ok).toBe(false);
+        }
     });
 
     it('rejette les entrées absurdes sans lever', () => {
@@ -46,14 +50,11 @@ describe('offer_token — le coût d\'acquisition ne fait plus confiance au clie
     });
 
     it('signale un jeton expiré sans le rejeter (l\'opérateur vérifiera)', () => {
-        const token = signOffer(OFFRE);
-        const dot = token.lastIndexOf('.');
-        const data = JSON.parse(Buffer.from(token.slice(0, dot), 'base64url').toString('utf8'));
-        expect(Date.now() - data.ts).toBeLessThan(5000);
         expect(OFFER_TOKEN_TTL_MS).toBe(72 * 3600 * 1000);
-        // Un vrai jeton vieilli garde une signature valide : expired est un
-        // drapeau, pas un rejet — la commande n'est jamais bloquée pour ça.
-        const v = verifyOffer(token);
-        if (v.ok) expect(typeof v.expired).toBe('boolean');
+        // expired est un drapeau, pas un rejet — la commande n'est jamais
+        // bloquée pour ça : un jeton frais doit le porter à false.
+        const v = verifyOffer(signOffer(OFFRE));
+        expect(v.ok).toBe(true);
+        if (v.ok) expect(v.expired).toBe(false);
     });
 });
