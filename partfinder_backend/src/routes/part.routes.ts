@@ -11,6 +11,27 @@ const router = express.Router();
 // Marge appliquée sur le prix source (33% par défaut, surchargée par env).
 const MARGIN_MULTIPLIER = Number(process.env.PART_MARGIN_MULTIPLIER || '1.33');
 
+/**
+ * Retire d'un texte tout ce qui désigne la source d'approvisionnement.
+ *
+ * Les descriptions d'annonces sont rédigées par les vendeurs : elles citent
+ * la marketplace et renvoient vers leur boutique. Comme cet extrait est
+ * AFFICHÉ sur chaque carte de résultat, le nom du fournisseur se retrouvait
+ * sous les yeux du client.
+ */
+function neutralizeSource(text: string): string {
+    if (!text) return '';
+    return String(text)
+        // Liens vendeur / boutique (contiennent le domaine de la marketplace).
+        .replace(/https?:\/\/\S+/gi, ' ')
+        .replace(/\bwww\.\S+/gi, ' ')
+        // Noms de marketplaces, avec ou sans extension de domaine.
+        .replace(/\b(e-?bay|ali-?express|alibaba|paypal|leboncoin)(\.[a-z]{2,3}(\.[a-z]{2,3})?)?\b/gi, ' ')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
 // Nettoie une description HTML eBay : retire le CSS/scripts/boilerplate vendeur, garde le texte utile.
 function cleanEbayDescription(html: string): string {
     if (!html) return '';
@@ -39,7 +60,7 @@ function cleanEbayDescription(html: string): string {
     t = t.slice(0, cut);
     t = t.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
     if (t.length > 1600) t = t.slice(0, 1600).replace(/\s+\S*$/, '') + '…';
-    return t;
+    return neutralizeSource(t);
 }
 
 /* ── Relais d'images ──────────────────────────────────────────────
@@ -292,6 +313,10 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
                 ...rest,
                 image: proxifyImage(r.image, req),
                 thumbnail: proxifyImage(r.thumbnail, req),
+                // Descriptions redigees par le vendeur : nettoyees du HTML et
+                // de toute mention de la source (elles sont affichees au client).
+                shortDescription: r.shortDescription ? cleanEbayDescription(r.shortDescription) : r.shortDescription,
+                fullDescription: r.fullDescription ? cleanEbayDescription(r.fullDescription) : r.fullDescription,
             };
         });
 
