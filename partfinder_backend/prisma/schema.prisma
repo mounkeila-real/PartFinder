@@ -75,6 +75,10 @@ model Order {
   poReference String?                         // Bon de commande / réf interne garage
   paymentStatus String    @default("UNPAID")  // UNPAID | PAID | FAILED
   stripeSessionId String?                     // Session Stripe Checkout
+  paymentUrl  String?                         // Lien de paiement Stripe en cours
+  quotedAmount Decimal?  @db.Decimal(10, 2)   // Prix définitif fixé par l'opérateur
+  adminNote   String?                         // Explication de l'ajustement (visible client)
+  validatedAt DateTime?                       // Date de validation par l'opérateur
   items       OrderItem[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

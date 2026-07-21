@@ -342,8 +342,15 @@
     <div class="auth-overlay display-none" id="checkout-overlay">
         <div class="auth-modal" role="dialog" aria-modal="true">
             <button class="auth-close" id="checkout-close" aria-label="Fermer"><i class="ph ph-x"></i></button>
-            <h2 class="auth-h">Finaliser la commande</h2>
+            <h2 class="auth-h">Demande de commande</h2>
             <div class="auth-error display-none" id="checkout-error"></div>
+
+            <p class="checkout-notice">
+                <i class="ph ph-info"></i>
+                Les montants ci-dessous sont indicatifs. Nous vérifions la disponibilité et
+                l'acheminement, puis vous recevez le <strong>prix définitif tout compris</strong>
+                à régler (sous 24 h ouvrées). <strong>Aucun débit sans votre accord.</strong>
+            </p>
 
             <div class="checkout-summary" id="checkout-summary"></div>
 
@@ -355,9 +362,9 @@
                     <input type="text" id="co-poref" placeholder="Ex: dossier client #1234">
                 </label>
                 <button type="submit" class="btn-primary auth-submit" id="co-pay">
-                    <i class="ph ph-lock-simple"></i> Payer <span id="co-total"></span>
+                    <i class="ph ph-paper-plane-tilt"></i> Envoyer ma demande <span id="co-total"></span>
                 </button>
-                <p class="checkout-secure"><i class="ph ph-shield-check"></i> Paiement sécurisé par Stripe — vous serez redirigé.</p>
+                <p class="checkout-secure"><i class="ph ph-shield-check"></i> Paiement sécurisé, uniquement après validation du prix définitif.</p>
             </form>
         </div>
     </div>

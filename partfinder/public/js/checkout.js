@@ -30,7 +30,8 @@
             summary.innerHTML = items.map(i =>
                 `<div class="co-line"><span>${esc(i.partName)} × ${i.quantity || 1}</span><span>${(i.priceSold * (i.quantity || 1)).toFixed(2)} €</span></div>`
             ).join('') + `<div class="co-line co-line-total"><span>Total TTC</span><strong>${total().toFixed(2)} €</strong></div>`;
-            totalSpan.textContent = total().toFixed(2) + ' €';
+            totalSpan.textContent = '';
+            payBtn.innerHTML = '<i class="ph ph-paper-plane-tilt"></i> Envoyer ma demande';
             overlay.classList.remove('display-none');
         };
 
@@ -45,22 +46,27 @@
             if (!address) { errorBox.textContent = 'Adresse de livraison requise.'; errorBox.classList.remove('display-none'); return; }
 
             payBtn.disabled = true;
-            payBtn.innerHTML = '<i class="ph ph-circle-notch"></i> Redirection…';
+            payBtn.innerHTML = '<i class="ph ph-circle-notch"></i> Envoi…';
             try {
-                const res = await fetch(API_BASE_URL + '/checkout/session', {
+                // Demande de commande : le montant définitif est arrêté après vérification.
+                const res = await fetch(API_BASE_URL + '/checkout/request', {
                     method: 'POST',
                     headers: Object.assign({ 'Content-Type': 'application/json' }, window.pfAuthHeader ? window.pfAuthHeader() : {}),
                     body: JSON.stringify({ items, shippingAddress: address, poReference: $('co-poref').value.trim() }),
                 });
                 const data = await res.json();
-                if (!res.ok || !data.url) throw new Error(data.error || 'Impossible de créer le paiement.');
-                // Redirection vers la page de paiement Stripe.
-                window.location.href = data.url;
+                if (!res.ok) throw new Error(data.error || 'Impossible d\'envoyer la demande.');
+                close();
+                showBanner('success',
+                    'Demande n°' + data.orderId + ' envoyée. Nous vérifions la disponibilité et l\'acheminement, '
+                    + 'puis vous recevrez le montant définitif à régler (sous 24 h ouvrées). Aucun débit avant votre accord.');
+                if (window.pfClearCart) window.pfClearCart();
             } catch (err) {
                 errorBox.textContent = err.message;
                 errorBox.classList.remove('display-none');
+            } finally {
                 payBtn.disabled = false;
-                payBtn.innerHTML = '<i class="ph ph-lock-simple"></i> Payer ' + total().toFixed(2) + ' €';
+                payBtn.innerHTML = '<i class="ph ph-paper-plane-tilt"></i> Envoyer ma demande';
             }
         });
 

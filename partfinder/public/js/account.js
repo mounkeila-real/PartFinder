@@ -8,6 +8,8 @@
         : 'https://partfinder-backend-production-c0af.up.railway.app/api';
 
     const STATUS_LABELS = {
+        PENDING_VALIDATION: ['En cours de validation', 'st-pending'],
+        AWAITING_PAYMENT: ['À régler', 'st-pending'],
         PENDING: ['En attente', 'st-pending'],
         CONFIRMED: ['Confirmée', 'st-progress'],
         PROCESSING: ['En traitement', 'st-progress'],
@@ -15,7 +17,7 @@
         DELIVERED: ['Livrée', 'st-done'],
         CANCELLED: ['Annulée', 'st-cancel'],
     };
-    const OPEN_STATUSES = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED'];
+    const OPEN_STATUSES = ['PENDING_VALIDATION', 'AWAITING_PAYMENT', 'PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED'];
 
     document.addEventListener('DOMContentLoaded', () => {
         const overlay = document.getElementById('account-overlay');
@@ -84,6 +86,18 @@
             const items = (o.items || []).map(i =>
                 `<div class="acc-order-item"><span>${esc(i.partName)} × ${i.quantity}</span><span>${(i.priceSold * i.quantity).toFixed(2)} €</span></div>`
             ).join('');
+            const amount = Number(o.quotedAmount != null ? o.quotedAmount : o.totalAmount);
+            const isValidation = o.status === 'PENDING_VALIDATION';
+            const toPay = o.status === 'AWAITING_PAYMENT' && o.paymentUrl;
+
+            const noticeHtml = isValidation
+                ? `<p class="acc-order-notice">Nous vérifions la disponibilité et l'acheminement. Vous recevrez le montant définitif à régler sous 24 h ouvrées — aucun débit sans votre accord.</p>`
+                : '';
+            const noteHtml = o.adminNote ? `<p class="acc-order-notice">${esc(o.adminNote)}</p>` : '';
+            const payHtml = toPay
+                ? `<a class="acc-pay-btn" href="${o.paymentUrl}" target="_blank" rel="noopener"><i class="ph ph-lock-simple"></i> Régler ${amount.toFixed(2)} €</a>`
+                : '';
+
             return `<div class="acc-order">
                 <div class="acc-order-head">
                     <strong>Commande #${o.id}</strong>
@@ -91,7 +105,13 @@
                 </div>
                 <div class="acc-order-meta">${date}</div>
                 ${items}
-                <div class="acc-order-total"><span>Total TTC</span><strong>${Number(o.totalAmount).toFixed(2)} €</strong></div>
+                <div class="acc-order-total">
+                    <span>${isValidation ? 'Montant indicatif' : 'Total TTC'}</span>
+                    <strong>${amount.toFixed(2)} €</strong>
+                </div>
+                ${noteHtml}
+                ${noticeHtml}
+                ${payHtml}
             </div>`;
         }
 

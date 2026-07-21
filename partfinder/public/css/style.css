@@ -1518,6 +1518,23 @@ textarea:focus {
 }
 .acc-order-total strong { color: var(--accent-neon); }
 
+.acc-order-notice {
+    margin-top: 10px; padding: 10px 12px;
+    background: rgba(31, 95, 214, 0.06);
+    border-left: 3px solid var(--accent-electric);
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem; line-height: 1.5; color: var(--text-secondary);
+}
+
+.acc-pay-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-top: 12px; height: 46px;
+    background: var(--accent-neon); color: #fff;
+    border-radius: var(--radius-md); font-weight: 700; font-size: 0.95rem;
+    transition: filter 0.2s ease;
+}
+.acc-pay-btn:hover { filter: brightness(1.08); }
+
 .acc-status {
     font-size: 0.72rem; font-weight: 700; letter-spacing: 0.4px;
     padding: 3px 10px; border-radius: 999px; white-space: nowrap;
@@ -1578,6 +1595,52 @@ textarea:focus {
     .adm-row { flex-direction: column; align-items: stretch; }
     .adm-actions { justify-content: flex-end; }
     .adm-row-meta { white-space: normal; }
+}
+
+/* ── Validation des commandes (admin) ────────────────────────────── */
+.adm-row-order { flex-direction: column; align-items: stretch; gap: 0; }
+.adm-order-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+.adm-validate {
+    margin-top: 12px; padding-top: 12px;
+    border-top: 1px dashed var(--border-color);
+}
+.adm-validate-row { display: grid; grid-template-columns: 160px 1fr; gap: 12px; }
+.adm-validate-row label {
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
+}
+.adm-validate-row input {
+    height: 40px; padding: 0 10px; font-size: 0.9rem;
+    background: var(--bg-surface); border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); color: var(--text-primary);
+}
+.adm-validate-actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.adm-mini-btn {
+    height: 38px; padding: 0 14px; border-radius: var(--radius-sm);
+    background: var(--overlay); color: var(--text-primary);
+    font-size: 0.85rem; font-weight: 600; transition: all 0.2s ease;
+}
+.adm-mini-btn:hover { background: var(--border-highlight); }
+.adm-mini-primary { background: var(--accent-electric); color: #fff; }
+.adm-mini-primary:hover { background: var(--accent-electric-hover); }
+.adm-mini-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.adm-mini-link { font-size: 0.82rem; color: var(--accent-electric); text-decoration: underline; }
+
+/* Encart d'information dans la demande de commande (client) */
+.checkout-notice {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: rgba(31, 95, 214, 0.06);
+    border: 1px solid rgba(31, 95, 214, 0.25);
+    border-radius: var(--radius-md);
+    padding: 12px 14px; margin-bottom: 18px;
+    font-size: 0.86rem; line-height: 1.5; color: var(--text-secondary);
+}
+.checkout-notice i { color: var(--accent-electric); font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+
+@media (max-width: 1023px) {
+    .adm-validate-row { grid-template-columns: 1fr; }
+    .adm-order-head { flex-direction: column; align-items: stretch; gap: 10px; }
 }
 
 /* ── Tunnel d'achat (Stripe) ─────────────────────────────────────── */

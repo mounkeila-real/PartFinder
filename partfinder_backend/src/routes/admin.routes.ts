@@ -1,7 +1,9 @@
 import express from 'express';
 import crypto from 'crypto';
+import Stripe from 'stripe';
 import { PrismaClient } from '@prisma/client';
 import { AuthService } from '../services/auth.service';
+import { EmailService } from '../services/email.service';
 import { requireAdmin, AuthedRequest } from '../middleware/auth.middleware';
 
 /**
@@ -145,6 +147,98 @@ router.patch('/orders/:id/status', async (req: AuthedRequest, res: express.Respo
         res.json({ order });
     } catch (e: any) {
         res.status(500).json({ error: 'Erreur lors du changement de statut.' });
+    }
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   Validation des commandes : ajustement du prix + demande de fonds
+   ══════════════════════════════════════════════════════════════════ */
+
+const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY || '';
+const stripe = STRIPE_SECRET ? new Stripe(STRIPE_SECRET) : null;
+
+/**
+ * PATCH /api/admin/orders/:id/price — l'opérateur arrête le prix définitif.
+ * body: { quotedAmount, adminNote? }
+ */
+router.patch('/orders/:id/price', async (req: AuthedRequest, res: express.Response) => {
+    try {
+        const id = Number(req.params.id);
+        const amount = Number(req.body?.quotedAmount);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return res.status(400).json({ error: 'Montant invalide.' });
+        }
+        const order = await prisma.order.update({
+            where: { id },
+            data: {
+                quotedAmount: amount,
+                totalAmount: amount,
+                adminNote: req.body?.adminNote ? String(req.body.adminNote) : null,
+                validatedAt: new Date(),
+            },
+            include: { items: true },
+        });
+        res.json({ order });
+    } catch (e: any) {
+        console.error('[admin] price:', e.message);
+        res.status(500).json({ error: 'Erreur lors de l\'ajustement du prix.' });
+    }
+});
+
+/**
+ * POST /api/admin/orders/:id/payment-link — génère la demande de fonds Stripe
+ * pour le prix validé, passe la commande en AWAITING_PAYMENT et notifie le client.
+ */
+router.post('/orders/:id/payment-link', async (req: AuthedRequest, res: express.Response) => {
+    try {
+        if (!stripe) return res.status(503).json({ error: 'Paiement non configuré (STRIPE_SECRET_KEY manquant).' });
+
+        const id = Number(req.params.id);
+        const order = await prisma.order.findUnique({ where: { id }, include: { items: true, user: true } });
+        if (!order) return res.status(404).json({ error: 'Commande introuvable.' });
+
+        const amount = Number(order.quotedAmount ?? order.totalAmount);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return res.status(400).json({ error: 'Fixez d\'abord le prix définitif.' });
+        }
+
+        const base = process.env.FRONTEND_URL
+            || (req.headers.origin as string)
+            || 'https://partfinder-production.up.railway.app';
+
+        const session = await stripe.checkout.sessions.create({
+            mode: 'payment',
+            line_items: [{
+                quantity: 1,
+                price_data: {
+                    currency: 'eur',
+                    unit_amount: Math.round(amount * 100),
+                    // Libellé neutre : aucune mention d'une source d'approvisionnement.
+                    product_data: { name: `Commande PartFinder #${order.id}` },
+                },
+            }],
+            success_url: `${base}/?paid=1&order=${order.id}`,
+            cancel_url: `${base}/?canceled=1&order=${order.id}`,
+            client_reference_id: String(order.id),
+            metadata: { orderId: String(order.id) },
+            customer_email: order.user?.email || undefined,
+        });
+
+        const updated = await prisma.order.update({
+            where: { id: order.id },
+            data: { stripeSessionId: session.id, paymentUrl: session.url, status: 'AWAITING_PAYMENT' },
+        });
+
+        // Notification client (best effort : n'échoue jamais la requête).
+        if (order.user?.email && session.url) {
+            EmailService.sendPaymentRequestEmail(order.user.email, order.id, amount, session.url, order.adminNote)
+                .catch((err: any) => console.error('[admin] email demande de fonds:', err?.message));
+        }
+
+        res.json({ order: updated, paymentUrl: session.url });
+    } catch (e: any) {
+        console.error('[admin] payment-link:', e.message);
+        res.status(500).json({ error: 'Erreur lors de la création de la demande de paiement.' });
     }
 });
 

@@ -37,6 +37,10 @@ export interface NormalizedPart {
     seller: string | null;
     shortDescription: string | null;
     fullDescription: string | null;
+    /** Frais de port : montant si connu, null si non communiqué / calculé à l'adresse. */
+    shippingCost?: number | null;
+    /** FIXED (montant ferme) | CALCULATED (dépend de l'adresse) | null (inconnu). */
+    shippingType?: string | null;
     isMock?: boolean;
 }
 

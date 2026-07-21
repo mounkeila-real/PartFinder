@@ -52,4 +52,53 @@ export class EmailService {
             return false;
         }
     }
+
+    /**
+     * Demande de fonds : le prix définitif de la commande a été arrêté,
+     * le client est invité à régler via le lien de paiement sécurisé.
+     * Vocabulaire neutre — aucune mention d'une source d'approvisionnement.
+     */
+    static async sendPaymentRequestEmail(
+        email: string,
+        orderId: number,
+        amountEur: number,
+        paymentUrl: string,
+        note?: string | null,
+    ): Promise<boolean> {
+        const montant = amountEur.toFixed(2).replace('.', ',') + ' €';
+        const htmlContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                <h2 style="color: #1F5FD6; text-align: center;">Votre commande #${orderId} est prête à être réglée</h2>
+                <p>Bonjour,</p>
+                <p>Nous avons vérifié votre commande et arrêté son montant définitif :</p>
+                <p style="font-size: 26px; font-weight: bold; color: #F26B1D; text-align: center; margin: 24px 0;">${montant}</p>
+                ${note ? `<p style="background:#F5F7FB;padding:12px 16px;border-radius:8px;font-size:14px;">${note}</p>` : ''}
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="${paymentUrl}" style="background-color: #1F5FD6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Régler ma commande</a>
+                </div>
+                <p style="font-size: 12px; color: #666;">Si le bouton ne fonctionne pas, copiez-collez ce lien :</p>
+                <p style="font-size: 12px; color: #1F5FD6; word-break: break-all;">${paymentUrl}</p>
+                <hr style="border: 0; border-top: 1px solid #eeeeee; margin: 20px 0;" />
+                <p style="font-size: 11px; color: #999; text-align: center;">Paiement sécurisé. Aucun débit n'est effectué sans votre accord.</p>
+            </div>
+        `;
+
+        if (!resend) {
+            console.warn(`[EMAIL BACKUP] Demande de paiement commande #${orderId} (${montant}) pour ${email}:\n👉 ${paymentUrl}\n`);
+            return true;
+        }
+        try {
+            await resend.emails.send({
+                from: FROM_EMAIL,
+                to: email,
+                subject: `Votre commande #${orderId} — montant à régler`,
+                html: htmlContent,
+            });
+            console.log(`[resend] Payment request sent to ${email} (order #${orderId})`);
+            return true;
+        } catch (error: any) {
+            console.error('[resend] Failed to send payment request:', error.message);
+            return false;
+        }
+    }
 }

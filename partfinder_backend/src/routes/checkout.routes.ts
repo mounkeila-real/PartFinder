@@ -88,6 +88,56 @@ router.post('/session', requireAuth, async (req: AuthedRequest, res: express.Res
 });
 
 /**
+ * POST /api/checkout/request — DEMANDE de commande (pas de paiement immédiat).
+ *
+ * Tant que le poids réel et le port d'acheminement ne sont pas connus, le prix
+ * définitif ne peut pas être arrêté : la commande part en PENDING_VALIDATION.
+ * Un opérateur ajuste le prix puis envoie la demande de paiement (Stripe).
+ * body: { items, shippingAddress, poReference? }
+ */
+router.post('/request', requireAuth, async (req: AuthedRequest, res: express.Response) => {
+    try {
+        const { items, shippingAddress, poReference } = req.body || {};
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ error: 'Panier vide.' });
+        }
+        if (!shippingAddress || !String(shippingAddress).trim()) {
+            return res.status(400).json({ error: 'Adresse de livraison requise.' });
+        }
+
+        // Montant indicatif (prix des pièces) — ne comprend pas encore l'acheminement.
+        const estimatedAmount = items.reduce(
+            (s: number, i: any) => s + Number(i.priceSold) * Number(i.quantity || 1), 0);
+
+        const order = await prisma.order.create({
+            data: {
+                userId: req.user!.userId,
+                totalAmount: estimatedAmount,
+                status: 'PENDING_VALIDATION',
+                paymentStatus: 'UNPAID',
+                shippingAddress: String(shippingAddress),
+                poReference: poReference ? String(poReference) : null,
+                items: {
+                    create: items.map((i: any) => ({
+                        partOem: i.partOem || '—',
+                        partName: i.partName,
+                        quantity: Number(i.quantity) || 1,
+                        priceSold: Number(i.priceSold),
+                    })),
+                },
+            },
+            include: { items: true },
+        });
+
+        console.log('[checkout] demande a valider #', order.id);
+        res.status(201).json({ orderId: order.id, status: order.status });
+    } catch (e: any) {
+        console.error('[checkout] request:', e.message);
+        res.status(500).json({ error: 'Erreur lors de l\'envoi de la demande.' });
+    }
+});
+
+/**
  * Webhook Stripe — corps BRUT requis (monté avec express.raw dans index.ts,
  * AVANT express.json). Confirme le paiement et passe la commande en PAID/CONFIRMED.
  */

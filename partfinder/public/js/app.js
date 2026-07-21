@@ -766,7 +766,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const FALLBACK_IMG = 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&q=80&w=400';
 
         try {
-            // Flux complet : l'IA détermine la pièce PUIS eBay renvoie les offres.
+            // Flux complet : l'IA determine la piece PUIS les offres sont recuperees.
             const response = await fetch(`${API_BASE_URL}/parts/find`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -790,7 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const determined = data.part || {};
             const apiResults = Array.isArray(data.results) ? data.results : [];
 
-            // Normalise les annonces eBay pour le renderer.
+            // Normalise les offres pour le renderer.
             let resultsToRender = apiResults.map(item => {
                 const src = item.sourcePrice != null ? item.sourcePrice : (item.price != null ? item.price : 0);
                 const isUsed = item.condition && /USED|OCCAS|REFURB/i.test(item.condition);
@@ -805,7 +805,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     condition: isUsed ? 'used' : 'new',
                     description: item.fullDescription || item.shortDescription || '',
                     url: item.itemWebUrl || null,
-                    source: item.source || 'ebay',
+                    // Source d'approvisionnement conservee en interne uniquement (jamais affichee).
+                    source: item.source || null,
                     isMock: !!item.isMock
                 };
             });
@@ -825,12 +826,11 @@ document.addEventListener('DOMContentLoaded', () => {
                  `;
 
             window.currentSearchResults = resultsToRender;
-            if (sortSelect) sortSelect.value = 'relevance'; // nouvelle recherche -> ordre eBay
+            if (sortSelect) sortSelect.value = 'relevance'; // nouvelle recherche -> ordre par defaut
 
             if (resultsToRender.length === 0) {
                 resultsContent.classList.remove('display-none');
-                const q = data.usedQuery || determined.ebayQuery || '';
-                offersGrid.innerHTML = '<p style="color: var(--text-secondary); padding: 24px; line-height: 1.6;">Aucune offre eBay trouvee pour cette recherche.<br>Requete essayee : <strong>' + q + '</strong>.<br>Essaie une reference OEM, ou une description de piece plus simple.</p>';
+                offersGrid.innerHTML = '<p style="color: var(--text-secondary); padding: 24px; line-height: 1.6;">Aucune pièce disponible pour cette recherche.<br>Essayez une référence constructeur (OEM) ou une description plus simple.</p>';
             } else {
                 renderResults(resultsToRender);
                 resultsContent.classList.remove('display-none');
@@ -842,7 +842,7 @@ document.addEventListener('DOMContentLoaded', () => {
             resultsContent.classList.remove('display-none');
             const resTitleErr = document.getElementById('res-part-name');
             if (resTitleErr) resTitleErr.innerText = 'Erreur de recherche';
-            offersGrid.innerHTML = '<p style="color: #ff6b6b; padding: 24px; line-height: 1.6;">La recherche a echoue (backend injoignable ou erreur eBay). Reessaie dans un instant.</p>';
+            offersGrid.innerHTML = '<p style="color: #ff6b6b; padding: 24px; line-height: 1.6;">La recherche a échoué. Merci de réessayer dans un instant.</p>';
         } finally {
             // Reset loading UI for next time
             steps.forEach(s => {
@@ -862,7 +862,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return item.finalPrice != null ? item.finalPrice : (item.sourcePrice || 0) * MARGIN_MULTIPLIER;
     }
 
-    // Tri cote client (aucun appel eBay) : reordonne les resultats deja recus.
+    // Tri cote client (aucun appel reseau) : reordonne les resultats deja recus.
     const sortSelect = document.getElementById('sort-select');
     if (sortSelect) {
         sortSelect.addEventListener('change', () => {
@@ -871,7 +871,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'price-asc':  arr.sort((a, b) => offerPrice(a) - offerPrice(b)); break;
                 case 'price-desc': arr.sort((a, b) => offerPrice(b) - offerPrice(a)); break;
                 case 'cond-new':   arr.sort((a, b) => (a.condition === 'new' ? 0 : 1) - (b.condition === 'new' ? 0 : 1)); break;
-                default: break; // 'relevance' = ordre eBay d'origine
+                default: break; // 'relevance' = ordre d'origine
             }
             renderResults(arr);
         });
@@ -885,14 +885,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? item.finalPrice
                 : (item.sourcePrice || 0) * MARGIN_MULTIPLIER).toFixed(2);
 
-            // Description complète eBay, nettoyée du HTML et tronquée.
+            // Description complete, nettoyee du HTML et tronquee.
             const rawDesc = (item.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
             const shortDesc = rawDesc.length > 160 ? rawDesc.slice(0, 160) + '…' : rawDesc;
             const descHtml = shortDesc ? `<p class="offer-desc">${shortDesc}</p>` : '';
             const linkHtml = `<button type="button" class="offer-link" data-detail="${item.id}">Voir la fiche</button>`;
             const mockBadge = item.isMock ? '<span class="offer-mock" title="Résultat de démonstration">DÉMO</span>' : '';
-            const sourceLabel = item.source === 'aliexpress' ? 'AliExpress' : 'eBay';
-            const sourceBadge = `<span class="offer-source src-${item.source || 'ebay'}">${sourceLabel}</span>`;
+            // Aucune source d'approvisionnement n'est exposee au client.
+            const sourceBadge = '';
 
             const card = document.createElement('div');
             card.className = 'offer-card';
@@ -929,7 +929,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // "Voir la fiche" -> page interne (infos eBay, sans lien eBay)
+        // "Voir la fiche" -> page interne PartFinder
         document.querySelectorAll('.offer-link[data-detail]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 openItemDetail(e.currentTarget.getAttribute('data-detail'));
@@ -937,7 +937,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Ouvre une page interne avec toutes les infos extraites d'eBay (aucun lien eBay)
+    // Ouvre une page interne PartFinder avec les informations de la piece
     function openItemDetail(itemId) {
         // Fenetre popup dimensionnee et centree (pas en plein ecran)
         const w = 940;
@@ -1046,6 +1046,13 @@ document.addEventListener('DOMContentLoaded', () => {
         state.cart = state.cart.filter(item => item.id !== id);
         updateCartUI();
     }
+
+    // Vide le panier apres l'envoi d'une demande de commande (appele par checkout.js).
+    window.pfClearCart = function () {
+        state.cart = [];
+        updateCartUI();
+        if (cartPanel) cartPanel.classList.add('display-none');
+    };
 
     function updateCartUI() {
         // Update badge

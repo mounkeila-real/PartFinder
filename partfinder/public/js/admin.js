@@ -8,8 +8,9 @@
         ? 'http://localhost:3000/api'
         : 'https://partfinder-backend-production-c0af.up.railway.app/api';
 
-    const ORDER_STATUSES = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
+    const ORDER_STATUSES = ['PENDING_VALIDATION', 'AWAITING_PAYMENT', 'PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
     const STATUS_FR = {
+        PENDING_VALIDATION: 'À valider', AWAITING_PAYMENT: 'Paiement demandé',
         PENDING: 'En attente', CONFIRMED: 'Confirmée', PROCESSING: 'En traitement',
         SHIPPED: 'Expédiée', DELIVERED: 'Livrée', CANCELLED: 'Annulée',
     };
@@ -133,14 +134,44 @@
             const options = ORDER_STATUSES.map(s =>
                 `<option value="${s}" ${s === o.status ? 'selected' : ''}>${STATUS_FR[s]}</option>`).join('');
             const items = (o.items || []).map(i => esc(i.partName) + ' ×' + i.quantity).join(', ');
-            return `<div class="adm-row" data-oid="${o.id}">
-                <div class="adm-row-main">
-                    <strong>#${o.id}</strong> · ${esc(who)} · <span class="adm-price">${Number(o.totalAmount).toFixed(2)} €</span>
-                    <div class="adm-row-meta">${date} · ${items}</div>
+            const amount = Number(o.quotedAmount != null ? o.quotedAmount : o.totalAmount);
+            const toValidate = o.status === 'PENDING_VALIDATION';
+            const awaiting = o.status === 'AWAITING_PAYMENT';
+
+            // Bloc de validation : fixer le prix definitif puis envoyer la demande de fonds.
+            const validationHtml = (toValidate || awaiting) ? `
+                <div class="adm-validate">
+                    <div class="adm-validate-row">
+                        <label>Prix définitif (€)
+                            <input type="number" step="0.01" min="0" class="adm-price-input" value="${amount.toFixed(2)}">
+                        </label>
+                        <label>Note au client (optionnel)
+                            <input type="text" class="adm-note-input" placeholder="Ex : port outre-mer inclus" value="${esc(o.adminNote || '')}">
+                        </label>
+                    </div>
+                    <div class="adm-validate-actions">
+                        <button class="adm-mini-btn" data-act="save-price">Enregistrer le prix</button>
+                        <button class="adm-mini-btn adm-mini-primary" data-act="send-payment">
+                            ${awaiting ? 'Renvoyer' : 'Envoyer'} la demande de paiement
+                        </button>
+                        ${o.paymentUrl ? `<a class="adm-mini-link" href="${o.paymentUrl}" target="_blank" rel="noopener">Lien de paiement</a>` : ''}
+                    </div>
+                </div>` : '';
+
+            return `<div class="adm-row adm-row-order" data-oid="${o.id}">
+                <div class="adm-order-head">
+                    <div class="adm-row-main">
+                        <strong>#${o.id}</strong> · ${esc(who)} · <span class="adm-price">${amount.toFixed(2)} €</span>
+                        ${toValidate ? '<span class="acc-status st-pending">À valider</span>' : ''}
+                        ${awaiting ? '<span class="acc-status st-progress">Paiement demandé</span>' : ''}
+                        <div class="adm-row-meta">${date} · ${items}</div>
+                        ${o.shippingAddress ? `<div class="adm-row-meta">📍 ${esc(o.shippingAddress)}</div>` : ''}
+                    </div>
+                    <div class="adm-actions">
+                        <select class="adm-status-select">${options}</select>
+                    </div>
                 </div>
-                <div class="adm-actions">
-                    <select class="adm-status-select">${options}</select>
-                </div>
+                ${validationHtml}
             </div>`;
         }
 
@@ -154,6 +185,41 @@
                     : '<p class="acc-empty">Aucune commande.</p>';
             } catch (e) { ordersBox.innerHTML = '<p class="acc-empty">' + esc(e.message) + '</p>'; }
         }
+
+        // Validation : enregistrer le prix / envoyer la demande de fonds Stripe
+        ordersBox.addEventListener('click', async (e) => {
+            const btn = e.target.closest('.adm-mini-btn');
+            if (!btn) return;
+            const row = btn.closest('.adm-row-order');
+            const oid = row.getAttribute('data-oid');
+            const act = btn.getAttribute('data-act');
+            const priceInput = row.querySelector('.adm-price-input');
+            const noteInput = row.querySelector('.adm-note-input');
+            clearMsg();
+            btn.disabled = true;
+            try {
+                const pricePayload = JSON.stringify({
+                    quotedAmount: Number(priceInput.value),
+                    adminNote: noteInput.value.trim() || null,
+                });
+                if (act === 'save-price') {
+                    await api('/admin/orders/' + oid + '/price', { method: 'PATCH', body: pricePayload });
+                    showSuccess('Prix définitif enregistré pour la commande #' + oid + '.');
+                    loadOrders();
+                } else if (act === 'send-payment') {
+                    // On enregistre d'abord le prix affiché, puis on génère le lien.
+                    await api('/admin/orders/' + oid + '/price', { method: 'PATCH', body: pricePayload });
+                    const data = await api('/admin/orders/' + oid + '/payment-link', { method: 'POST' });
+                    showSuccess('Demande de paiement envoyée au client (commande #' + oid + ').');
+                    if (data.paymentUrl) window.open(data.paymentUrl, '_blank', 'noopener');
+                    loadOrders();
+                }
+            } catch (err) {
+                showError(err.message);
+            } finally {
+                btn.disabled = false;
+            }
+        });
 
         ordersBox.addEventListener('change', async (e) => {
             const sel = e.target.closest('.adm-status-select');
