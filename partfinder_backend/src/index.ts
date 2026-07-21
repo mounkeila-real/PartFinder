@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.routes';
 import adminRoutes from './routes/admin.routes';
 import garageRoutes from './routes/garage.routes';
 import checkoutRoutes, { stripeWebhookHandler } from './routes/checkout.routes';
+import warehouseRoutes from './routes/warehouse.routes';
 import { startScheduler } from './jobs/scheduler';
 
 dotenv.config();
@@ -35,6 +36,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/garage', garageRoutes);
 app.use('/api/checkout', checkoutRoutes);
+app.use('/api/warehouse', warehouseRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

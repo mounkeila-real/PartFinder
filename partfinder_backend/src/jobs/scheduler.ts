@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { PrismaClient } from '@prisma/client';
 import { EmailService } from '../services/email.service';
 import { checkGridFreshness, replaceGrid, activeProvider } from '../services/colissimo.service';
+import * as pricing from '../services/pricing';
 
 /**
  * Tâches planifiées.
@@ -55,6 +56,54 @@ export async function refreshColissimoRates(): Promise<void> {
     }
 }
 
+/**
+ * Facturation du stockage : gratuit N jours après réception, puis X €/jour.
+ *
+ * Un SEUL appel de fonds par colis, mis à jour au fil des jours (compteur) —
+ * et non un appel quotidien, qui serait ingérable pour le client comme pour
+ * la comptabilité. Il sera réglé au moment de l'expédition.
+ */
+export async function billStorage(): Promise<void> {
+    const settings = await pricing.getSettings();
+    const gratuits = settings.stockageJoursGratuits;
+    const prixJour = settings.stockagePrixJourEur;
+    if (!(prixJour > 0)) return;
+
+    const limite = new Date(Date.now() - gratuits * 86_400_000);
+
+    // Colis encore en entrepôt, reçus au-delà de la franchise.
+    const parcels = await prisma.inboundParcel.findMany({
+        where: {
+            receivedAt: { lt: limite, not: null },
+            statut: { in: ['RECEIVED', 'WEIGHED', 'ISSUE'] },
+        },
+        select: { id: true, userId: true, orderId: true, receivedAt: true },
+    });
+
+    for (const p of parcels) {
+        const jours = Math.floor((Date.now() - p.receivedAt!.getTime()) / 86_400_000) - gratuits;
+        if (jours <= 0) continue;
+        const montant = Math.round(jours * prixJour * 100) / 100;
+        const detail = `Stockage du colis #${p.id} : ${jours} jour(s) au-delà des ${gratuits} jours offerts.`;
+
+        // Un seul appel de fonds STOCKAGE par colis : on le met à jour.
+        const existing = await prisma.paymentRequest.findFirst({
+            where: { userId: p.userId, motif: 'STOCKAGE', statut: 'PENDING', detail: { contains: `colis #${p.id} ` } },
+        });
+
+        if (existing) {
+            if (Number(existing.montantEur) !== montant) {
+                await prisma.paymentRequest.update({ where: { id: existing.id }, data: { montantEur: montant, detail } });
+            }
+        } else {
+            await prisma.paymentRequest.create({
+                data: { userId: p.userId, orderId: p.orderId, motif: 'STOCKAGE', montantEur: montant, detail, statut: 'PENDING' },
+            });
+            console.log(`[cron] stockage facturé — colis #${p.id}, ${jours} j, ${montant} €`);
+        }
+    }
+}
+
 export function startScheduler(): void {
     if (process.env.DISABLE_CRON === '1') {
         console.log('[cron] désactivé (DISABLE_CRON=1)');
@@ -71,7 +120,12 @@ export function startScheduler(): void {
         refreshColissimoRates().catch((e) => console.error('[cron] rappel annuel:', e.message));
     }, { timezone: 'Europe/Paris' });
 
-    console.log('[cron] planificateur démarré (contrôle grille Colissimo : lundi 08:00 + 2 janvier)');
+    // Chaque jour à 06h00 : facturation du stockage au-delà de la franchise.
+    cron.schedule('0 6 * * *', () => {
+        billStorage().catch((e) => console.error('[cron] billStorage:', e.message));
+    }, { timezone: 'Europe/Paris' });
+
+    console.log('[cron] planificateur démarré (grille Colissimo : lundi 08:00 + 2 janvier ; stockage : quotidien 06:00)');
 
     // Contrôle au démarrage, sans bloquer le boot.
     setTimeout(() => {

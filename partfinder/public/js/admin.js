@@ -55,6 +55,7 @@
             clearMsg();
             if (name === 'orders') loadOrders();
             if (name === 'pricing') loadPricing();
+            if (name === 'warehouse' && window.pfLoadWarehouse) window.pfLoadWarehouse();
         }
         tabs.forEach(t => t.addEventListener('click', () => switchTab(t.getAttribute('data-adm-tab'))));
 

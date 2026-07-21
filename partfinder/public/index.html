@@ -418,6 +418,7 @@
                 <button class="auth-tab active" data-adm-tab="clients">Clients</button>
                 <button class="auth-tab" data-adm-tab="orders">Commandes</button>
                 <button class="auth-tab" data-adm-tab="pricing">Tarification</button>
+                <button class="auth-tab" data-adm-tab="warehouse">Entrepôt</button>
             </div>
 
             <div class="auth-error display-none" id="admin-error"></div>
@@ -472,6 +473,64 @@
 
                 <h3 class="acc-sub">Grille Colissimo</h3>
                 <div id="adm-colissimo"><p class="acc-empty">Chargement…</p></div>
+            </div>
+
+            <!-- Entrepôt : réception, pesée, consolidation (mobile-first) -->
+            <div class="display-none" data-adm-panel="warehouse">
+
+                <div class="wh-scan">
+                    <label>Numéro de suivi du colis
+                        <input type="text" id="wh-tracking" placeholder="Scanner ou saisir" autocomplete="off">
+                    </label>
+                    <button class="wh-btn wh-btn-primary" id="wh-receive">
+                        <i class="ph ph-package"></i> Réceptionner
+                    </button>
+                </div>
+                <div id="wh-receive-result"></div>
+
+                <div class="wh-filters">
+                    <button class="wh-chip active" data-wh-statut="EXPECTED">Attendus</button>
+                    <button class="wh-chip" data-wh-statut="RECEIVED">Reçus</button>
+                    <button class="wh-chip" data-wh-statut="WEIGHED">Pesés</button>
+                    <button class="wh-chip" data-wh-statut="ISSUE">Litiges</button>
+                </div>
+                <input type="search" id="wh-search" class="wh-search" placeholder="Rechercher (suivi, client…)">
+
+                <div id="wh-parcels"><p class="acc-empty">Chargement…</p></div>
+
+                <div class="wh-consolidate display-none" id="wh-consolidate-bar">
+                    <span id="wh-selected-count"></span>
+                    <button class="wh-btn" id="wh-consolidate">Consolider</button>
+                </div>
+            </div>
+
+            <!-- Fiche de pesée (plein écran, gros champs) -->
+            <div class="wh-weigh-panel display-none" id="wh-weigh-panel">
+                <div class="wh-weigh-head">
+                    <button class="btn-icon" id="wh-weigh-back"><i class="ph ph-arrow-left"></i></button>
+                    <strong id="wh-weigh-title">Pesée</strong>
+                </div>
+                <div class="wh-weigh-body">
+                    <div class="auth-error display-none" id="wh-weigh-error"></div>
+                    <label class="wh-big-label">Poids réel (kg) *
+                        <input type="number" step="0.01" min="0" id="wh-poids" class="wh-big-input" inputmode="decimal">
+                    </label>
+                    <div class="wh-dims">
+                        <label>Longueur (cm)<input type="number" min="0" id="wh-l" inputmode="numeric"></label>
+                        <label>Largeur (cm)<input type="number" min="0" id="wh-w" inputmode="numeric"></label>
+                        <label>Hauteur (cm)<input type="number" min="0" id="wh-h" inputmode="numeric"></label>
+                    </div>
+                    <label class="wh-big-label">Photos du colis * (min. 1)
+                        <input type="file" id="wh-photos" accept="image/*" capture="environment" multiple>
+                    </label>
+                    <div id="wh-photo-preview" class="wh-photos"></div>
+                    <label class="wh-big-label">Notes
+                        <textarea id="wh-notes" rows="2" placeholder="État du colis, remarques…"></textarea>
+                    </label>
+                    <button class="wh-btn wh-btn-primary wh-btn-full" id="wh-weigh-submit">
+                        <i class="ph ph-check"></i> Valider la pesée
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -628,6 +687,7 @@
     <script src="js/garage.js"></script>
     <script src="js/checkout.js"></script>
     <script src="js/shipping-info.js"></script>
+    <script src="js/warehouse.js"></script>
 </body>
 
 </html>
