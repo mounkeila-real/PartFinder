@@ -1564,7 +1564,7 @@ textarea:focus {
 .acc-logout { width: 100%; margin-top: 18px; }
 
 /* ── Panneau Administration ──────────────────────────────────────── */
-.admin-modal { max-width: 680px; }
+.admin-modal { max-width: 780px; }
 
 .adm-row {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -1595,6 +1595,75 @@ textarea:focus {
     .adm-row { flex-direction: column; align-items: stretch; }
     .adm-actions { justify-content: flex-end; }
     .adm-row-meta { white-space: normal; }
+}
+
+/* ── Admin : Tarification ────────────────────────────────────────── */
+.pr-hint { font-size: 0.78rem; color: var(--text-tertiary); font-weight: 400; }
+
+.pr-sim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pr-sim-grid label {
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
+}
+.pr-sim-grid input, .pr-sim-grid select {
+    height: 40px; padding: 0 10px; font-size: 0.9rem;
+    background: var(--bg-surface); border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); color: var(--text-primary);
+}
+.pr-sim-opts { display: flex; align-items: center; gap: 16px; margin: 12px 0; flex-wrap: wrap; }
+.pr-check { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); }
+
+.pr-result {
+    border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    padding: 16px; background: var(--overlay-soft); margin-bottom: 8px;
+}
+.pr-total {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border-color);
+}
+.pr-total strong { font-size: 1.6rem; color: var(--accent-neon); }
+.pr-regime {
+    display: inline-block; margin: 10px 0; padding: 3px 10px;
+    border-radius: 999px; font-size: 0.75rem; font-weight: 700;
+}
+.pr-ferme { background: rgba(23, 138, 91, 0.12); color: var(--success); }
+.pr-estime { background: rgba(219, 147, 11, 0.14); color: #9A6605; }
+
+.pr-breakdown { margin-top: 6px; }
+.pr-line {
+    display: flex; justify-content: space-between; gap: 12px;
+    font-size: 0.87rem; color: var(--text-secondary);
+    padding: 5px 0; border-bottom: 1px dashed var(--border-color);
+}
+.pr-line.pr-marge { color: var(--accent-electric); font-weight: 700; }
+.pr-foot { margin-top: 10px; font-size: 0.8rem; color: var(--text-tertiary); }
+
+.pr-indispo {
+    border: 1px solid rgba(219, 147, 11, 0.4); background: rgba(219, 147, 11, 0.08);
+    border-radius: var(--radius-md); padding: 14px; font-size: 0.88rem;
+}
+.pr-indispo p { margin-top: 6px; color: var(--text-secondary); }
+
+.pr-setting {
+    display: grid; grid-template-columns: 1fr 110px 52px; gap: 10px; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--border-color);
+}
+.pr-setting-input {
+    height: 38px; padding: 0 10px; font-size: 0.9rem;
+    background: var(--bg-surface); border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); color: var(--text-primary); width: 100%;
+}
+.pr-setting-label strong { font-size: 0.88rem; }
+
+.pr-fresh { padding: 10px 14px; border-radius: var(--radius-md); font-size: 0.86rem; margin-bottom: 12px; }
+.pr-ok { background: rgba(23, 138, 91, 0.10); color: var(--success); }
+.pr-stale { background: rgba(219, 147, 11, 0.12); color: #9A6605; }
+.pr-zones { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.pr-zones h4 { font-size: 0.9rem; margin-bottom: 6px; color: var(--text-secondary); }
+
+@media (max-width: 1023px) {
+    .pr-sim-grid, .pr-zones { grid-template-columns: 1fr; }
+    .pr-setting { grid-template-columns: 1fr 90px 48px; }
 }
 
 /* ── Validation des commandes (admin) ────────────────────────────── */

@@ -388,6 +388,7 @@
             <div class="auth-tabs">
                 <button class="auth-tab active" data-adm-tab="clients">Clients</button>
                 <button class="auth-tab" data-adm-tab="orders">Commandes</button>
+                <button class="auth-tab" data-adm-tab="pricing">Tarification</button>
             </div>
 
             <div class="auth-error display-none" id="admin-error"></div>
@@ -398,6 +399,50 @@
             </div>
             <div class="display-none" data-adm-panel="orders">
                 <div id="adm-orders"><p class="acc-empty">Chargement…</p></div>
+            </div>
+
+            <!-- Tarification : simulateur, paramètres, grille Colissimo -->
+            <div class="display-none" data-adm-panel="pricing">
+
+                <h3 class="acc-sub">Simulateur de prix <span class="pr-hint">(usage interne — vérifier la marge)</span></h3>
+                <div class="pr-sim-grid">
+                    <label>Prix pièce (€)
+                        <input type="number" step="0.01" min="0" id="sim-prix" value="120">
+                    </label>
+                    <label>Port vendeur (€)
+                        <input type="number" step="0.01" min="0" id="sim-port" value="15" placeholder="vide = inconnu">
+                    </label>
+                    <label>Catégorie (poids de référence)
+                        <select id="sim-categorie"><option value="">— Chargement…</option></select>
+                    </label>
+                    <label>Poids forcé (kg)
+                        <input type="number" step="0.1" min="0" id="sim-poids" placeholder="prime sur la catégorie">
+                    </label>
+                    <label>Zone
+                        <select id="sim-zone">
+                            <option value="OM1">OM1 — Antilles, Guyane, Réunion, Mayotte…</option>
+                            <option value="OM2">OM2 — Nouvelle-Calédonie, Polynésie, Wallis</option>
+                        </select>
+                    </label>
+                    <label>Assurance
+                        <select id="sim-assurance">
+                            <option value="STANDARD">Standard (23 €/kg)</option>
+                            <option value="AD_VALOREM">Ad valorem</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="pr-sim-opts">
+                    <label class="pr-check"><input type="checkbox" id="sim-nonannonce"> Colis non annoncé</label>
+                    <label class="pr-check"><input type="checkbox" id="sim-consolidation"> Consolidation</label>
+                    <button class="adm-mini-btn adm-mini-primary" id="sim-run">Calculer</button>
+                </div>
+                <div id="sim-result"></div>
+
+                <h3 class="acc-sub">Paramètres de tarification</h3>
+                <div id="adm-settings"><p class="acc-empty">Chargement…</p></div>
+
+                <h3 class="acc-sub">Grille Colissimo</h3>
+                <div id="adm-colissimo"><p class="acc-empty">Chargement…</p></div>
             </div>
         </div>
     </div>

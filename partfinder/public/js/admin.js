@@ -54,6 +54,7 @@
             panels.forEach(p => p.classList.toggle('display-none', p.getAttribute('data-adm-panel') !== name));
             clearMsg();
             if (name === 'orders') loadOrders();
+            if (name === 'pricing') loadPricing();
         }
         tabs.forEach(t => t.addEventListener('click', () => switchTab(t.getAttribute('data-adm-tab'))));
 
@@ -126,6 +127,155 @@
                 }
             } catch (err) { showError(err.message); }
         });
+
+        // ── Tarification ─────────────────────────────────────────────
+        const eur = (n) => Number(n).toFixed(2).replace('.', ',') + ' €';
+
+        // Motifs d'indisponibilité renvoyés par le module de tarification.
+        const INDISPO_FR = {
+            POIDS_INCONNU: 'Poids inconnu — choisissez une catégorie ou forcez un poids.',
+            PORT_VENDEUR_INCONNU: 'Port vendeur inconnu (frais calculés à l\'adresse) — saisissez-le.',
+            HORS_GABARIT: 'Pièce hors gabarit Colissimo — expédition impossible en l\'état.',
+            WEIGHT_TOO_HIGH: 'Poids au-delà de la limite Colissimo (30 kg).',
+            OUT_OF_GAUGE: 'Dimensions hors normes Colissimo.',
+            NO_GRID: 'Aucune grille tarifaire pour cette zone.',
+        };
+
+        async function loadPricing() {
+            loadCategories();
+            loadSettings();
+            loadColissimo();
+        }
+
+        async function loadCategories() {
+            const sel = document.getElementById('sim-categorie');
+            try {
+                const data = await api('/admin/pricing/categories', { method: 'GET' });
+                const cats = data.categories || [];
+                sel.innerHTML = '<option value="">— Aucune (poids forcé requis)</option>' +
+                    cats.map(c => `<option value="${esc(c.code)}">${esc(c.labelFr)} — ${Number(c.poidsKg)} kg${c.horsGabarit ? ' ⚠ hors gabarit' : ''}</option>`).join('');
+            } catch (e) { sel.innerHTML = '<option value="">Erreur de chargement</option>'; }
+        }
+
+        document.getElementById('sim-run').addEventListener('click', async () => {
+            const box = document.getElementById('sim-result');
+            const portVal = document.getElementById('sim-port').value.trim();
+            const poidsVal = document.getElementById('sim-poids').value.trim();
+            box.innerHTML = '<p class="acc-empty">Calcul…</p>';
+            try {
+                const r = await api('/admin/pricing/simulate', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        prixPieceEur: Number(document.getElementById('sim-prix').value),
+                        portVendeurEur: portVal === '' ? null : Number(portVal),
+                        poidsKg: poidsVal === '' ? null : Number(poidsVal),
+                        categoryCode: document.getElementById('sim-categorie').value || null,
+                        zone: document.getElementById('sim-zone').value,
+                        assurance: document.getElementById('sim-assurance').value,
+                        colisNonAnnonce: document.getElementById('sim-nonannonce').checked,
+                        consolidation: document.getElementById('sim-consolidation').checked,
+                    }),
+                });
+
+                if (r.prixClientEur == null) {
+                    box.innerHTML = `<div class="pr-indispo">
+                        <strong>Aucun prix ferme calculable</strong>
+                        <p>${esc(INDISPO_FR[r.indisponible] || r.indisponible || 'Données insuffisantes.')}</p>
+                        <p class="pr-hint">Cette commande partirait en validation opérateur (régime ESTIMÉ).</p>
+                    </div>`;
+                    return;
+                }
+
+                const d = r.detail;
+                const ligne = (l, v, cls) => `<div class="pr-line ${cls || ''}"><span>${l}</span><span>${eur(v)}</span></div>`;
+                box.innerHTML = `
+                    <div class="pr-result">
+                        <div class="pr-total">
+                            <span>Prix client tout compris</span>
+                            <strong>${eur(r.prixClientEur)}</strong>
+                        </div>
+                        <div class="pr-regime ${r.regime === 'FERME' ? 'pr-ferme' : 'pr-estime'}">
+                            Régime ${r.regime}${r.estimation ? ` · poids ${Number(r.estimation.poidsKg)} kg (${esc(r.estimation.source)})` : ''}
+                        </div>
+                        <div class="pr-breakdown">
+                            ${ligne('Prix pièce', d.prixPieceEur)}
+                            ${ligne('Port vendeur → entrepôt', d.portVendeurEur)}
+                            ${ligne('Frais de traitement', d.fraisTraitementEur)}
+                            ${ligne(`Port Colissimo (tranche ${d.trancheKg} kg, facturé ${d.poidsFactureKg} kg)`, d.portColissimoEur)}
+                            ${d.supplementGabaritEur ? ligne('Supplément gabarit', d.supplementGabaritEur) : ''}
+                            ${d.supplementColisNonAnnonceEur ? ligne('Supplément colis non annoncé', d.supplementColisNonAnnonceEur) : ''}
+                            ${d.consolidationEur ? ligne('Consolidation', d.consolidationEur) : ''}
+                            ${ligne('Assurance', d.assuranceEur)}
+                            ${ligne('Marge PartFinder', d.margeEur, 'pr-marge')}
+                        </div>
+                        <div class="pr-foot">
+                            Coût d'acquisition : ${eur(d.coutAcquisitionEur)}
+                            ${d.adValoremRecommande ? ' · <strong>Ad valorem recommandé</strong> (valeur > 23 €/kg)' : ''}
+                        </div>
+                    </div>`;
+            } catch (e) {
+                box.innerHTML = `<p class="acc-empty">${esc(e.message)}</p>`;
+            }
+        });
+
+        async function loadSettings() {
+            const box = document.getElementById('adm-settings');
+            try {
+                const data = await api('/admin/pricing/settings', { method: 'GET' });
+                const s = data.settings || [];
+                box.innerHTML = s.map(x => `
+                    <div class="pr-setting" data-key="${esc(x.key)}">
+                        <div class="pr-setting-label">
+                            <strong>${esc(x.label || x.key)}</strong>
+                            <div class="adm-row-meta">${esc(x.key)}</div>
+                        </div>
+                        <input type="number" step="0.01" min="0" class="pr-setting-input" value="${esc(x.value)}">
+                        <button class="adm-mini-btn" data-act="save-setting">OK</button>
+                    </div>`).join('');
+            } catch (e) { box.innerHTML = `<p class="acc-empty">${esc(e.message)}</p>`; }
+        }
+
+        document.getElementById('adm-settings').addEventListener('click', async (e) => {
+            const btn = e.target.closest('[data-act="save-setting"]');
+            if (!btn) return;
+            const row = btn.closest('.pr-setting');
+            const key = row.getAttribute('data-key');
+            const value = row.querySelector('.pr-setting-input').value;
+            clearMsg();
+            btn.disabled = true;
+            try {
+                await api('/admin/pricing/settings/' + encodeURIComponent(key), {
+                    method: 'PATCH', body: JSON.stringify({ value }),
+                });
+                showSuccess('Paramètre « ' + key + ' » mis à jour — effet immédiat.');
+            } catch (err) { showError(err.message); }
+            finally { btn.disabled = false; }
+        });
+
+        async function loadColissimo() {
+            const box = document.getElementById('adm-colissimo');
+            try {
+                const data = await api('/admin/pricing/colissimo', { method: 'GET' });
+                const rates = data.rates || [];
+                const f = data.freshness || {};
+                const om1 = rates.filter(r => r.zone === 'OM1');
+                const om2 = rates.filter(r => r.zone === 'OM2');
+                const col = (rows) => rows.map(r =>
+                    `<div class="pr-line"><span>≤ ${Number(r.poidsMaxKg)} kg</span><span>${eur(r.prixEur)}</span></div>`).join('');
+
+                box.innerHTML = `
+                    <div class="pr-fresh ${f.stale ? 'pr-stale' : 'pr-ok'}">
+                        ${f.stale ? '⚠️ ' : '✓ '}${esc(f.message || '')}
+                        ${data.autoRefresh ? '' : '<div class="pr-hint">Mise à jour manuelle (aucun contrat Colissimo Entreprise configuré).</div>'}
+                    </div>
+                    <div class="pr-zones">
+                        <div><h4>OM1</h4>${col(om1)}</div>
+                        <div><h4>OM2</h4>${col(om2)}</div>
+                    </div>
+                    <p class="pr-hint">Pour publier une nouvelle grille (mise à jour du 1<sup>er</sup> janvier),
+                    utilisez <code>POST /api/admin/pricing/colissimo</code> — l'ancienne est conservée en historique.</p>`;
+            } catch (e) { box.innerHTML = `<p class="acc-empty">${esc(e.message)}</p>`; }
+        }
 
         // ── Commandes ────────────────────────────────────────────────
         function orderRow(o) {
