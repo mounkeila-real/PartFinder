@@ -1597,6 +1597,50 @@ textarea:focus {
     .adm-row-meta { white-space: normal; }
 }
 
+/* ── Expéditions & CN23 ──────────────────────────────────────────── */
+.sh-chip {
+    height: 40px; padding: 0 14px; border-radius: 999px;
+    background: var(--overlay-soft); color: var(--text-secondary);
+    font-size: 0.85rem; font-weight: 600;
+}
+.sh-chip.active { background: var(--accent-electric); color: #fff; }
+.sh-tracking {
+    height: 38px; padding: 0 10px; font-size: 0.88rem; min-width: 180px;
+    background: var(--bg-surface); border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); color: var(--text-primary);
+}
+
+.cn23 {
+    border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    padding: 16px; margin-bottom: 14px; background: var(--bg-surface);
+}
+.cn23-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.cn23-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; font-size: 0.85rem; line-height: 1.5; }
+.cn23-cols h4 { font-size: 0.8rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+.cn23-table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.82rem; }
+.cn23-table th, .cn23-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border-color); }
+.cn23-table th { color: var(--text-tertiary); font-weight: 600; }
+.cn23-foot { font-size: 0.85rem; color: var(--text-secondary); }
+
+@media print {
+    body * { visibility: hidden; }
+    .cn23, .cn23 * { visibility: visible; }
+    .cn23 { position: absolute; left: 0; top: 0; width: 100%; border: none; }
+    .cn23-head button { display: none; }
+}
+
+/* Suivi client */
+.pk-steps { display: flex; gap: 14px; margin: 8px 0; font-size: 0.82rem; color: var(--text-tertiary); flex-wrap: wrap; }
+.pk-steps .pk-done { color: var(--success); font-weight: 600; }
+.pk-photos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.pk-photos img { width: 76px; height: 76px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border-color); }
+
+@media (max-width: 1023px) {
+    .cn23-cols { grid-template-columns: 1fr; }
+    .cn23-table { font-size: 0.75rem; }
+    .sh-tracking { min-width: 0; width: 100%; }
+}
+
 /* ── Entrepôt (opérateur, mobile-first) ──────────────────────────── */
 .wh-scan { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
 .wh-scan label {

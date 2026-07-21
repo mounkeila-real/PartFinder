@@ -54,6 +54,40 @@ export class EmailService {
     }
 
     /**
+     * Colis expédié : notification client avec le numéro de suivi.
+     * Vocabulaire neutre — aucune source d'approvisionnement mentionnée.
+     */
+    static async sendShipmentEmail(email: string, reference: number, tracking: string): Promise<boolean> {
+        const suivi = `https://www.laposte.fr/outils/suivre-vos-envois?code=${encodeURIComponent(tracking)}`;
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                <h2 style="color: #1F5FD6; text-align: center;">Votre colis est en route 🚚</h2>
+                <p>Bonjour,</p>
+                <p>Votre commande <strong>#${reference}</strong> vient d'être expédiée depuis notre entrepôt.</p>
+                <p style="text-align:center;margin:24px 0">
+                    <span style="display:inline-block;background:#F5F7FB;padding:12px 20px;border-radius:8px;font-size:18px;font-weight:bold;letter-spacing:1px">${tracking}</span>
+                </p>
+                <div style="text-align: center; margin: 24px 0;">
+                    <a href="${suivi}" style="background-color:#1F5FD6;color:white;padding:12px 24px;text-decoration:none;border-radius:4px;font-weight:bold;display:inline-block">Suivre mon colis</a>
+                </div>
+                <p style="font-size:12px;color:#666">Les taxes locales éventuelles (octroi de mer) restent à la charge du destinataire.</p>
+                <hr style="border:0;border-top:1px solid #eee;margin:20px 0" />
+                <p style="font-size:11px;color:#999;text-align:center">PartFinder — merci de votre confiance.</p>
+            </div>`;
+        if (!resend) {
+            console.warn(`[EMAIL BACKUP] Expedition #${reference} pour ${email} — suivi ${tracking}`);
+            return true;
+        }
+        try {
+            await resend.emails.send({ from: FROM_EMAIL, to: email, subject: `Votre commande #${reference} est expédiée`, html });
+            return true;
+        } catch (error: any) {
+            console.error('[resend] Failed to send shipment email:', error.message);
+            return false;
+        }
+    }
+
+    /**
      * Alerte interne (admin) : la grille tarifaire Colissimo doit être vérifiée.
      * Email opérationnel — jamais envoyé à un client.
      */

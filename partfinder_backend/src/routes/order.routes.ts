@@ -79,4 +79,51 @@ router.get('/mine', requireAuth, async (req: AuthedRequest, res: express.Respons
     }
 });
 
+/**
+ * GET /api/orders/my-parcels — suivi des colis du client connecté.
+ * Vue neutre : étapes entrepôt et expédition, jamais la provenance des pièces.
+ */
+router.get('/my-parcels', requireAuth, async (req: AuthedRequest, res: express.Response) => {
+    try {
+        const userId = req.user!.userId;
+        const [parcels, shipments] = await Promise.all([
+            prisma.inboundParcel.findMany({
+                where: { userId },
+                orderBy: { createdAt: 'desc' },
+                take: 50,
+            }),
+            prisma.outboundShipment.findMany({
+                where: { userId },
+                orderBy: { createdAt: 'desc' },
+                take: 50,
+            }),
+        ]);
+
+        res.json({
+            // On n'expose ni notes internes ni identifiants de suivi entrants
+            // (ils désignent l'acheminement fournisseur).
+            parcels: parcels.map((p) => ({
+                id: p.id,
+                orderId: p.orderId,
+                etape: p.statut,
+                poidsKg: p.poidsReelKg != null ? Number(p.poidsReelKg) : null,
+                photos: Array.isArray(p.photos) ? p.photos : [],
+                recuLe: p.receivedAt,
+                peseLe: p.weighedAt,
+            })),
+            shipments: shipments.map((s) => ({
+                id: s.id,
+                orderId: s.orderId,
+                statut: s.statut,
+                poidsKg: s.poidsFactureKg != null ? Number(s.poidsFactureKg) : null,
+                tracking: s.trackingColissimo,
+                expedieLe: s.shippedAt,
+            })),
+        });
+    } catch (e: any) {
+        console.error('[orders] my-parcels:', e.message);
+        res.status(500).json({ error: 'Erreur lors du chargement du suivi.' });
+    }
+});
+
 export default router;

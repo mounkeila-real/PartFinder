@@ -40,6 +40,73 @@
             tabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-acc-tab') === name));
             panels.forEach(p => p.classList.toggle('display-none', p.getAttribute('data-acc-panel') !== name));
             clearMsg();
+            if (name === 'parcels') loadParcels();
+        }
+
+        // ── Suivi des colis (vocabulaire neutre) ─────────────────────
+        const ETAPE_FR = {
+            EXPECTED: 'En attente de réception',
+            RECEIVED: 'Reçu à notre entrepôt',
+            WEIGHED: 'Contrôlé et pesé',
+            CONSOLIDATED: 'Regroupé pour expédition',
+            SHIPPED: 'Expédié',
+            ISSUE: 'En cours de traitement',
+        };
+
+        async function loadParcels() {
+            const box = document.getElementById('acc-parcels');
+            box.innerHTML = '<p class="acc-empty">Chargement…</p>';
+            try {
+                const data = await api('/orders/my-parcels', { method: 'GET' });
+                const parcels = data.parcels || [];
+                const shipments = data.shipments || [];
+
+                if (!parcels.length && !shipments.length) {
+                    box.innerHTML = '<p class="acc-empty">Aucun colis en cours.</p>';
+                    return;
+                }
+
+                const etapes = (p) => {
+                    const done = (ok) => ok ? '✓' : '○';
+                    return `<div class="pk-steps">
+                        <span class="${p.recuLe ? 'pk-done' : ''}">${done(!!p.recuLe)} Reçu</span>
+                        <span class="${p.peseLe ? 'pk-done' : ''}">${done(!!p.peseLe)} Contrôlé</span>
+                        <span class="${p.etape === 'SHIPPED' ? 'pk-done' : ''}">${done(p.etape === 'SHIPPED')} Expédié</span>
+                    </div>`;
+                };
+
+                const photos = (p) => (p.photos || []).length
+                    ? `<div class="pk-photos">${p.photos.map(u => `<img src="${u}" alt="Photo du colis">`).join('')}</div>`
+                    : '';
+
+                const parcelsHtml = parcels.map(p => `
+                    <div class="acc-order">
+                        <div class="acc-order-head">
+                            <strong>Colis ${p.orderId ? `— commande #${p.orderId}` : `#${p.id}`}</strong>
+                            <span class="acc-status ${p.etape === 'SHIPPED' ? 'st-done' : p.etape === 'ISSUE' ? 'st-cancel' : 'st-progress'}">${ETAPE_FR[p.etape] || p.etape}</span>
+                        </div>
+                        ${etapes(p)}
+                        ${p.poidsKg ? `<div class="acc-order-meta">Poids constaté : ${p.poidsKg} kg</div>` : ''}
+                        ${photos(p)}
+                    </div>`).join('');
+
+                const shipHtml = shipments.filter(s => s.tracking).map(s => `
+                    <div class="acc-order">
+                        <div class="acc-order-head">
+                            <strong>Expédition ${s.orderId ? `— commande #${s.orderId}` : `#${s.id}`}</strong>
+                            <span class="acc-status st-done">Expédiée</span>
+                        </div>
+                        <div class="acc-order-meta">${s.expedieLe ? new Date(s.expedieLe).toLocaleDateString('fr-FR') : ''} · ${s.poidsKg || '—'} kg</div>
+                        <a class="acc-pay-btn" href="https://www.laposte.fr/outils/suivre-vos-envois?code=${encodeURIComponent(s.tracking)}" target="_blank" rel="noopener">
+                            <i class="ph ph-truck"></i> Suivre mon colis (${esc(s.tracking)})
+                        </a>
+                    </div>`).join('');
+
+                box.innerHTML = (shipHtml ? `<h3 class="acc-sub">Expéditions</h3>${shipHtml}` : '')
+                    + (parcelsHtml ? `<h3 class="acc-sub">À l'entrepôt</h3>${parcelsHtml}` : '');
+            } catch (e) {
+                box.innerHTML = `<p class="acc-empty">${esc(e.message)}</p>`;
+            }
         }
         tabs.forEach(t => t.addEventListener('click', () => switchTab(t.getAttribute('data-acc-tab'))));
 

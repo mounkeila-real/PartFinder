@@ -419,6 +419,7 @@
                 <button class="auth-tab" data-adm-tab="orders">Commandes</button>
                 <button class="auth-tab" data-adm-tab="pricing">Tarification</button>
                 <button class="auth-tab" data-adm-tab="warehouse">Entrepôt</button>
+                <button class="auth-tab" data-adm-tab="shipping">Expéditions</button>
             </div>
 
             <div class="auth-error display-none" id="admin-error"></div>
@@ -504,6 +505,17 @@
                 </div>
             </div>
 
+            <!-- Expéditions -->
+            <div class="display-none" data-adm-panel="shipping">
+                <div class="wh-filters">
+                    <button class="sh-chip active" data-sh-statut="PREPARING">À préparer</button>
+                    <button class="sh-chip" data-sh-statut="LABEL_READY">Étiquette prête</button>
+                    <button class="sh-chip" data-sh-statut="SHIPPED">Expédiées</button>
+                </div>
+                <div id="sh-result"></div>
+                <div id="sh-list"><p class="acc-empty">Chargement…</p></div>
+            </div>
+
             <!-- Fiche de pesée (plein écran, gros champs) -->
             <div class="wh-weigh-panel display-none" id="wh-weigh-panel">
                 <div class="wh-weigh-head">
@@ -543,6 +555,7 @@
 
             <div class="auth-tabs">
                 <button class="auth-tab active" data-acc-tab="orders">Mes commandes</button>
+                <button class="auth-tab" data-acc-tab="parcels">Mes colis</button>
                 <button class="auth-tab" data-acc-tab="profile">Profil</button>
                 <button class="auth-tab" data-acc-tab="security">Sécurité</button>
             </div>
@@ -555,6 +568,11 @@
                 <div class="acc-orders" id="acc-orders">
                     <p class="acc-empty">Chargement…</p>
                 </div>
+            </div>
+
+            <!-- Suivi des colis -->
+            <div class="display-none" data-acc-panel="parcels">
+                <div id="acc-parcels"><p class="acc-empty">Chargement…</p></div>
             </div>
 
             <!-- Profil -->
@@ -688,6 +706,7 @@
     <script src="js/checkout.js"></script>
     <script src="js/shipping-info.js"></script>
     <script src="js/warehouse.js"></script>
+    <script src="js/shipping.js"></script>
 </body>
 
 </html>

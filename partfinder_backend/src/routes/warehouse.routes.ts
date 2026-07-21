@@ -4,6 +4,10 @@ import { PrismaClient } from '@prisma/client';
 import { requireAdmin, AuthedRequest } from '../middleware/auth.middleware';
 import { EmailService } from '../services/email.service';
 import * as pricing from '../services/pricing';
+import {
+    activeLabelProvider, buildCn23, DEFAULT_CODE_SH,
+    type Cn23Line,
+} from '../services/label.service';
 
 /**
  * Parcours entrepôt — réception, pesée, écarts, consolidation.
@@ -373,6 +377,240 @@ router.post('/consolidate', async (req: express.Request, res: express.Response) 
     } catch (e: any) {
         console.error('[warehouse] consolidate:', e.message);
         res.status(500).json({ error: 'Erreur lors de la consolidation.' });
+    }
+});
+
+/* ── Réexpédition ────────────────────────────────────────────────── */
+
+/** GET /api/warehouse/shipments?statut=PREPARING — file des expéditions. */
+router.get('/shipments', async (req: express.Request, res: express.Response) => {
+    try {
+        const statut = req.query.statut ? String(req.query.statut) : undefined;
+        const shipments = await prisma.outboundShipment.findMany({
+            where: statut ? { statut } : {},
+            include: {
+                user: { select: { id: true, companyName: true, email: true } },
+                address: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+        });
+
+        // Signale les expéditions bloquées par un appel de fonds en attente.
+        const userIds = [...new Set(shipments.map((s) => s.userId))];
+        const pending = userIds.length
+            ? await prisma.paymentRequest.findMany({
+                where: { userId: { in: userIds }, statut: 'PENDING' },
+                select: { userId: true, orderId: true, montantEur: true },
+            })
+            : [];
+
+        res.json({
+            shipments: shipments.map((s) => {
+                const bloquants = pending.filter(
+                    (p) => p.userId === s.userId && (p.orderId == null || p.orderId === s.orderId),
+                );
+                return {
+                    ...s,
+                    bloque: bloquants.length > 0,
+                    montantDuEur: bloquants.reduce((t, p) => t + Number(p.montantEur), 0),
+                };
+            }),
+        });
+    } catch (e: any) {
+        console.error('[warehouse] shipments:', e.message);
+        res.status(500).json({ error: 'Erreur lors du chargement des expéditions.' });
+    }
+});
+
+/**
+ * POST /api/warehouse/shipments — crée une expédition à partir de colis pesés.
+ * body: { parcelIds: number[], addressId?, assurance?, valeurDeclareeEur? }
+ */
+router.post('/shipments', async (req: express.Request, res: express.Response) => {
+    try {
+        const ids: number[] = Array.isArray(req.body?.parcelIds) ? req.body.parcelIds.map(Number) : [];
+        if (!ids.length) return res.status(400).json({ error: 'Sélectionnez au moins un colis.' });
+
+        const parcels = await prisma.inboundParcel.findMany({ where: { id: { in: ids } } });
+        if (parcels.length !== ids.length) return res.status(400).json({ error: 'Colis introuvable(s).' });
+        if (parcels.some((p) => p.statut !== 'WEIGHED')) {
+            return res.status(400).json({ error: 'Tous les colis doivent être pesés.' });
+        }
+        const userIds = new Set(parcels.map((p) => p.userId));
+        if (userIds.size > 1) return res.status(400).json({ error: 'Les colis doivent appartenir au même client.' });
+
+        const userId = parcels[0].userId;
+        const orderId = parcels.find((p) => p.orderId)?.orderId ?? null;
+
+        // BLOCAGE MÉTIER : aucune expédition tant qu'un appel de fonds est en attente.
+        const pending = await prisma.paymentRequest.findMany({
+            where: { userId, statut: 'PENDING', OR: [{ orderId: null }, { orderId }] },
+        });
+        if (pending.length) {
+            const total = pending.reduce((t, p) => t + Number(p.montantEur), 0);
+            return res.status(409).json({
+                error: `Expédition bloquée : ${pending.length} paiement(s) en attente (${total.toFixed(2)} €).`,
+                paiementsEnAttente: pending.map((p) => ({ id: p.id, motif: p.motif, montantEur: Number(p.montantEur) })),
+            });
+        }
+
+        const zone = await zoneOf(userId);
+        const poidsTotal = parcels.reduce((s, p) => s + Number(p.poidsReelKg || 0), 0);
+        const poidsFacture = ids.length > 1
+            ? Math.round(poidsTotal * 1.05 * 100) / 100  // emballage de regroupement
+            : Math.round(poidsTotal * 100) / 100;
+
+        let portEur: number;
+        try {
+            const ship = await pricing.getColissimoRate(poidsFacture, zone);
+            portEur = ship.portEur + ship.supplementGabaritEur;
+        } catch (e: any) {
+            return res.status(400).json({ error: `Expédition impossible : ${e.message}` });
+        }
+
+        const addressId = req.body?.addressId ? Number(req.body.addressId) : (
+            await prisma.address.findFirst({ where: { userId }, orderBy: [{ parDefaut: 'desc' }, { createdAt: 'desc' }] })
+        )?.id ?? null;
+
+        const shipment = await prisma.outboundShipment.create({
+            data: {
+                userId, orderId, inboundParcelIds: ids, addressId, zone,
+                poidsFactureKg: poidsFacture,
+                portEur,
+                assurance: req.body?.assurance === 'AD_VALOREM' ? 'AD_VALOREM' : 'STANDARD',
+                valeurDeclareeEur: req.body?.valeurDeclareeEur != null ? Number(req.body.valeurDeclareeEur) : null,
+                statut: 'PREPARING',
+            },
+            include: { user: true, address: true },
+        });
+
+        res.status(201).json({ shipment });
+    } catch (e: any) {
+        console.error('[warehouse] create shipment:', e.message);
+        res.status(500).json({ error: 'Erreur lors de la création de l\'expédition.' });
+    }
+});
+
+/**
+ * POST /api/warehouse/shipments/:id/label — prépare l'étiquette / la CN23.
+ * Sans contrat Colissimo, renvoie les données à recopier (ManualLabelProvider).
+ */
+router.post('/shipments/:id/label', async (req: express.Request, res: express.Response) => {
+    try {
+        const id = Number(req.params.id);
+        const shipment = await prisma.outboundShipment.findUnique({
+            where: { id },
+            include: { user: true, address: true },
+        });
+        if (!shipment) return res.status(404).json({ error: 'Expédition introuvable.' });
+
+        // Re-contrôle du blocage au moment de l'étiquetage.
+        const pending = await prisma.paymentRequest.count({
+            where: { userId: shipment.userId, statut: 'PENDING', OR: [{ orderId: null }, { orderId: shipment.orderId }] },
+        });
+        if (pending) return res.status(409).json({ error: 'Paiement en attente : étiquetage bloqué.' });
+
+        // Lignes CN23 depuis la commande (désignation neutre, sans marque de source).
+        const order = shipment.orderId
+            ? await prisma.order.findUnique({ where: { id: shipment.orderId }, include: { items: true } })
+            : null;
+
+        const poidsTotal = Number(shipment.poidsFactureKg || 0);
+        const items = order?.items ?? [];
+        const lignes: Cn23Line[] = items.length
+            ? items.map((i) => ({
+                designation: `Pièce détachée automobile d'occasion — ${i.partName}`.slice(0, 120),
+                quantite: i.quantity || 1,
+                poidsNetKg: items.length ? Math.round((poidsTotal / items.length) * 100) / 100 : poidsTotal,
+                valeurEur: Number(i.priceSold) || 0,
+                codeSH: String(req.body?.codeSH || DEFAULT_CODE_SH),
+                origine: String(req.body?.origine || 'FR'),
+            }))
+            : [{
+                designation: "Pièce détachée automobile d'occasion",
+                quantite: 1,
+                poidsNetKg: poidsTotal,
+                valeurEur: Number(shipment.valeurDeclareeEur || 0),
+                codeSH: String(req.body?.codeSH || DEFAULT_CODE_SH),
+                origine: String(req.body?.origine || 'FR'),
+            }];
+
+        const a = shipment.address;
+        const cn23 = buildCn23({
+            destinataire: {
+                nom: a?.destinataire || shipment.user?.companyName || '—',
+                adresse: [a?.ligne1, a?.ligne2].filter(Boolean).join(', ') || '—',
+                codePostal: a?.codePostal || '—',
+                ville: a?.ville || '—',
+                territoire: a?.territoire || shipment.zone,
+                telephone: a?.telephone ?? null,
+            },
+            lignes,
+            poidsTotalKg: poidsTotal,
+        });
+
+        const provider = activeLabelProvider();
+        const label = await provider.createLabel(cn23);
+
+        const updated = await prisma.outboundShipment.update({
+            where: { id },
+            data: {
+                cn23Data: cn23 as any,
+                statut: 'LABEL_READY',
+                ...(label.tracking ? { trackingColissimo: label.tracking } : {}),
+            },
+        });
+
+        res.json({ shipment: updated, label });
+    } catch (e: any) {
+        console.error('[warehouse] label:', e.message);
+        res.status(500).json({ error: e.message || 'Erreur lors de la préparation de l\'étiquette.' });
+    }
+});
+
+/**
+ * POST /api/warehouse/shipments/:id/ship — saisie du suivi et notification client.
+ * body: { tracking }
+ */
+router.post('/shipments/:id/ship', async (req: express.Request, res: express.Response) => {
+    try {
+        const id = Number(req.params.id);
+        const tracking = String(req.body?.tracking || '').trim();
+        if (!tracking) return res.status(400).json({ error: 'Numéro de suivi requis.' });
+
+        const shipment = await prisma.outboundShipment.findUnique({ where: { id }, include: { user: true } });
+        if (!shipment) return res.status(404).json({ error: 'Expédition introuvable.' });
+
+        const pending = await prisma.paymentRequest.count({
+            where: { userId: shipment.userId, statut: 'PENDING', OR: [{ orderId: null }, { orderId: shipment.orderId }] },
+        });
+        if (pending) return res.status(409).json({ error: 'Paiement en attente : expédition bloquée.' });
+
+        const updated = await prisma.$transaction(async (tx) => {
+            const s = await tx.outboundShipment.update({
+                where: { id },
+                data: { trackingColissimo: tracking, statut: 'SHIPPED', shippedAt: new Date() },
+            });
+            await tx.inboundParcel.updateMany({
+                where: { id: { in: shipment.inboundParcelIds } },
+                data: { statut: 'SHIPPED' },
+            });
+            if (shipment.orderId) {
+                await tx.order.update({ where: { id: shipment.orderId }, data: { status: 'SHIPPED' } });
+            }
+            return s;
+        });
+
+        if (shipment.user?.email) {
+            EmailService.sendShipmentEmail(shipment.user.email, shipment.orderId ?? id, tracking)
+                .catch((err: any) => console.error('[warehouse] email expedition:', err?.message));
+        }
+
+        res.json({ shipment: updated });
+    } catch (e: any) {
+        console.error('[warehouse] ship:', e.message);
+        res.status(500).json({ error: 'Erreur lors de l\'expédition.' });
     }
 });
 
