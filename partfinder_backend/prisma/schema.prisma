@@ -97,6 +97,13 @@ model OrderItem {
   partName  String
   quantity  Int    @default(1)
   priceSold Float  // Price with margin applied
+  // Coût d'acquisition — INTERNE, jamais exposé au client.
+  // Sert à l'opérateur pour arrêter le prix définitif et vérifier la marge.
+  sourcePriceEur    Decimal? @db.Decimal(10, 2)
+  sourceShippingEur Decimal? @db.Decimal(10, 2)  // null = port vendeur inconnu
+  sourceShippingType String?                     // FIXED | CALCULATED | null
+  categoryCode      String?                      // catégorie retenue (poids de référence)
+  poidsEstimeKg     Decimal? @db.Decimal(6, 2)
 }
 
 // Vehicle Database Models (imported from vehicle-make-model-data)

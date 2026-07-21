@@ -7,6 +7,7 @@ import { EmailService } from '../services/email.service';
 import { requireAdmin, AuthedRequest } from '../middleware/auth.middleware';
 import { getActiveRates, replaceGrid, checkGridFreshness, activeProvider } from '../services/colissimo.service';
 import { refreshColissimoRates } from '../jobs/scheduler';
+import * as pricing from '../services/pricing';
 
 /**
  * Administration (Phase 3) — toutes les routes exigent le rôle ADMIN.
@@ -295,6 +296,106 @@ router.post('/pricing/colissimo', async (req: AuthedRequest, res: express.Respon
     } catch (e: any) {
         console.error('[admin] colissimo post:', e.message);
         res.status(400).json({ error: e.message || 'Erreur lors de la publication de la grille.' });
+    }
+});
+
+/**
+ * POST /api/admin/pricing/simulate — simulateur de prix (usage interne).
+ * Renvoie la DÉCOMPOSITION COMPLÈTE, invisible côté client, pour vérifier la marge.
+ * body: { prixPieceEur, portVendeurEur?, poidsKg?, categoryCode?, titre?, zone,
+ *         valeurDeclareeEur?, assurance?, colisNonAnnonce?, consolidation? }
+ */
+router.post('/pricing/simulate', async (req: express.Request, res: express.Response) => {
+    try {
+        const b = req.body || {};
+        const zone = String(b.zone || 'OM1').toUpperCase();
+        if (zone !== 'OM1' && zone !== 'OM2') {
+            return res.status(400).json({ error: 'Zone invalide (OM1 ou OM2).' });
+        }
+        const prixPieceEur = Number(b.prixPieceEur);
+        if (!Number.isFinite(prixPieceEur) || prixPieceEur < 0) {
+            return res.status(400).json({ error: 'Prix pièce invalide.' });
+        }
+
+        // Un poids saisi explicitement prime (simulation « et si »).
+        const result = await pricing.quote({
+            prixPieceEur,
+            portVendeurEur: b.portVendeurEur != null ? Number(b.portVendeurEur) : null,
+            valeurDeclareeEur: b.valeurDeclareeEur != null ? Number(b.valeurDeclareeEur) : undefined,
+            zone: zone as 'OM1' | 'OM2',
+            poidsVendeurKg: b.poidsKg != null ? Number(b.poidsKg) : null,
+            categoryCode: b.categoryCode || null,
+            titre: b.titre || null,
+            assurance: b.assurance === 'AD_VALOREM' ? 'AD_VALOREM' : 'STANDARD',
+            colisNonAnnonce: !!b.colisNonAnnonce,
+            consolidation: !!b.consolidation,
+        });
+
+        res.json(result);
+    } catch (e: any) {
+        console.error('[admin] simulate:', e.message);
+        res.status(500).json({ error: e.message || 'Erreur de simulation.' });
+    }
+});
+
+/** GET /api/admin/pricing/categories — référentiel des catégories (poids de référence). */
+router.get('/pricing/categories', async (_req: express.Request, res: express.Response) => {
+    try {
+        const categories = await prisma.partCategory.findMany({ orderBy: { labelFr: 'asc' } });
+        res.json({ categories });
+    } catch (e: any) {
+        res.status(500).json({ error: 'Erreur lors du chargement des catégories.' });
+    }
+});
+
+/** GET /api/admin/pricing/settings — paramètres de tarification. */
+router.get('/pricing/settings', async (_req: express.Request, res: express.Response) => {
+    try {
+        const settings = await prisma.pricingSetting.findMany({ orderBy: { key: 'asc' } });
+        res.json({ settings });
+    } catch (e: any) {
+        res.status(500).json({ error: 'Erreur lors du chargement des paramètres.' });
+    }
+});
+
+/**
+ * PATCH /api/admin/pricing/settings/:key — modifie un paramètre + journalise.
+ * body: { value }
+ */
+router.patch('/pricing/settings/:key', async (req: AuthedRequest, res: express.Response) => {
+    try {
+        const key = String(req.params.key);
+        const value = String(req.body?.value ?? '').trim();
+        const num = Number(value);
+        if (!Number.isFinite(num) || num < 0) {
+            return res.status(400).json({ error: 'Valeur invalide (nombre positif attendu).' });
+        }
+        // Bornes de sécurité : évite une marge à 0 % ou une saisie aberrante.
+        const BORNES: Record<string, [number, number]> = {
+            marge_pourcent: [0, 200],
+            marge_minimum_eur: [0, 1000],
+            marge_securite_port_pourcent: [0, 100],
+            seuil_ecart_tranches: [1, 10],
+        };
+        const b = BORNES[key];
+        if (b && (num < b[0] || num > b[1])) {
+            return res.status(400).json({ error: `Valeur hors bornes pour ${key} (${b[0]}–${b[1]}).` });
+        }
+
+        const existing = await prisma.pricingSetting.findUnique({ where: { key } });
+        if (!existing) return res.status(404).json({ error: 'Paramètre inconnu.' });
+
+        const [updated] = await prisma.$transaction([
+            prisma.pricingSetting.update({ where: { key }, data: { value } }),
+            prisma.pricingSettingLog.create({
+                data: { key, oldValue: existing.value, newValue: value, userId: req.user!.userId },
+            }),
+        ]);
+        pricing.invalidateSettingsCache();
+        res.json({ setting: updated });
+    } catch (e: any) {
+        console.error('[admin] settings patch:', e.message);
+        res.status(500).json({ error: 'Erreur lors de la mise à jour.' });
     }
 });
 

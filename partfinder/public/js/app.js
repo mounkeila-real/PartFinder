@@ -805,8 +805,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     condition: isUsed ? 'used' : 'new',
                     description: item.fullDescription || item.shortDescription || '',
                     url: item.itemWebUrl || null,
-                    // Source d'approvisionnement conservee en interne uniquement (jamais affichee).
+                    // Donnees d'approvisionnement : INTERNES, jamais affichees au client.
+                    // Elles remontent avec la commande pour que l'operateur puisse
+                    // arreter le prix definitif en connaissant son cout reel.
                     source: item.source || null,
+                    sourceShipping: item.shippingCost != null ? item.shippingCost : null,
+                    sourceShippingType: item.shippingType || null,
                     isMock: !!item.isMock
                 };
             });
@@ -1111,7 +1115,11 @@ document.addEventListener('DOMContentLoaded', () => {
             partOem: item.oem || 'OEM-REF',
             partName: item.name,
             quantity: 1,
-            priceSold: item.displayPrice
+            priceSold: item.displayPrice,
+            // Cout d'acquisition (interne) transmis pour la validation operateur.
+            sourcePriceEur: item.sourcePrice != null ? item.sourcePrice : null,
+            sourceShippingEur: item.sourceShipping != null ? item.sourceShipping : null,
+            sourceShippingType: item.sourceShippingType || null,
         }));
 
         // Ouvre le tunnel de paiement Stripe (livraison + redirection).

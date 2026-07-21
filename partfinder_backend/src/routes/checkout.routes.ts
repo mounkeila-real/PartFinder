@@ -123,6 +123,10 @@ router.post('/request', requireAuth, async (req: AuthedRequest, res: express.Res
                         partName: i.partName,
                         quantity: Number(i.quantity) || 1,
                         priceSold: Number(i.priceSold),
+                        // Coût d'acquisition conservé pour la validation opérateur (interne).
+                        sourcePriceEur: i.sourcePriceEur != null ? Number(i.sourcePriceEur) : null,
+                        sourceShippingEur: i.sourceShippingEur != null ? Number(i.sourceShippingEur) : null,
+                        sourceShippingType: i.sourceShippingType || null,
                     })),
                 },
             },

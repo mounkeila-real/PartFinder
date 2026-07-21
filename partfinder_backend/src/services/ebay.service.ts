@@ -235,8 +235,44 @@ export class EbayService {
         };
     }
 
+    /**
+     * Frais de port vendeur -> entrepôt, extraits des options d'expédition.
+     *
+     * ⚠️ Trois cas à ne pas confondre :
+     *   - shippingCost.value = 0        -> livraison offerte (montant FERME de 0 €)
+     *   - shippingCostType = CALCULATED -> dépend de l'adresse : montant INCONNU
+     *   - aucune option                 -> INCONNU
+     * Renvoyer 0 pour un port inconnu conduirait à vendre à perte : on renvoie
+     * donc null, ce qui bascule la commande en validation opérateur.
+     */
+    private static extractShipping(s: any): { shippingCost: number | null; shippingType: string | null } {
+        const options: any[] = Array.isArray(s.shippingOptions) ? s.shippingOptions : [];
+        if (!options.length) return { shippingCost: null, shippingType: null };
+
+        // On retient l'option la moins chère parmi celles au montant ferme.
+        let best: number | null = null;
+        let type: string | null = null;
+
+        for (const o of options) {
+            const t = o.shippingCostType || null;
+            const raw = o.shippingCost?.value;
+            const val = raw != null ? parseFloat(raw) : null;
+
+            if (t === 'CALCULATED') {
+                if (type === null) type = 'CALCULATED';
+                continue; // montant non ferme : inexploitable pour un prix ferme
+            }
+            if (val != null && Number.isFinite(val)) {
+                if (best === null || val < best) best = val;
+                type = 'FIXED';
+            }
+        }
+        return { shippingCost: best, shippingType: type };
+    }
+
     private static normalizeSummary(s: any): NormalizedPart {
         const priceValue = s.price?.value != null ? parseFloat(s.price.value) : null;
+        const shipping = this.extractShipping(s);
         return {
             itemId: s.itemId,
             title: s.title || '',
@@ -249,6 +285,8 @@ export class EbayService {
             seller: s.seller?.username || null,
             shortDescription: s.shortDescription || null,
             fullDescription: null,
+            shippingCost: shipping.shippingCost,
+            shippingType: shipping.shippingType,
         };
     }
 
