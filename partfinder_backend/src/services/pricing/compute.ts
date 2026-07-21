@@ -339,6 +339,71 @@ export function computeTotalPrice(
     };
 }
 
+// ── Prix hors port d'acheminement ────────────────────────────────────
+export interface PartialPriceInput {
+    prixPieceEur: number;
+    portVendeurEur: number;
+    valeurDeclareeEur?: number;
+    colisNonAnnonce?: boolean;
+    consolidation?: boolean;
+    settings?: PricingSettings;
+}
+
+export interface PartialPriceResult {
+    /** Tout sauf le port outre-mer (qui exige de connaître le poids). */
+    prixHorsPortEur: number;
+    detail: {
+        prixPieceEur: number;
+        portVendeurEur: number;
+        fraisTraitementEur: number;
+        supplementColisNonAnnonceEur: number;
+        consolidationEur: number;
+        margeEur: number;
+        coutAcquisitionEur: number;
+        valeurDeclareeEur: number;
+    };
+}
+
+/**
+ * Prix calculable SANS connaître le poids : toutes les composantes sauf le port
+ * Colissimo. Sert à afficher « XX € + frais de port » sur les résultats de
+ * recherche, sans déclencher d'appel IA pour chaque annonce.
+ */
+export function computePriceWithoutShipping(
+    input: PartialPriceInput,
+    feeTiers: FeeTier[],
+): PartialPriceResult {
+    const settings = input.settings ?? DEFAULT_SETTINGS;
+    const valeurDeclareeEur = input.valeurDeclareeEur ?? input.prixPieceEur;
+
+    const fraisTraitementEur = findProcessingFee(valeurDeclareeEur, feeTiers);
+    const margeEur = computeMargin(input.prixPieceEur, input.portVendeurEur, settings);
+    const supplementColisNonAnnonceEur = input.colisNonAnnonce ? settings.supplementColisNonAnnonceEur : 0;
+    const consolidationEur = input.consolidation ? settings.consolidationForfaitEur : 0;
+
+    const totalCents =
+        toCents(input.prixPieceEur) +
+        toCents(input.portVendeurEur) +
+        toCents(fraisTraitementEur) +
+        toCents(supplementColisNonAnnonceEur) +
+        toCents(consolidationEur) +
+        toCents(margeEur);
+
+    return {
+        prixHorsPortEur: roundUpTo10Cents(toEur(totalCents)),
+        detail: {
+            prixPieceEur: input.prixPieceEur,
+            portVendeurEur: input.portVendeurEur,
+            fraisTraitementEur,
+            supplementColisNonAnnonceEur,
+            consolidationEur,
+            margeEur,
+            coutAcquisitionEur: Math.round((input.prixPieceEur + input.portVendeurEur) * 100) / 100,
+            valeurDeclareeEur,
+        },
+    };
+}
+
 // ── Écart de pesée ───────────────────────────────────────────────────
 /**
  * Compare l'estimation à la pesée réelle : renvoie l'écart en NOMBRE DE

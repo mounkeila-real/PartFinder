@@ -225,12 +225,19 @@ model PricingSettingLog {
 // Cache de classification IA : un titre normalisé n'est jamais reclassifié.
 model AiClassification {
   id                 Int           @id @default(autoincrement())
-  titreNormalise     String        @unique
+  titreNormalise     String        @unique  // clé de cache (titre normalisé + empreinte description)
+  titreOrigine       String?                // titre lisible, pour la revue opérateur
   categoryId         Int?
   category           PartCategory? @relation(fields: [categoryId], references: [id])
   confiance          Decimal       @db.Decimal(4, 3)
+  // Nombre d'unités de la catégorie (ex. « 2 disques » -> 2, « jeu de 4 plaquettes » -> 1
+  // car la catégorie « jeu de plaquettes » est déjà l'unité).
+  quantite           Int           @default(1)
+  poidsEstimeKg      Decimal?      @db.Decimal(6, 2)  // poids retenu = poids catégorie x quantité
   valideParOperateur Boolean       @default(false)
   createdAt          DateTime      @default(now())
+
+  @@index([valideParOperateur])
 }
 
 // Adresses de livraison du client (la zone pilote le tarif Colissimo).

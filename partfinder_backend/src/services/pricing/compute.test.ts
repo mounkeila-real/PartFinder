@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     roundUpTo10Cents, selectTranche, checkParcelLimits, computeShipping,
     findProcessingFee, computeInsurance, computeMargin, getPriceRegime,
-    computeTotalPrice, computeWeightDeviation, PricingError,
+    computeTotalPrice, computePriceWithoutShipping, computeWeightDeviation, PricingError,
     DEFAULT_SETTINGS, type RateTranche, type FeeTier,
 } from './compute';
 
@@ -235,6 +235,42 @@ describe('computeTotalPrice', () => {
         );
         // 0,10 + 0,20 + 9 + 12,55 + marge mini 10 = 31,85 -> 31,90
         expect(r.prixClientEur).toBe(31.90);
+    });
+});
+
+describe('computePriceWithoutShipping', () => {
+    it('calcule tout sauf le port outre-mer', () => {
+        const r = computePriceWithoutShipping({ prixPieceEur: 120, portVendeurEur: 15 }, TIERS);
+        // 120 + 15 + frais 20 + marge 20,25 = 175,25 -> 175,30
+        expect(r.prixHorsPortEur).toBe(175.30);
+        expect(r.detail.fraisTraitementEur).toBe(20);
+        expect(r.detail.margeEur).toBe(20.25);
+    });
+
+    it('correspond au prix complet moins le port Colissimo', () => {
+        const complet = computeTotalPrice(
+            { prixPieceEur: 120, portVendeurEur: 15, poidsKg: 6, tranches: TRANCHES },
+            TIERS,
+        );
+        const partiel = computePriceWithoutShipping({ prixPieceEur: 120, portVendeurEur: 15 }, TIERS);
+        // 237,80 - 62,50 = 175,30
+        expect(complet.prixClientEur - complet.detail.portColissimoEur).toBeCloseTo(partiel.prixHorsPortEur, 2);
+    });
+
+    it('applique la marge minimum sur les petits montants', () => {
+        const r = computePriceWithoutShipping({ prixPieceEur: 20, portVendeurEur: 5 }, TIERS);
+        expect(r.detail.margeEur).toBe(10);
+        // 20 + 5 + 9 + 10 = 44
+        expect(r.prixHorsPortEur).toBe(44);
+    });
+
+    it('inclut les suppléments', () => {
+        const r = computePriceWithoutShipping(
+            { prixPieceEur: 100, portVendeurEur: 10, colisNonAnnonce: true, consolidation: true },
+            TIERS,
+        );
+        expect(r.detail.supplementColisNonAnnonceEur).toBe(5);
+        expect(r.detail.consolidationEur).toBe(15);
     });
 });
 

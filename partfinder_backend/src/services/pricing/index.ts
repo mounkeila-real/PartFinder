@@ -1,7 +1,8 @@
 import { PrismaClient } from '@prisma/client';
+import { classifyPart, cacheKey as aiCacheKey } from '../aiClassifier';
 import {
     computeTotalPrice, computeShipping, findProcessingFee, computeInsurance,
-    getPriceRegime, computeWeightDeviation, selectTranche,
+    computePriceWithoutShipping, getPriceRegime, computeWeightDeviation, selectTranche,
     DEFAULT_SETTINGS, PricingError,
     type PricingSettings, type RateTranche, type FeeTier, type Zone,
     type AssuranceOption, type WeightSource, type ParcelDims,
@@ -100,6 +101,10 @@ export interface WeightEstimate {
     categoryCode?: string;
     valideParOperateur?: boolean;
     horsGabarit?: boolean;
+    /** Nombre d'unités de la catégorie (le poids en tient déjà compte). */
+    quantite?: number;
+    /** true = classification incertaine, à faire valider par un opérateur. */
+    besoinRevue?: boolean;
 }
 
 /** Normalisation d'un titre d'annonce pour le cache de classification. */
@@ -114,23 +119,33 @@ export function normalizeTitle(titre: string): string {
 
 /**
  * Chaîne de résolution du poids :
- *   a) poids fourni par le vendeur   -> SELLER  (FERME)
- *   b) catégorie connue du parcours  -> CATALOG (FERME)
- *   c) cache de classification IA    -> AI_CACHED
- *   d) appel IA (Phase 3)            -> AI      [non branché ici]
+ *   a) poids fourni par le vendeur       -> SELLER  (FERME)
+ *   b) catégorie connue du parcours      -> CATALOG (FERME)
+ *   c) classification IA (cache, puis appel) -> AI_CACHED / AI
  * Ne lève jamais : renvoie UNKNOWN plutôt que de bloquer le parcours client.
+ *
+ * ⚠️ Le poids retenu = poids de la catégorie × QUANTITÉ. Un lot de 2 disques
+ * pèse le double d'un seul : ignorer la quantité sous-estimerait le port.
  */
 export async function estimateWeight(input: {
     poidsVendeurKg?: number | null;
     categoryCode?: string | null;
     titre?: string | null;
+    description?: string | null;
+    /**
+     * ⚠️ COÛT : n'activer l'IA que sur un article précis (ajout au panier,
+     * validation opérateur). JAMAIS sur une liste de résultats de recherche :
+     * 50 résultats = 50 appels facturés par recherche.
+     * Le cache, lui, est toujours consulté (lecture base, gratuite).
+     */
+    allowAi?: boolean;
 }): Promise<WeightEstimate> {
     // (a) Poids annoncé par le vendeur
     if (input.poidsVendeurKg && input.poidsVendeurKg > 0) {
-        return { poidsKg: input.poidsVendeurKg, dims: {}, source: 'SELLER', confiance: 1 };
+        return { poidsKg: input.poidsVendeurKg, dims: {}, source: 'SELLER', confiance: 1, quantite: 1 };
     }
 
-    // (b) Catégorie déjà connue
+    // (b) Catégorie déjà connue du parcours
     if (input.categoryCode) {
         const cat = await prisma.partCategory.findUnique({ where: { code: input.categoryCode } });
         if (cat) {
@@ -141,20 +156,18 @@ export async function estimateWeight(input: {
                 confiance: cat.poidsVerifie ? 1 : 0.8,
                 categoryCode: cat.code,
                 horsGabarit: cat.horsGabarit,
+                quantite: 1,
             };
         }
     }
 
-    // (c) Cache de classification IA
+    // (c) Cache de classification (lecture base, gratuite) — toujours consulté.
     if (input.titre) {
-        const key = normalizeTitle(input.titre);
-        const cached = await prisma.aiClassification.findUnique({
-            where: { titreNormalise: key },
-            include: { category: true },
-        });
+        const cached = await lookupClassificationCache(input.titre, input.description ?? null);
         if (cached?.category) {
+            const quantite = cached.quantite || 1;
             return {
-                poidsKg: Number(cached.category.poidsKg),
+                poidsKg: Number(cached.category.poidsKg) * quantite,
                 dims: {
                     longueurCm: cached.category.longueurCm,
                     largeurCm: cached.category.largeurCm,
@@ -165,12 +178,48 @@ export async function estimateWeight(input: {
                 categoryCode: cached.category.code,
                 valideParOperateur: cached.valideParOperateur,
                 horsGabarit: cached.category.horsGabarit,
+                quantite,
+                besoinRevue: !cached.valideParOperateur && Number(cached.confiance) < 0.6,
             };
         }
     }
 
-    // (d) Aucune information fiable -> régime ESTIMÉ, jamais de blocage.
-    return { poidsKg: 0, dims: {}, source: 'UNKNOWN', confiance: 0 };
+    // (d) Appel IA — UNIQUEMENT sur demande explicite (article isolé), jamais en liste.
+    if (input.allowAi && input.titre) {
+        const cls = await classifyPart(input.titre, input.description ?? null);
+        if (cls.categoryCode) {
+            const cat = await prisma.partCategory.findUnique({ where: { code: cls.categoryCode } });
+            if (cat) {
+                const quantite = cls.quantite || 1;
+                return {
+                    poidsKg: Number(cat.poidsKg) * quantite,
+                    dims: { longueurCm: cat.longueurCm, largeurCm: cat.largeurCm, hauteurCm: cat.hauteurCm },
+                    source: cls.source === 'CACHE' ? 'AI_CACHED' : 'AI',
+                    confiance: cls.confiance,
+                    categoryCode: cat.code,
+                    valideParOperateur: cls.valideParOperateur,
+                    horsGabarit: cat.horsGabarit,
+                    quantite,
+                    besoinRevue: cls.besoinRevue,
+                };
+            }
+        }
+    }
+
+    // (e) Aucune information fiable -> régime ESTIMÉ, jamais de blocage.
+    return { poidsKg: 0, dims: {}, source: 'UNKNOWN', confiance: 0, quantite: 1, besoinRevue: true };
+}
+
+/** Consultation du cache de classification (aucun appel IA). */
+async function lookupClassificationCache(titre: string, description: string | null) {
+    try {
+        return await prisma.aiClassification.findUnique({
+            where: { titreNormalise: aiCacheKey(titre, description) },
+            include: { category: true },
+        });
+    } catch {
+        return null;
+    }
 }
 
 // ── Devis complet ────────────────────────────────────────────────────
@@ -182,19 +231,29 @@ export interface QuoteInput {
     poidsVendeurKg?: number | null;
     categoryCode?: string | null;
     titre?: string | null;
+    description?: string | null;
     assurance?: AssuranceOption;
     colisNonAnnonce?: boolean;
     consolidation?: boolean;
+    /** N'activer que sur un article isolé (panier, validation) — jamais en liste. */
+    allowAi?: boolean;
 }
 
 export interface QuoteResult {
-    /** Prix tout compris — LE seul montant présenté au client. */
+    /** Prix tout compris — LE seul montant présenté au client. null si le poids est inconnu. */
     prixClientEur: number | null;
+    /**
+     * Prix calculable sans le poids (pièce + acheminement vendeur + traitement
+     * + marge). Sert à afficher « XX € + frais de port » sans appel IA.
+     */
+    prixHorsPortEur: number | null;
+    /** true = le port outre-mer n'a pas pu être chiffré (poids inconnu). */
+    portInconnu: boolean;
     regime: 'FERME' | 'ESTIME';
     /** Détail interne : ne jamais transmettre au client. */
     detail: any;
     estimation: WeightEstimate;
-    /** Motif quand aucun prix ferme n'est calculable. */
+    /** Motif quand aucun prix tout compris n'est calculable. */
     indisponible?: string;
 }
 
@@ -208,20 +267,47 @@ export async function quote(input: QuoteInput): Promise<QuoteResult> {
         poidsVendeurKg: input.poidsVendeurKg,
         categoryCode: input.categoryCode,
         titre: input.titre,
+        description: input.description,
+        allowAi: input.allowAi === true,
     });
 
     const regime = getPriceRegime(estimation.source, estimation.confiance, estimation.valideParOperateur);
 
-    // Poids inconnu ou pièce hors gabarit : pas de prix automatique.
+    // Port vendeur inconnu (fréquent : frais calculés à l'adresse) : rien n'est
+    // chiffrable de façon fiable -> validation opérateur.
+    if (input.portVendeurEur == null) {
+        return {
+            prixClientEur: null, prixHorsPortEur: null, portInconnu: true,
+            regime: 'ESTIME', detail: null, estimation, indisponible: 'PORT_VENDEUR_INCONNU',
+        };
+    }
+
+    // Prix hors port : toujours calculable dès que le port vendeur est connu.
+    const feeTiersForPartial = await getFeeTiers();
+    const partial = computePriceWithoutShipping(
+        {
+            prixPieceEur: input.prixPieceEur,
+            portVendeurEur: input.portVendeurEur,
+            valeurDeclareeEur: input.valeurDeclareeEur,
+            colisNonAnnonce: input.colisNonAnnonce,
+            consolidation: input.consolidation,
+            settings,
+        },
+        feeTiersForPartial,
+    );
+
+    // Poids inconnu ou pièce hors gabarit : on affiche « prix + frais de port ».
     if (estimation.source === 'UNKNOWN' || estimation.poidsKg <= 0) {
-        return { prixClientEur: null, regime: 'ESTIME', detail: null, estimation, indisponible: 'POIDS_INCONNU' };
+        return {
+            prixClientEur: null, prixHorsPortEur: partial.prixHorsPortEur, portInconnu: true,
+            regime: 'ESTIME', detail: partial.detail, estimation, indisponible: 'POIDS_INCONNU',
+        };
     }
     if (estimation.horsGabarit) {
-        return { prixClientEur: null, regime: 'ESTIME', detail: null, estimation, indisponible: 'HORS_GABARIT' };
-    }
-    // Port vendeur inconnu (fréquent : frais calculés à l'adresse) -> validation.
-    if (input.portVendeurEur == null) {
-        return { prixClientEur: null, regime: 'ESTIME', detail: null, estimation, indisponible: 'PORT_VENDEUR_INCONNU' };
+        return {
+            prixClientEur: null, prixHorsPortEur: partial.prixHorsPortEur, portInconnu: true,
+            regime: 'ESTIME', detail: partial.detail, estimation, indisponible: 'HORS_GABARIT',
+        };
     }
 
     try {
@@ -241,10 +327,19 @@ export async function quote(input: QuoteInput): Promise<QuoteResult> {
             },
             feeTiers,
         );
-        return { prixClientEur: result.prixClientEur, regime, detail: result.detail, estimation };
+        return {
+            prixClientEur: result.prixClientEur,
+            prixHorsPortEur: partial.prixHorsPortEur,
+            portInconnu: false,
+            regime, detail: result.detail, estimation,
+        };
     } catch (e: any) {
         if (e instanceof PricingError) {
-            return { prixClientEur: null, regime: 'ESTIME', detail: null, estimation, indisponible: e.code };
+            // Hors gabarit / poids trop élevé : on garde le prix hors port.
+            return {
+                prixClientEur: null, prixHorsPortEur: partial.prixHorsPortEur, portInconnu: true,
+                regime: 'ESTIME', detail: partial.detail, estimation, indisponible: e.code,
+            };
         }
         throw e;
     }

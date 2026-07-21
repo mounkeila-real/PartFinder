@@ -329,6 +329,8 @@ router.post('/pricing/simulate', async (req: express.Request, res: express.Respo
             assurance: b.assurance === 'AD_VALOREM' ? 'AD_VALOREM' : 'STANDARD',
             colisNonAnnonce: !!b.colisNonAnnonce,
             consolidation: !!b.consolidation,
+            // Simulation sur un article isolé : l'appel IA est acceptable ici.
+            allowAi: b.allowAi === true,
         });
 
         res.json(result);
@@ -345,6 +347,94 @@ router.get('/pricing/categories', async (_req: express.Request, res: express.Res
         res.json({ categories });
     } catch (e: any) {
         res.status(500).json({ error: 'Erreur lors du chargement des catégories.' });
+    }
+});
+
+/**
+ * GET /api/admin/pricing/classifications — classifications IA à revoir.
+ * ?all=1 pour tout voir (par défaut : uniquement celles en attente).
+ */
+router.get('/pricing/classifications', async (req: express.Request, res: express.Response) => {
+    try {
+        const all = req.query.all === '1';
+        const rows = await prisma.aiClassification.findMany({
+            where: all ? {} : { valideParOperateur: false },
+            include: { category: true },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+        });
+        res.json({
+            classifications: rows.map((c) => ({
+                id: c.id,
+                titre: c.titreOrigine || c.titreNormalise,
+                categoryCode: c.category?.code ?? null,
+                categoryLabel: c.category?.labelFr ?? null,
+                poidsUnitaireKg: c.category ? Number(c.category.poidsKg) : null,
+                quantite: c.quantite,
+                poidsEstimeKg: c.poidsEstimeKg != null ? Number(c.poidsEstimeKg) : null,
+                confiance: Number(c.confiance),
+                valideParOperateur: c.valideParOperateur,
+                createdAt: c.createdAt,
+            })),
+        });
+    } catch (e: any) {
+        console.error('[admin] classifications:', e.message);
+        res.status(500).json({ error: 'Erreur lors du chargement des classifications.' });
+    }
+});
+
+/**
+ * PATCH /api/admin/pricing/classifications/:id — valider ou corriger.
+ * body: { categoryCode?, quantite?, valider? }
+ * Corriger met à jour le cache : les prochains devis utiliseront la valeur validée.
+ */
+router.patch('/pricing/classifications/:id', async (req: express.Request, res: express.Response) => {
+    try {
+        const id = Number(req.params.id);
+        const { categoryCode, quantite, valider } = req.body || {};
+
+        const existing = await prisma.aiClassification.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ error: 'Classification introuvable.' });
+
+        let categoryId = existing.categoryId;
+        let poidsUnitaire: number | null = null;
+        if (categoryCode) {
+            const cat = await prisma.partCategory.findUnique({ where: { code: String(categoryCode) } });
+            if (!cat) return res.status(400).json({ error: 'Catégorie inconnue.' });
+            categoryId = cat.id;
+            poidsUnitaire = Number(cat.poidsKg);
+        } else if (categoryId) {
+            const cat = await prisma.partCategory.findUnique({ where: { id: categoryId } });
+            poidsUnitaire = cat ? Number(cat.poidsKg) : null;
+        }
+
+        const qte = quantite != null ? Math.max(1, Math.round(Number(quantite))) : existing.quantite;
+
+        const updated = await prisma.aiClassification.update({
+            where: { id },
+            data: {
+                categoryId,
+                quantite: qte,
+                poidsEstimeKg: poidsUnitaire != null ? poidsUnitaire * qte : null,
+                // Une correction opérateur vaut validation : le poids devient fiable
+                // et le devis passera en régime FERME.
+                valideParOperateur: valider !== false,
+            },
+            include: { category: true },
+        });
+
+        res.json({
+            classification: {
+                id: updated.id,
+                categoryCode: updated.category?.code ?? null,
+                quantite: updated.quantite,
+                poidsEstimeKg: updated.poidsEstimeKg != null ? Number(updated.poidsEstimeKg) : null,
+                valideParOperateur: updated.valideParOperateur,
+            },
+        });
+    } catch (e: any) {
+        console.error('[admin] classification patch:', e.message);
+        res.status(500).json({ error: 'Erreur lors de la mise à jour.' });
     }
 });
 
