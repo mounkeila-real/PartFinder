@@ -472,6 +472,7 @@
                 <button class="auth-tab active" data-adm-tab="clients">Clients</button>
                 <button class="auth-tab" data-adm-tab="orders">Commandes</button>
                 <button class="auth-tab" data-adm-tab="pricing">Tarification</button>
+                <button class="auth-tab" data-adm-tab="glossaire">Glossaire</button>
                 <button class="auth-tab" data-adm-tab="warehouse">Entrepôt</button>
                 <button class="auth-tab" data-adm-tab="shipping">Expéditions</button>
             </div>
@@ -486,13 +487,16 @@
                 <div id="adm-orders"><p class="acc-empty">Chargement…</p></div>
             </div>
 
-            <!-- Tarification : simulateur, paramètres, grille Colissimo -->
-            <div class="display-none" data-adm-panel="pricing">
-
-                <h3 class="acc-sub">Glossaire <span class="pr-hint" id="glo-stats">—</span></h3>
+            <!-- Glossaire : termes appris, à valider avant d'entrer en service -->
+            <div class="display-none" data-adm-panel="glossaire">
+                <h3 class="acc-sub">Termes à valider <span class="pr-hint" id="glo-stats">—</span></h3>
                 <p class="pr-hint">Termes étrangers rencontrés que le glossaire ignore, les plus fréquents d'abord. Une entrée validée devient gratuite et instantanée, et améliore aussi les requêtes envoyées aux marchés étrangers.</p>
                 <div id="glo-result"></div>
                 <div id="glo-list"><p class="acc-empty">Chargement…</p></div>
+            </div>
+
+            <!-- Tarification : simulateur, paramètres, grille Colissimo -->
+            <div class="display-none" data-adm-panel="pricing">
 
                 <h3 class="acc-sub">Casses professionnelles <span class="pr-hint">(recherche ciblée en plus de la recherche générale)</span></h3>
                 <div class="sel-add">

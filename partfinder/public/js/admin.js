@@ -58,7 +58,7 @@
             if (name === 'warehouse' && window.pfLoadWarehouse) window.pfLoadWarehouse();
             if (name === 'shipping' && window.pfLoadShipping) window.pfLoadShipping();
             if (name === 'pricing' && window.pfLoadSellers) window.pfLoadSellers();
-            if (name === 'pricing' && window.pfLoadGlossaire) window.pfLoadGlossaire();
+            if (name === 'glossaire' && window.pfLoadGlossaire) window.pfLoadGlossaire();
         }
         tabs.forEach(t => t.addEventListener('click', () => switchTab(t.getAttribute('data-adm-tab'))));
 
