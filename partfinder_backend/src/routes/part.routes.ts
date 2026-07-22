@@ -555,7 +555,11 @@ router.get('/debug-sources', requireAdmin, async (req: express.Request, res: exp
             aliexpress: {
                 configure: AliexpressService.isConfigured(),
                 resultats: aeResults.length,
+                coupee: AliexpressService.estCoupee(),
                 diagnostic: aeDiag,
+                // Forme brute de la réponse : indispensable tant que
+                // l'intégration n'est pas validée (le mapping en dépend).
+                reponseBrute: aeDiag?.rawExcerpt || null,
             },
             verdict: [
                 EbayService.isConfigured() && !ebayResults.some((r: any) => r.isMock)

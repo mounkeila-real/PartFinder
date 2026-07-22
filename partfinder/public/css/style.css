@@ -1648,6 +1648,13 @@ textarea:focus {
 .src-trads { margin-top: 10px; padding: 10px 14px; background: var(--overlay-soft); border-radius: var(--radius-sm); }
 .src-trad { font-size: 0.82rem; color: var(--text-secondary); padding: 2px 0; }
 .src-trad-ko { color: var(--text-tertiary); }
+.src-raw { margin: 8px 0 12px; font-size: 0.8rem; }
+.src-raw summary { cursor: pointer; color: var(--text-tertiary); }
+.src-raw pre {
+    margin-top: 8px; padding: 10px; overflow-x: auto;
+    background: var(--bg-surface-elevated); border-radius: var(--radius-sm);
+    font-size: 0.72rem; white-space: pre-wrap; word-break: break-all;
+}
 
 /* ── Cookies & pages légales ─────────────────────────────────────── */
 .ck-banner {

@@ -280,9 +280,15 @@
                         ${t.reconnu ? esc(t.requete) : '<em>terme absent du glossaire — requête non traduite</em>'}
                     </div>`).join('');
 
+                const ae = d.aliexpress || {};
                 box.innerHTML =
                     ligne('eBay', d.ebay, d.ebay.donneesFactices ? ' · <strong>⚠ DONNÉES FACTICES</strong>' : ` · ${esc(d.ebay.environnement || '')}`)
-                    + ligne('AliExpress', d.aliexpress, '')
+                    + ligne('AliExpress', ae, ae.coupee ? ' · <strong>source coupée (refus répétés)</strong>' : '')
+                    // Réponse brute : tant que l'intégration n'est pas validée,
+                    // c'est elle qui révèle la forme réelle à mapper.
+                    + (ae.reponseBrute
+                        ? `<details class="src-raw"><summary>Réponse brute AliExpress</summary><pre>${esc(ae.reponseBrute)}</pre></details>`
+                        : '')
                     + (trad ? `<div class="src-trads"><div class="pr-hint">Requêtes envoyées aux marchés étrangers :</div>${trad}</div>` : '');
             } catch (e) {
                 box.innerHTML = `<p class="acc-empty">${esc(e.message)}</p>`;

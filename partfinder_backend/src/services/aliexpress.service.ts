@@ -25,18 +25,97 @@ import { NormalizedPart } from './ebay.service';
 
 const APP_KEY = process.env.ALIEXPRESS_APP_KEY || '';
 const APP_SECRET = process.env.ALIEXPRESS_APP_SECRET || '';
-const TRACKING_ID = process.env.ALIEXPRESS_TRACKING_ID || 'default';
 const SHIP_TO = process.env.ALIEXPRESS_SHIP_TO || 'FR';
 const CURRENCY = process.env.ALIEXPRESS_CURRENCY || 'EUR';
-const LANGUAGE = process.env.ALIEXPRESS_LANGUAGE || 'FR';
+const LOCAL = process.env.ALIEXPRESS_LOCAL || 'fr_FR';
+
+/**
+ * Méthode de recherche. L'app est autorisée sur le groupe « AliExpress-dropship »
+ * (ds.*) et PAS sur l'Affiliate : surchargeable par variable d'environnement
+ * pour ajuster sans redéploiement si le nom exact diffère.
+ */
+const SEARCH_METHOD = process.env.ALIEXPRESS_SEARCH_METHOD || 'aliexpress.ds.text.search';
 
 // Gateway "système" AliExpress (Singapour).
 const GATEWAY = 'https://api-sg.aliexpress.com/sync';
 
+/** Coupe-circuit : après N refus d'autorisation, on cesse d'appeler. */
+const SEUIL_COUPURE = 3;
+const DUREE_COUPURE_MS = 6 * 60 * 60 * 1000; // 6 h
+
+/**
+ * Erreurs qui ne se résoudront JAMAIS d'elles-mêmes : elles relèvent du compte
+ * AliExpress (permission d'API non accordée), pas du code ni du réseau.
+ * Réessayer à chaque recherche ne fait que polluer les journaux et ajouter
+ * de la latence.
+ */
+const ERREURS_PERMANENTES = /InsufficientPermission|does not have permission|InvalidAppKey|AppCallLimit/i;
+
 export class AliexpressService {
 
+    /** Coupe-circuit : refus consécutifs et date de réarmement. */
+    private static refusConsecutifs = 0;
+    private static couperJusqua = 0;
+
     static isConfigured(): boolean {
+        // Interrupteur explicite : permet de couper la source sans retirer
+        // les clés de Railway, le temps d'obtenir l'autorisation.
+        if (process.env.ALIEXPRESS_ENABLED === '0') return false;
         return !!(APP_KEY && APP_SECRET);
+    }
+
+    /** La source est-elle temporairement coupée après des refus répétés ? */
+    static estCoupee(): boolean {
+        return Date.now() < this.couperJusqua;
+    }
+
+    static rearmer(): void {
+        this.refusConsecutifs = 0;
+        this.couperJusqua = 0;
+    }
+
+    /**
+     * Traduit une erreur brute en message actionnable.
+     * « InsufficientPermission » ne dit pas QUOI faire ; le message doit
+     * distinguer un problème de compte d'un problème de code.
+     */
+    private static expliquer(brut: string): string {
+        if (/InsufficientPermission|does not have permission/i.test(brut)) {
+            return `PERMISSION REFUSEE par AliExpress pour « ${SEARCH_METHOD} ». `
+                + 'Verifier dans la console AliExpress que le groupe de permissions couvrant '
+                + 'cette methode est actif (l\'app est autorisee sur AliExpress-dropship). '
+                + `Brut : ${brut.slice(0, 160)}`;
+        }
+        if (/InvalidSignature|IncompleteSignature/i.test(brut)) {
+            return `SIGNATURE REFUSEE — verifier ALIEXPRESS_APP_SECRET. Brut : ${brut.slice(0, 160)}`;
+        }
+        if (/AppCallLimit|Quota/i.test(brut)) {
+            return `QUOTA D'APPELS ATTEINT. Brut : ${brut.slice(0, 160)}`;
+        }
+        return brut.slice(0, 300);
+    }
+
+    /**
+     * Coupe-circuit : après plusieurs refus définitifs, on cesse d'appeler.
+     * Sans cela, chaque recherche client relançait un appel voué à échouer —
+     * latence inutile et journaux AliExpress saturés d'erreurs.
+     */
+    private static enregistrerEchec(brut: string): void {
+        if (!ERREURS_PERMANENTES.test(brut)) {
+            this.refusConsecutifs = 0;
+            return;
+        }
+        this.refusConsecutifs += 1;
+        if (this.refusConsecutifs >= SEUIL_COUPURE) {
+            this.couperJusqua = Date.now() + DUREE_COUPURE_MS;
+            if (this.lastDiagnostic) {
+                this.lastDiagnostic.coupeJusqua = new Date(this.couperJusqua).toISOString();
+            }
+            console.warn(
+                `[AliExpress] source coupee ${DUREE_COUPURE_MS / 3600000} h apres `
+                + `${this.refusConsecutifs} refus consecutifs — corriger la permission puis reactiver.`
+            );
+        }
     }
 
     // Horodatage "yyyy-MM-dd HH:mm:ss" en heure de Chine (GMT+8), requis par le gateway.
@@ -60,13 +139,21 @@ export class AliexpressService {
      */
     static lastDiagnostic: {
         at: string; ok: boolean; count: number; error: string | null; rawExcerpt: string | null;
+        /** Vrai quand l'échec relève du compte AliExpress, pas du code. */
+        permanent?: boolean;
+        coupeJusqua?: string | null;
     } | null = null;
 
     static async searchProducts(query: string, limit = 20): Promise<NormalizedPart[]> {
+        // Source coupée : on n'appelle pas. Le diagnostic conserve la cause.
+        if (this.estCoupee()) return [];
+
         if (!this.isConfigured()) {
             this.lastDiagnostic = {
                 at: new Date().toISOString(), ok: false, count: 0,
-                error: 'NON CONFIGURE (ALIEXPRESS_APP_KEY / ALIEXPRESS_APP_SECRET absents)',
+                error: process.env.ALIEXPRESS_ENABLED === '0'
+                    ? 'DESACTIVEE MANUELLEMENT (ALIEXPRESS_ENABLED=0)'
+                    : 'NON CONFIGURE (ALIEXPRESS_APP_KEY / ALIEXPRESS_APP_SECRET absents)',
                 rawExcerpt: null,
             };
             return [];
@@ -74,36 +161,46 @@ export class AliexpressService {
         if (!query || !query.trim()) return [];
 
         try {
+            // API DROP SHIPPING (ds.*), la seule autorisée pour cette app.
+            // L'API Affiliate (affiliate.*) exige une permission distincte,
+            // non accordée : elle répondait InsufficientPermission à chaque
+            // recherche, ce qui ressemblait à « 0 résultat ».
             const params: Record<string, string> = {
-                method: 'aliexpress.affiliate.product.query',
+                method: SEARCH_METHOD,
                 app_key: APP_KEY,
                 timestamp: this.timestamp(),
                 format: 'json',
                 v: '2.0',
                 sign_method: 'hmac-sha256',
-                // Paramètres métier
-                keywords: query,
-                page_size: String(Math.min(limit, 50)),
-                page_no: '1',
-                target_currency: CURRENCY,
-                target_language: LANGUAGE,
-                ship_to_country: SHIP_TO,
-                tracking_id: TRACKING_ID,
-                fields: 'product_id,product_title,product_main_image_url,target_sale_price,target_sale_price_currency,promotion_link,product_detail_url,first_level_category_name',
+                // Paramètres métier de ds.text.search (nommage différent de
+                // l'API Affiliate : keyWord, local, countryCode...).
+                keyWord: query,
+                local: LOCAL,
+                countryCode: SHIP_TO,
+                currency: CURRENCY,
+                pageSize: String(Math.min(limit, 50)),
+                pageIndex: '1',
+                sortBy: 'orders,desc',
             };
             params.sign = this.sign(params);
 
             const resp = await axios.post(GATEWAY, null, { params, timeout: 15000 });
             const data = resp.data;
 
-            // Log de diagnostic (tronqué) — utile tant que l'intégration n'est pas validée.
-            console.log('[AliExpress] product.query réponse:', JSON.stringify(data).slice(0, 900));
+            // Journalisé tant que l'intégration n'est pas validée : c'est cet
+            // extrait qui révèle la forme réelle de la réponse.
+            console.log('[AliExpress] ds.search réponse:', JSON.stringify(data).slice(0, 900));
 
-            // Chemin de réponse AliExpress (plusieurs variantes possibles selon le gateway).
+            // Chemins de réponse tolérants : la forme exacte varie selon la
+            // méthode et la version. Le rawExcerpt du diagnostic permet de
+            // corriger vite si aucun de ces chemins ne correspond.
             const products =
-                data?.aliexpress_affiliate_product_query_response?.resp_result?.result?.products?.product ||
-                data?.resp_result?.result?.products?.product ||
+                data?.aliexpress_ds_text_search_response?.data?.products?.selection_search_product ||
+                data?.aliexpress_ds_text_search_response?.data?.products?.product ||
+                data?.aliexpress_ds_recommend_feed_get_response?.result?.products?.traffic_product_d_t_o ||
+                data?.data?.products?.selection_search_product ||
                 data?.result?.products?.product ||
+                data?.resp_result?.result?.products?.product ||
                 [];
 
             const arr = Array.isArray(products) ? products : [];
@@ -116,41 +213,62 @@ export class AliexpressService {
                     ? { code: (data as any).code, msg: (data as any).msg || (data as any).sub_msg }
                     : null);
 
+            const texteErreur = apiError ? JSON.stringify(apiError) : '';
             this.lastDiagnostic = {
                 at: new Date().toISOString(),
                 ok: !apiError,
                 count: arr.length,
-                error: apiError ? JSON.stringify(apiError).slice(0, 300) : null,
+                error: apiError ? this.expliquer(texteErreur) : null,
                 rawExcerpt: JSON.stringify(data).slice(0, 400),
+                permanent: ERREURS_PERMANENTES.test(texteErreur),
+                coupeJusqua: null,
             };
+
+            if (apiError) this.enregistrerEchec(texteErreur);
+            else this.rearmer();
 
             return arr.map((p: any) => this.normalize(p));
         } catch (err: any) {
             const detail = err.response?.data || err.message;
-            console.error('[AliExpress] product.query échec:', detail);
+            const brut = typeof detail === 'string' ? detail : JSON.stringify(detail);
+            console.error('[AliExpress] recherche échec:', brut.slice(0, 300));
             this.lastDiagnostic = {
                 at: new Date().toISOString(), ok: false, count: 0,
-                error: (typeof detail === 'string' ? detail : JSON.stringify(detail)).slice(0, 300),
+                error: this.expliquer(brut),
                 rawExcerpt: null,
+                permanent: ERREURS_PERMANENTES.test(brut),
+                coupeJusqua: null,
             };
+            this.enregistrerEchec(brut);
             return []; // n'impacte jamais le flux eBay
         }
     }
 
     private static normalize(p: any): NormalizedPart {
-        const priceRaw = p.target_sale_price ?? p.target_app_sale_price ?? p.sale_price ?? p.original_price;
+        // Le nommage diffère entre l'API Affiliate et l'API Drop Shipping
+        // (target_sale_price vs targetSalePrice, selon la méthode et la
+        // version) : on accepte les deux plutôt que de parier sur une forme.
+        const priceRaw = p.target_sale_price ?? p.targetSalePrice
+            ?? p.target_app_sale_price ?? p.sale_price ?? p.salePrice
+            ?? p.original_price ?? p.originalPrice;
         const price = priceRaw != null ? (parseFloat(String(priceRaw)) || null) : null;
+        const image = p.product_main_image_url || p.productMainImageUrl
+            || p.image_url || p.imageUrl || null;
         return {
-            itemId: 'ae_' + (p.product_id || p.productId || Math.random().toString(36).slice(2)),
-            title: p.product_title || 'Produit AliExpress',
+            itemId: 'ae_' + (p.product_id || p.productId || p.itemId
+                || Math.random().toString(36).slice(2)),
+            // Titre NEUTRE par défaut : « Produit AliExpress » se serait
+            // affiché tel quel sur la fiche client en cas de titre manquant.
+            title: p.product_title || p.productTitle || p.subject || 'Pièce détachée',
             price,
-            currency: p.target_sale_price_currency || CURRENCY,
-            image: p.product_main_image_url || null,
-            thumbnail: p.product_main_image_url || null,
+            currency: p.target_sale_price_currency || p.targetSalePriceCurrency || CURRENCY,
+            image,
+            thumbnail: image,
             condition: 'NEW',
-            itemWebUrl: p.promotion_link || p.product_detail_url || null,
+            itemWebUrl: p.promotion_link || p.promotionLink
+                || p.product_detail_url || p.productDetailUrl || null,
             seller: 'AliExpress',
-            shortDescription: p.first_level_category_name || null,
+            shortDescription: p.first_level_category_name || p.firstLevelCategoryName || null,
             fullDescription: null,
         };
     }
