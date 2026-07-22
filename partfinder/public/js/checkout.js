@@ -20,8 +20,76 @@
         const payBtn = $('co-pay');
 
         let items = [];
+        let territoires = [];
 
         function total() { return items.reduce((s, i) => s + Number(i.priceSold) * Number(i.quantity || 1), 0); }
+
+        // ── Territoires ──────────────────────────────────────────────
+        // Référentiel chargé depuis le backend : le dupliquer ici finirait par
+        // diverger de celui qui sert au calcul du tarif d'acheminement.
+        async function loadTerritoires() {
+            if (territoires.length) return;
+            try {
+                const r = await fetch(API_BASE_URL + '/parts/territoires');
+                const d = await r.json();
+                territoires = d.territoires || [];
+                const sel = $('co-territoire');
+                sel.innerHTML = '<option value="">— Sélectionner —</option>' +
+                    territoires.map(t => `<option value="${esc(t.code)}">${esc(t.label)}</option>`).join('');
+            } catch { /* le champ reste vide : la validation serveur bloquera */ }
+        }
+
+        // Déduit le territoire du code postal (971xx → Guadeloupe…).
+        function autoTerritoire() {
+            const cp = $('co-cp').value.replace(/\s/g, '');
+            if (!/^\d{5}$/.test(cp)) return;
+            const t = territoires.find(x => (x.prefixes || []).some(p => cp.startsWith(p)));
+            if (t) { $('co-territoire').value = t.code; showZone(); }
+        }
+
+        function showZone() {
+            const code = $('co-territoire').value;
+            const t = territoires.find(x => x.code === code);
+            $('co-zone-hint').textContent = t
+                ? `Acheminement zone ${t.zone}` : '';
+        }
+
+        // ── Adresses enregistrées ────────────────────────────────────
+        async function loadSaved() {
+            const box = $('co-saved');
+            const sel = $('co-saved-select');
+            box.classList.add('display-none');
+            if (!window.pfAuthHeader) return;
+            try {
+                const r = await fetch(API_BASE_URL + '/orders/my-addresses', { headers: window.pfAuthHeader() });
+                if (!r.ok) return;
+                const d = await r.json();
+                const list = d.addresses || [];
+                if (!list.length) return;
+                sel.innerHTML = '<option value="">— Nouvelle adresse —</option>' +
+                    list.map(a => `<option value="${a.id}">${esc(a.destinataire)} — ${esc(a.ville)} (${esc(a.codePostal)})</option>`).join('');
+                sel.onchange = () => {
+                    const a = list.find(x => String(x.id) === sel.value);
+                    if (!a) return;
+                    $('co-destinataire').value = a.destinataire || '';
+                    $('co-ligne1').value = a.ligne1 || '';
+                    $('co-ligne2').value = a.ligne2 || '';
+                    $('co-cp').value = a.codePostal || '';
+                    $('co-ville').value = a.ville || '';
+                    $('co-territoire').value = a.territoire || '';
+                    $('co-tel').value = a.telephone || '';
+                    showZone();
+                };
+                box.classList.remove('display-none');
+                // Pré-remplit avec l'adresse par défaut.
+                sel.value = String(list[0].id);
+                sel.onchange();
+            } catch { /* sans adresse enregistrée, le formulaire reste vierge */ }
+        }
+
+        $('co-cp').addEventListener('blur', autoTerritoire);
+        $('co-cp').addEventListener('input', () => { if ($('co-cp').value.length === 5) autoTerritoire(); });
+        $('co-territoire').addEventListener('change', showZone);
 
         // Ouvre le tunnel avec les articles du panier (appelé par app.js).
         window.pfCheckout = function (cartItems) {
@@ -33,6 +101,7 @@
             totalSpan.textContent = '';
             payBtn.innerHTML = '<i class="ph ph-paper-plane-tilt"></i> Envoyer ma demande';
             overlay.classList.remove('display-none');
+            loadTerritoires().then(loadSaved);
         };
 
         function close() { overlay.classList.add('display-none'); }
@@ -42,8 +111,21 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             errorBox.classList.add('display-none');
-            const address = $('co-address').value.trim();
-            if (!address) { errorBox.textContent = 'Adresse de livraison requise.'; errorBox.classList.remove('display-none'); return; }
+
+            const address = {
+                destinataire: $('co-destinataire').value.trim(),
+                ligne1: $('co-ligne1').value.trim(),
+                ligne2: $('co-ligne2').value.trim() || null,
+                codePostal: $('co-cp').value.replace(/\s/g, ''),
+                ville: $('co-ville').value.trim(),
+                territoire: $('co-territoire').value,
+                telephone: $('co-tel').value.trim(),
+            };
+            if (!address.territoire) {
+                errorBox.textContent = 'Sélectionnez le territoire de livraison.';
+                errorBox.classList.remove('display-none');
+                return;
+            }
 
             payBtn.disabled = true;
             payBtn.innerHTML = '<i class="ph ph-circle-notch"></i> Envoi…';
@@ -52,10 +134,14 @@
                 const res = await fetch(API_BASE_URL + '/checkout/request', {
                     method: 'POST',
                     headers: Object.assign({ 'Content-Type': 'application/json' }, window.pfAuthHeader ? window.pfAuthHeader() : {}),
-                    body: JSON.stringify({ items, shippingAddress: address, poReference: $('co-poref').value.trim() }),
+                    body: JSON.stringify({ items, address, poReference: $('co-poref').value.trim() }),
                 });
                 const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Impossible d\'envoyer la demande.');
+                if (!res.ok) {
+                    // Le serveur renvoie le détail par champ (code postal
+                    // incohérent avec le territoire, téléphone manquant…).
+                    throw new Error((data.erreurs && data.erreurs.join(' ')) || data.error || 'Impossible d\'envoyer la demande.');
+                }
                 close();
                 showBanner('success',
                     'Demande n°' + data.orderId + ' envoyée. Nous vérifions la disponibilité et l\'acheminement, '

@@ -389,9 +389,54 @@
             <div class="checkout-summary" id="checkout-summary"></div>
 
             <form class="auth-form" id="checkout-form">
-                <label>Adresse de livraison *
-                    <textarea id="co-address" rows="3" required placeholder="Raison sociale, rue, code postal, ville, pays"></textarea>
-                </label>
+                <div id="co-saved" class="display-none">
+                    <label>Adresse enregistrée
+                        <select id="co-saved-select"></select>
+                    </label>
+                </div>
+
+                <fieldset class="co-addr">
+                    <legend>Adresse de livraison</legend>
+
+                    <label>Destinataire *
+                        <input type="text" id="co-destinataire" required autocomplete="name"
+                               placeholder="Nom, prénom ou raison sociale">
+                    </label>
+                    <label>Adresse *
+                        <input type="text" id="co-ligne1" required autocomplete="address-line1"
+                               placeholder="N° et rue">
+                    </label>
+                    <label>Complément <span class="auth-hint">(optionnel)</span>
+                        <input type="text" id="co-ligne2" autocomplete="address-line2"
+                               placeholder="Bâtiment, lieu-dit, boîte postale">
+                    </label>
+
+                    <div class="co-grid">
+                        <label>Code postal *
+                            <input type="text" id="co-cp" required inputmode="numeric"
+                                   pattern="[0-9]{5}" maxlength="5" autocomplete="postal-code"
+                                   placeholder="97400">
+                        </label>
+                        <label>Ville *
+                            <input type="text" id="co-ville" required autocomplete="address-level2"
+                                   placeholder="Saint-Denis">
+                        </label>
+                    </div>
+
+                    <label>Territoire *
+                        <select id="co-territoire" required>
+                            <option value="">— Sélectionner —</option>
+                        </select>
+                        <span class="auth-hint" id="co-zone-hint"></span>
+                    </label>
+
+                    <label>Téléphone *
+                        <input type="tel" id="co-tel" required autocomplete="tel"
+                               placeholder="0692 12 34 56">
+                        <span class="auth-hint">Le transporteur vous prévient de la livraison.</span>
+                    </label>
+                </fieldset>
+
                 <label>Référence / bon de commande <span class="auth-hint">(optionnel)</span>
                     <input type="text" id="co-poref" placeholder="Ex: dossier client #1234">
                 </label>

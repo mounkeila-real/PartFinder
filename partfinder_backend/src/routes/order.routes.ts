@@ -80,6 +80,24 @@ router.get('/mine', requireAuth, async (req: AuthedRequest, res: express.Respons
 });
 
 /**
+ * GET /api/orders/my-addresses — adresses enregistrées du client.
+ * Évite de ressaisir une adresse outre-mer complète à chaque commande.
+ */
+router.get('/my-addresses', requireAuth, async (req: AuthedRequest, res: express.Response) => {
+    try {
+        const addresses = await prisma.address.findMany({
+            where: { userId: req.user!.userId },
+            orderBy: [{ parDefaut: 'desc' }, { createdAt: 'desc' }],
+            take: 10,
+        });
+        res.json({ addresses });
+    } catch (e: any) {
+        console.error('[orders] my-addresses:', e.message);
+        res.status(500).json({ error: 'Erreur lors du chargement des adresses.' });
+    }
+});
+
+/**
  * GET /api/orders/my-parcels — suivi des colis du client connecté.
  * Vue neutre : étapes entrepôt et expédition, jamais la provenance des pièces.
  */

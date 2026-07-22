@@ -1666,6 +1666,19 @@ textarea:focus {
 .acc-legal a { color: var(--text-tertiary); text-decoration: underline; }
 .acc-legal a:hover { color: var(--text-primary); }
 
+/* Adresse de livraison structurée */
+.co-addr {
+    border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    padding: 14px 16px 4px; margin: 0;
+}
+.co-addr legend {
+    padding: 0 8px; font-size: 0.8rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary);
+}
+.co-grid { display: grid; grid-template-columns: 120px 1fr; gap: 12px; }
+#co-zone-hint { color: var(--accent-electric); font-weight: 600; }
+@media (max-width: 479px) { .co-grid { grid-template-columns: 1fr; } }
+
 .co-cgv { display: flex; gap: 10px; align-items: flex-start; font-size: 0.85rem; color: var(--text-secondary); }
 .co-cgv input { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
 .co-cgv a { color: var(--accent-electric); text-decoration: underline; }

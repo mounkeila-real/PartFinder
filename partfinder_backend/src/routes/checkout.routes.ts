@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthedRequest } from '../middleware/auth.middleware';
 import { verifyOffer } from '../services/offer_token';
+import { validerAdresse, formatAdresse } from '../services/territoires';
 
 /**
  * Extrait le coût d'acquisition d'un article depuis son jeton d'offre signé.
@@ -128,13 +129,18 @@ router.post('/session', requireAuth, async (req: AuthedRequest, res: express.Res
  */
 router.post('/request', requireAuth, async (req: AuthedRequest, res: express.Response) => {
     try {
-        const { items, shippingAddress, poReference } = req.body || {};
+        const { items, address, poReference } = req.body || {};
         if (!Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ error: 'Panier vide.' });
         }
-        if (!shippingAddress || !String(shippingAddress).trim()) {
-            return res.status(400).json({ error: 'Adresse de livraison requise.' });
+
+        // Adresse STRUCTURÉE : la zone (OM1/OM2) commande tout le tarif
+        // d'acheminement, elle est donc dérivée du territoire côté serveur.
+        const v = validerAdresse(address);
+        if (!v.ok || !v.valeur) {
+            return res.status(400).json({ error: v.erreurs.join(' '), erreurs: v.erreurs });
         }
+        const adr = v.valeur;
 
         // Montant indicatif (prix des pièces) — ne comprend pas encore l'acheminement.
         const estimatedAmount = items.reduce(
@@ -144,13 +150,52 @@ router.post('/request', requireAuth, async (req: AuthedRequest, res: express.Res
         const costs = items.map((i: any) => costsFromToken(i));
         const notes = costs.map((c, idx) => c.note ? `Article ${idx + 1}: ${c.note}` : null).filter(Boolean);
 
+        // Enregistre l'adresse : c'est elle qui portera la ZONE pour tout
+        // l'aval (pesée, calcul du port, expédition, CN23). Sans cet
+        // enregistrement, l'entrepôt retombait systématiquement sur OM1 —
+        // un client de Nouvelle-Calédonie aurait été facturé au tarif Antilles.
+        const userId = req.user!.userId;
+        const dejaVue = await prisma.address.findFirst({
+            where: {
+                userId, ligne1: adr.ligne1, codePostal: adr.codePostal,
+                ville: adr.ville, territoire: adr.territoire,
+            },
+        });
+        const adresse = dejaVue
+            ? await prisma.address.update({
+                where: { id: dejaVue.id },
+                data: {
+                    destinataire: adr.destinataire, ligne2: adr.ligne2,
+                    telephone: adr.telephone, zone: adr.zone, parDefaut: true,
+                },
+            })
+            : await prisma.address.create({
+                data: {
+                    userId,
+                    destinataire: adr.destinataire,
+                    ligne1: adr.ligne1,
+                    ligne2: adr.ligne2,
+                    codePostal: adr.codePostal,
+                    ville: adr.ville,
+                    territoire: adr.territoire,
+                    zone: adr.zone,
+                    telephone: adr.telephone,
+                    parDefaut: true,
+                },
+            });
+        // Une seule adresse par défaut : sinon zoneOf() pourrait retenir l'ancienne.
+        await prisma.address.updateMany({
+            where: { userId, id: { not: adresse.id } },
+            data: { parDefaut: false },
+        });
+
         const order = await prisma.order.create({
             data: {
-                userId: req.user!.userId,
+                userId,
                 totalAmount: estimatedAmount,
                 status: 'PENDING_VALIDATION',
                 paymentStatus: 'UNPAID',
-                shippingAddress: String(shippingAddress),
+                shippingAddress: formatAdresse(adr),
                 poReference: poReference ? String(poReference) : null,
                 adminNote: notes.length ? notes.join(' | ') : null,
                 items: {
@@ -169,8 +214,8 @@ router.post('/request', requireAuth, async (req: AuthedRequest, res: express.Res
             include: { items: true },
         });
 
-        console.log('[checkout] demande a valider #', order.id);
-        res.status(201).json({ orderId: order.id, status: order.status });
+        console.log('[checkout] demande a valider #', order.id, '— zone', adr.zone);
+        res.status(201).json({ orderId: order.id, status: order.status, zone: adr.zone });
     } catch (e: any) {
         console.error('[checkout] request:', e.message);
         res.status(500).json({ error: 'Erreur lors de l\'envoi de la demande.' });

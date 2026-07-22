@@ -7,6 +7,7 @@ import * as pricing from '../services/pricing';
 import { requireAdmin } from '../middleware/auth.middleware';
 import { signOffer } from '../services/offer_token';
 import { translateQuery, MARKETPLACES } from '../services/part_glossary';
+import { TERRITOIRES } from '../services/territoires';
 
 const router = express.Router();
 
@@ -132,6 +133,19 @@ router.get('/image/:token', async (req: express.Request, res: express.Response) 
         // Visuel indisponible : le frontend affiche son propre repli.
         return res.status(404).end();
     }
+});
+
+/**
+ * GET /api/parts/territoires — territoires desservis (PUBLIC).
+ * Référentiel unique : le frontend ne redéfinit pas sa propre liste, qui
+ * finirait par diverger de celle qui sert au calcul du tarif.
+ */
+router.get('/territoires', (_req: express.Request, res: express.Response) => {
+    res.json({
+        territoires: TERRITOIRES.map((t) => ({
+            code: t.code, label: t.label, zone: t.zone, prefixes: t.prefixes,
+        })),
+    });
 });
 
 /**
