@@ -86,6 +86,11 @@
         // vaut mieux que de lancer une traduction fr→fr sans effet.
         if (langueReelle === 'fr') return sortie;
 
+        // DÉDOUBLONNAGE : un tableau de caractéristiques répète beaucoup les
+        // mêmes libellés et valeurs (« Vorne », « Links », le nom de la pièce).
+        // Les traduire une fois chacun au lieu d'une fois par cellule divise
+        // le travail — c'est la principale source de lenteur.
+        const parTexte = new Map();
         entrees.forEach((e, i) => {
             if (!e.texte || !e.texte.trim()) return;
             // Sans détection, l'indice du marché sert de repli ; s'il vaut
@@ -94,10 +99,21 @@
             const langue = langueReelle || (e.langue && e.langue !== 'fr' ? e.langue : null);
             const cle = (langue || 'auto') + '|' + e.texte;
             if (cache.has(cle)) { sortie[i] = cache.get(cle); return; }
-            aFaire.push({ i, texte: e.texte, langue, cle });
+            const deja = parTexte.get(cle);
+            if (deja) { deja.indices.push(i); return; }
+            parTexte.set(cle, { texte: e.texte, langue, cle, indices: [i] });
         });
+        aFaire.push(...parTexte.values());
 
         if (!aFaire.length) return sortie;
+
+        // Applique une traduction à toutes les cellules qui partagent ce texte.
+        const appliquer = (x, t) => {
+            if (!t) return;
+            x.indices.forEach(i => { sortie[i] = t; });
+            cache.set(x.cle, t);
+            x.fait = true;
+        };
 
         // 1) Navigateur — par langue, pour réutiliser chaque traducteur.
         //    Sans langue source identifiée, l'API n'est pas utilisable : on
@@ -112,10 +128,35 @@
             await Promise.all([...parLangue.entries()].map(async ([langue, lot]) => {
                 const tr = await traducteurPour(langue);
                 if (!tr) return;
-                await Promise.all(lot.map(async (x) => {
+
+                // REGROUPEMENT : chaque appel au modèle embarqué coûte cher.
+                // Vingt libellés de tableau envoyés séparément, c'est vingt
+                // allers-retours ; regroupés en un texte d'une ligne par
+                // libellé, c'est un seul.
+                //
+                // Uniquement les textes SANS saut de ligne : la description
+                // en contient, et le découpage du résultat repose justement
+                // sur le nombre de lignes.
+                const courts = lot.filter(x => !x.texte.includes('\n'));
+                const longs = lot.filter(x => x.texte.includes('\n'));
+
+                if (courts.length > 1) {
                     try {
-                        const t = await tr.translate(x.texte);
-                        if (t) { sortie[x.i] = t; cache.set(x.cle, t); x.fait = true; }
+                        const res = await tr.translate(courts.map(x => x.texte).join('\n'));
+                        const lignes = String(res).split('\n');
+                        // Garde-fou : si le modèle a fusionné ou scindé des
+                        // lignes, le lien texte↔cellule est rompu. On ne
+                        // devine pas — on repasse au traitement individuel.
+                        if (lignes.length === courts.length) {
+                            courts.forEach((x, i) => appliquer(x, lignes[i].trim()));
+                        }
+                    } catch { /* traitement individuel ci-dessous */ }
+                }
+
+                const restants = [...courts.filter(x => !x.fait), ...longs];
+                await Promise.all(restants.map(async (x) => {
+                    try {
+                        appliquer(x, await tr.translate(x.texte));
                     } catch { /* laissé au repli serveur */ }
                 }));
             }));
@@ -131,10 +172,7 @@
                     body: JSON.stringify({ textes: restants.map(x => x.texte) }),
                 });
                 const d = await r.json();
-                (d.textes || []).forEach((t, k) => {
-                    const x = restants[k];
-                    if (x && t) { sortie[x.i] = t; cache.set(x.cle, t); }
-                });
+                (d.textes || []).forEach((t, k) => appliquer(restants[k], t));
             } catch { /* 3) on garde les textes d'origine */ }
         }
 

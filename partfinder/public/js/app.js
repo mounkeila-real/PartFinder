@@ -1078,25 +1078,43 @@ document.addEventListener('DOMContentLoaded', () => {
             return lettres >= 3 && lettres / s.length > 0.4;
         };
 
+        // Traduit un lot et remplace le texte en place. Renvoie le nombre
+        // d'éléments réellement modifiés.
+        async function traduireLot(cibles) {
+            if (!cibles.length) return 0;
+            const textes = await window.pfTraduire(
+                cibles.map(el => ({ texte: el.textContent.trim(), langue }))
+            );
+            let n = 0;
+            cibles.forEach((el, i) => {
+                const t = textes[i];
+                if (!t || t === el.textContent.trim()) return;
+                el.title = el.textContent.trim();   // original en infobulle
+                el.textContent = t;
+                n++;
+            });
+            return n;
+        }
+
         btn.addEventListener('click', async () => {
             const cibles = [...doc.querySelectorAll('[data-tr]')]
                 .filter(el => traduisible(el.textContent));
             if (!cibles.length) { if (etat) etat.textContent = 'Rien à traduire.'; return; }
 
             btn.disabled = true;
-            if (etat) etat.textContent = 'Traduction en cours…';
+            // Le premier usage télécharge le modèle de traduction : sans ce
+            // message, l'attente passe pour un blocage.
+            if (etat) etat.textContent = 'Préparation de la traduction…';
             try {
-                const textes = await window.pfTraduire(
-                    cibles.map(el => ({ texte: el.textContent.trim(), langue }))
-                );
-                let n = 0;
-                cibles.forEach((el, i) => {
-                    const t = textes[i];
-                    if (!t || t === el.textContent.trim()) return;
-                    el.title = el.textContent.trim();   // original en infobulle
-                    el.textContent = t;
-                    n++;
-                });
+                // DEUX TEMPS : titre et description d'abord — c'est ce que le
+                // client lit en premier — puis le tableau. Tout attendre
+                // laissait la fiche inchangée pendant plusieurs secondes.
+                const prioritaires = cibles.filter(el => el.matches('h1, .desc'));
+                const reste = cibles.filter(el => !el.matches('h1, .desc'));
+
+                let n = await traduireLot(prioritaires);
+                if (etat && reste.length) etat.textContent = `Traduction des caractéristiques… (${reste.length})`;
+                n += await traduireLot(reste);
                 if (etat) {
                     // Ne jamais laisser croire à une traduction qui n'a pas eu
                     // lieu : l'état réel de la pièce en dépend. Et distinguer
