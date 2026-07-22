@@ -98,6 +98,11 @@ mise en production**.
 
 | ID | Prio | Objectif | Étapes | Résultat attendu |
 |---|---|---|---|---|
+| CMD-00 | **P1** | Zone tarifaire correcte | Commander avec une adresse en **Nouvelle-Calédonie** (CP `98800`), puis vérifier le port calculé à la pesée | Zone **OM2** appliquée. Une zone OM1 sur une adresse Pacifique = **vente à perte** |
+| CMD-0a | **P1** | Détection du territoire | Saisir le code postal `97400` | Territoire « La Réunion » sélectionné **automatiquement**, mention « zone OM1 » |
+| CMD-0b | **P1** | Incohérence bloquée | Saisir CP `97400` puis forcer le territoire « Nouvelle-Calédonie » | **Refusé** avec un message explicite |
+| CMD-0c | P2 | Téléphone obligatoire | Envoyer sans téléphone | **Refusé** (le transporteur en a besoin outre-mer) |
+| CMD-0d | P2 | Adresse réutilisée | Passer une 2ᵉ commande | L'adresse précédente est **proposée pré-remplie** |
 | CMD-01 | **P1** | Demande de commande | Panier → adresse → **cocher les CGV** → envoyer | Commande créée en `PENDING_VALIDATION`, **aucun débit** |
 | CMD-02 | **P1** | CGV obligatoires | Envoyer sans cocher | Envoi **bloqué** |
 | CMD-03 | **P1** | Validation opérateur | Admin → Commandes → ajuster le prix → envoyer la demande de paiement | Statut `AWAITING_PAYMENT`, email au client |
