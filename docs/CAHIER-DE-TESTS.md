@@ -185,6 +185,10 @@ mise en production**.
 | ADM-01 | **P1** | Accès réservé | Se connecter en **client** et tenter l'admin | **Refusé** |
 | ADM-02 | **P1** | État des sources | Tarification → « Tester les sources » | Verdict eBay / AliExpress + requêtes traduites |
 | ADM-03 | **P1** | Alerte données factices | Voir ADM-02 | Si eBay échoue, l'alerte **⚠ DONNÉES FACTICES** apparaît |
+| ADM-03a | **P1** | Ajout d'une casse | Tarification → saisir identifiant + libellé → Ajouter | Vendeur listé, marqué « Non vérifié » |
+| ADM-03b | **P1** | Vérification | Cliquer « Vérifier » | Nombre d'annonces trouvées. **« 0 annonce » = identifiant faux** — il serait accepté sans erreur et ne remonterait jamais rien |
+| ADM-03c | P2 | Casses dans les résultats | Après ajout d'une casse vérifiée, relancer une recherche | Ses annonces apparaissent avec le badge **« Pro »**, remontées à prix comparable |
+| ADM-03d | **P1** | Aucune fuite via le badge | Inspecter la réponse `/find` | Le badge est présent, mais **aucun nom de vendeur ni de marketplace** |
 | ADM-04 | P2 | Simulateur | Simuler un prix | Décomposition complète (pièce, port, frais, marge) |
 | ADM-05 | P2 | Paramètres | Modifier le taux de marge | Pris en compte **sans redéploiement** |
 | ADM-06 | P2 | Bornes | Saisir une marge aberrante (ex. 500 %) | **Refusé** |
