@@ -10,6 +10,7 @@ import { translateQuery, MARKETPLACES } from '../services/part_glossary';
 import { TERRITOIRES } from '../services/territoires';
 import { getActiveSellers } from '../services/supplier_sellers.service';
 import { translateToFrench } from '../services/translation.service';
+import { observerTermes } from '../services/glossary_learning.service';
 
 const router = express.Router();
 
@@ -421,6 +422,15 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
 
         if (ecartesDevise > 0) {
             console.warn(`[parts] ${ecartesDevise} annonce(s) écartée(s) : devise non EUR`);
+        }
+
+        // Apprentissage : relève les termes étrangers que le glossaire ne
+        // connaît pas encore. Volontairement NON attendu — la recherche
+        // client ne doit pas ralentir pour un enrichissement différé.
+        for (const r of rawResults as any[]) {
+            if (r.langue && r.langue !== 'fr' && r.title) {
+                observerTermes(r.title, r.langue).catch(() => null);
+            }
         }
 
         const aliexpressResults = await aliexpressPromise;

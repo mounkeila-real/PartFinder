@@ -240,6 +240,34 @@ model AiClassification {
   @@index([valideParOperateur])
 }
 
+// Termes appris — enrichissement du glossaire par la pratique.
+//
+// Le glossaire pilote AUSSI la recherche multilingue : une entrée fausse
+// enverrait une requête erronée aux marchés étrangers et ferait perdre des
+// annonces, sans que rien ne le signale. Rien n'entre donc automatiquement :
+// un terme est d'abord observé, puis proposé, puis VALIDÉ par un opérateur.
+model GlossaryTerm {
+  id           Int      @id @default(autoincrement())
+  // Terme tel que rencontré dans les annonces (normalisé, minuscules).
+  terme        String
+  langueSource String                              // de | es | it | en
+  occurrences  Int      @default(1)                // fréquence observée
+  // Traductions proposées (DeepL) puis corrigées à la validation.
+  labelFr      String?
+  de           String?
+  es           String?
+  it           String?
+  en           String?
+  statut       String   @default("CANDIDAT")       // CANDIDAT | VALIDE | REJETE
+  valideLe     DateTime?
+  valideParId  Int?
+  createdAt    DateTime @default(now())
+
+  @@unique([terme, langueSource])
+  @@index([statut, occurrences])
+  @@map("glossary_terms")
+}
+
 // Traductions déjà obtenues — une description n'est jamais retraduite.
 // Le quota DeepL gratuit est limité : sans ce cache, chaque consultation
 // d'une même annonce le consommerait à nouveau.

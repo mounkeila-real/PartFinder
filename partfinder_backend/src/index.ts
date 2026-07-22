@@ -13,6 +13,8 @@ import checkoutRoutes, { stripeWebhookHandler } from './routes/checkout.routes';
 import warehouseRoutes from './routes/warehouse.routes';
 import paymentRequestRoutes from './routes/payment_requests.routes';
 import { startScheduler } from './jobs/scheduler';
+import { termesValides } from './services/glossary_learning.service';
+import { chargerTermesAppris } from './services/part_glossary';
 
 dotenv.config();
 
@@ -48,4 +50,14 @@ app.get('/health', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
     startScheduler();
+
+    // Termes de glossaire validés par un opérateur : ils étendent le
+    // glossaire statique, pour l'affichage comme pour les requêtes envoyées
+    // aux marchés étrangers. Échec sans conséquence : on garde le statique.
+    termesValides()
+        .then((t) => {
+            chargerTermesAppris(t);
+            if (t.length) console.log(`[glossaire] ${t.length} terme(s) appris chargé(s)`);
+        })
+        .catch((e) => console.error('[glossaire] chargement des termes appris:', e.message));
 });

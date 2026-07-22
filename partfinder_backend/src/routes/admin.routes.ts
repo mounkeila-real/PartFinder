@@ -9,6 +9,9 @@ import { getActiveRates, replaceGrid, checkGridFreshness, activeProvider } from 
 import { refreshColissimoRates } from '../jobs/scheduler';
 import * as pricing from '../services/pricing';
 import { invalidateSellersCache, verifierVendeur } from '../services/supplier_sellers.service';
+import { candidats, statistiques, termesValides } from '../services/glossary_learning.service';
+import { traduireVers } from '../services/translation.service';
+import { chargerTermesAppris } from '../services/part_glossary';
 
 /**
  * Administration (Phase 3) — toutes les routes exigent le rôle ADMIN.
@@ -589,6 +592,102 @@ router.post('/sellers/:id/verify', async (req: express.Request, res: express.Res
     } catch (e: any) {
         console.error('[admin] verify seller:', e.message);
         res.status(500).json({ error: e.message || 'Vérification impossible.' });
+    }
+});
+
+/* ── Glossaire : enrichissement par la pratique ───────────────────── */
+
+/** GET /api/admin/glossaire — termes inconnus les plus fréquents. */
+router.get('/glossaire', async (_req: express.Request, res: express.Response) => {
+    try {
+        const [liste, stats] = await Promise.all([candidats(40), statistiques()]);
+        res.json({ candidats: liste, stats });
+    } catch (e: any) {
+        console.error('[admin] glossaire:', e.message);
+        res.status(500).json({ error: 'Erreur lors du chargement du glossaire.' });
+    }
+});
+
+/**
+ * POST /api/admin/glossaire/:id/proposer — fait proposer les traductions
+ * par DeepL. L'opérateur les corrige avant validation : la proposition n'est
+ * qu'un point de départ, elle n'entre jamais seule dans le glossaire.
+ */
+router.post('/glossaire/:id/proposer', async (req: express.Request, res: express.Response) => {
+    try {
+        const id = Number(req.params.id);
+        const terme = await prisma.glossaryTerm.findUnique({ where: { id } });
+        if (!terme) return res.status(404).json({ error: 'Terme introuvable.' });
+
+        // D'abord vers le français (c'est la clé du glossaire), puis du
+        // français vers les autres langues, pour rester cohérent avec la
+        // façon dont les requêtes de recherche sont construites.
+        const versFr = await traduireVers(terme.terme, ['FR']);
+        const labelFr = versFr.fr;
+        if (!labelFr) {
+            return res.status(503).json({ error: 'Traduction indisponible (DEEPL_API_KEY absente ou quota atteint).' });
+        }
+        const autres = await traduireVers(labelFr, ['DE', 'ES', 'IT', 'EN']);
+
+        const maj = await prisma.glossaryTerm.update({
+            where: { id },
+            data: {
+                labelFr,
+                de: autres.de || null,
+                es: autres.es || null,
+                it: autres.it || null,
+                en: autres.en || null,
+            },
+        });
+        res.json({ terme: maj });
+    } catch (e: any) {
+        console.error('[admin] proposer terme:', e.message);
+        res.status(500).json({ error: 'Erreur lors de la proposition.' });
+    }
+});
+
+/**
+ * PATCH /api/admin/glossaire/:id — corrige et/ou valide un terme.
+ * La validation recharge le glossaire à chaud : effet immédiat sur
+ * l'affichage ET sur les requêtes envoyées aux marchés étrangers.
+ */
+router.patch('/glossaire/:id', async (req: AuthedRequest, res: express.Response) => {
+    try {
+        const id = Number(req.params.id);
+        const data: any = {};
+        for (const champ of ['labelFr', 'de', 'es', 'it', 'en']) {
+            if (req.body?.[champ] !== undefined) data[champ] = String(req.body[champ] || '').trim() || null;
+        }
+        if (req.body?.statut) {
+            const s = String(req.body.statut).toUpperCase();
+            if (!['CANDIDAT', 'VALIDE', 'REJETE'].includes(s)) {
+                return res.status(400).json({ error: 'Statut invalide.' });
+            }
+            data.statut = s;
+            if (s === 'VALIDE') {
+                data.valideLe = new Date();
+                data.valideParId = req.user?.userId ?? null;
+            }
+        }
+
+        const terme = await prisma.glossaryTerm.update({ where: { id }, data });
+
+        // Une entrée validée doit être complète : incomplète, elle
+        // n'améliorerait que l'affichage et pas la recherche.
+        if (terme.statut === 'VALIDE'
+            && !(terme.labelFr && terme.de && terme.es && terme.it && terme.en)) {
+            await prisma.glossaryTerm.update({ where: { id }, data: { statut: 'CANDIDAT' } });
+            return res.status(400).json({
+                error: 'Validation refusée : les cinq langues doivent être renseignées '
+                    + '(le glossaire construit aussi les requêtes envoyées aux marchés étrangers).',
+            });
+        }
+
+        chargerTermesAppris(await termesValides());
+        res.json({ terme });
+    } catch (e: any) {
+        console.error('[admin] valider terme:', e.message);
+        res.status(500).json({ error: 'Erreur lors de la validation.' });
     }
 });
 

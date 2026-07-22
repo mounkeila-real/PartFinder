@@ -58,6 +58,7 @@
             if (name === 'warehouse' && window.pfLoadWarehouse) window.pfLoadWarehouse();
             if (name === 'shipping' && window.pfLoadShipping) window.pfLoadShipping();
             if (name === 'pricing' && window.pfLoadSellers) window.pfLoadSellers();
+            if (name === 'pricing' && window.pfLoadGlossaire) window.pfLoadGlossaire();
         }
         tabs.forEach(t => t.addEventListener('click', () => switchTab(t.getAttribute('data-adm-tab'))));
 
@@ -159,6 +160,78 @@
                     cats.map(c => `<option value="${esc(c.code)}">${esc(c.labelFr)} — ${Number(c.poidsKg)} kg${c.horsGabarit ? ' ⚠ hors gabarit' : ''}</option>`).join('');
             } catch (e) { sel.innerHTML = '<option value="">Erreur de chargement</option>'; }
         }
+
+        // ── Glossaire : enrichissement par la pratique ───────────────
+        // Rien n'entre automatiquement : le glossaire pilote AUSSI la
+        // recherche multilingue, une entrée fausse ferait perdre des annonces
+        // sans que rien ne le signale.
+        async function loadGlossaire() {
+            const box = document.getElementById('glo-list');
+            box.innerHTML = '<p class="acc-empty">Chargement…</p>';
+            try {
+                const d = await api('/admin/glossaire', { method: 'GET' });
+                const s = d.stats || {};
+                document.getElementById('glo-stats').textContent =
+                    `${s.statiques || 0} termes de base · ${s.valides || 0} appris · ${s.candidats || 0} à traiter`;
+
+                const list = d.candidats || [];
+                if (!list.length) {
+                    box.innerHTML = '<p class="acc-empty">Aucun terme inconnu en attente.</p>';
+                    return;
+                }
+                box.innerHTML = list.map(t => `
+                    <div class="glo-row" data-gid="${t.id}">
+                        <div class="glo-head">
+                            <strong>${esc(t.terme)}</strong>
+                            <span class="pr-hint">${esc(t.langueSource)} · vu ${t.occurrences}×</span>
+                        </div>
+                        <div class="glo-fields">
+                            <input type="text" data-gf="labelFr" placeholder="Français" value="${esc(t.labelFr || '')}">
+                            <input type="text" data-gf="de" placeholder="Allemand">
+                            <input type="text" data-gf="es" placeholder="Espagnol">
+                            <input type="text" data-gf="it" placeholder="Italien">
+                            <input type="text" data-gf="en" placeholder="Anglais">
+                        </div>
+                        <div class="adm-validate-actions">
+                            <button class="adm-mini-btn" data-gact="proposer">Proposer (DeepL)</button>
+                            <button class="adm-mini-btn adm-mini-primary" data-gact="valider">Valider</button>
+                            <button class="adm-mini-btn" data-gact="rejeter">Ignorer</button>
+                        </div>
+                    </div>`).join('');
+            } catch (e) { box.innerHTML = `<p class="acc-empty">${esc(e.message)}</p>`; }
+        }
+        window.pfLoadGlossaire = loadGlossaire;
+
+        document.getElementById('glo-list').addEventListener('click', async (e) => {
+            const btn = e.target.closest('[data-gact]');
+            if (!btn) return;
+            const row = btn.closest('[data-gid]');
+            const id = row.getAttribute('data-gid');
+            const act = btn.getAttribute('data-gact');
+            const res = document.getElementById('glo-result');
+            const champ = (n) => row.querySelector(`[data-gf="${n}"]`);
+            btn.disabled = true;
+            res.innerHTML = '';
+            try {
+                if (act === 'proposer') {
+                    const d = await api(`/admin/glossaire/${id}/proposer`, { method: 'POST', body: JSON.stringify({}) });
+                    const t = d.terme || {};
+                    ['labelFr', 'de', 'es', 'it', 'en'].forEach(n => { if (t[n]) champ(n).value = t[n]; });
+                    res.innerHTML = '<div class="wh-ok">Propositions remplies — relisez-les avant de valider.</div>';
+                } else if (act === 'valider') {
+                    const body = { statut: 'VALIDE' };
+                    ['labelFr', 'de', 'es', 'it', 'en'].forEach(n => { body[n] = champ(n).value.trim(); });
+                    await api(`/admin/glossaire/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+                    res.innerHTML = '<div class="wh-ok">✓ Terme ajouté au glossaire — effet immédiat, sans redéploiement.</div>';
+                    loadGlossaire();
+                } else if (act === 'rejeter') {
+                    await api(`/admin/glossaire/${id}`, { method: 'PATCH', body: JSON.stringify({ statut: 'REJETE' }) });
+                    loadGlossaire();
+                }
+            } catch (err) {
+                res.innerHTML = `<div class="wh-warn">${esc(err.message)}</div>`;
+            } finally { btn.disabled = false; }
+        });
 
         // ── Casses professionnelles (whitelist vendeurs) ─────────────
         // Une recherche générale noie les grosses casses parmi les

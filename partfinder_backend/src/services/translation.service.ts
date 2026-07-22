@@ -53,6 +53,43 @@ export async function consommationDuMois(): Promise<number> {
     return r._sum.nbCaracteres || 0;
 }
 
+/**
+ * Traduit un texte court vers plusieurs langues cibles (usage glossaire).
+ *
+ * Un terme validé doit exister dans les quatre langues : le glossaire sert
+ * aussi à CONSTRUIRE les requêtes envoyées aux marchés étrangers, pas
+ * seulement à afficher. Une entrée incomplète n'améliorerait que l'affichage.
+ * Coût négligeable : quelques dizaines de caractères, une fois par terme.
+ */
+export async function traduireVers(
+    texte: string,
+    cibles: string[],
+): Promise<Record<string, string>> {
+    const out: Record<string, string> = {};
+    if (!isConfigured() || !texte.trim()) return out;
+
+    for (const cible of cibles) {
+        try {
+            const resp = await axios.post(
+                `${DEEPL_HOST}/v2/translate`,
+                { text: [texte], target_lang: cible.toUpperCase() },
+                {
+                    headers: {
+                        Authorization: `DeepL-Auth-Key ${DEEPL_KEY}`,
+                        'Content-Type': 'application/json',
+                    },
+                    timeout: 12000,
+                }
+            );
+            const t = resp.data?.translations?.[0]?.text;
+            if (t) out[cible.toLowerCase()] = t;
+        } catch (e: any) {
+            console.error(`[traduction] terme -> ${cible}:`, e.response?.data || e.message);
+        }
+    }
+    return out;
+}
+
 export interface TraductionResultat {
     textes: string[];
     /** Moteur réellement employé pour chaque texte. */

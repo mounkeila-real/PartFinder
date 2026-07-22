@@ -125,11 +125,33 @@ export function normalize(s: string): string {
         .trim();
 }
 
-// Index des formes françaises, les plus longues d'abord : « plaquettes de
-// frein » doit primer sur « frein » seul.
-const INDEX: { form: string; entry: Entry }[] = GLOSSARY
-    .flatMap((entry) => entry.fr.map((form) => ({ form: normalize(form), entry })))
-    .sort((a, b) => b.form.length - a.form.length);
+/**
+ * Entrées APPRISES puis validées par un opérateur, injectées au démarrage.
+ * Le glossaire statique reste la référence ; celles-ci l'étendent.
+ */
+let APPRIS: Entry[] = [];
+
+/** Index des formes françaises, reconstruit à chaque ajout d'entrées apprises. */
+let INDEX: { form: string; entry: Entry }[] = [];
+
+function reconstruireIndex(): void {
+    // Les plus longues d'abord : « plaquettes de frein » doit primer sur
+    // « frein » seul, sinon la traduction serait tronquée.
+    INDEX = [...GLOSSARY, ...APPRIS]
+        .flatMap((entry) => entry.fr.map((form) => ({ form: normalize(form), entry })))
+        .sort((a, b) => b.form.length - a.form.length);
+}
+reconstruireIndex();
+
+/**
+ * Injecte les termes validés en base. Appelé au démarrage et après chaque
+ * validation, pour que l'enrichissement prenne effet sans redéploiement.
+ */
+export function chargerTermesAppris(entrees: Entry[]): void {
+    APPRIS = entrees;
+    reconstruireIndex();
+    reconstruireIndexInverse();
+}
 
 export interface TranslationResult {
     /** Requête dans la langue cible. */
@@ -224,10 +246,12 @@ const MODIFICATEURS: Record<string, string> = {
 };
 
 /** Index inverse : forme étrangère normalisée → libellé français. */
-const INDEX_INVERSE: { forme: string; fr: string }[] = (() => {
+let INDEX_INVERSE: { forme: string; fr: string }[] = [];
+
+function reconstruireIndexInverse(): void {
     const out: { forme: string; fr: string }[] = [];
-    for (const e of GLOSSARY) {
-        // Première forme française = libellé de référence, remis en majuscule initiale.
+    for (const e of [...GLOSSARY, ...APPRIS]) {
+        // Première forme française = libellé de référence, majuscule initiale.
         const fr = e.fr[0].charAt(0).toUpperCase() + e.fr[0].slice(1);
         for (const lang of ['de', 'es', 'it', 'en'] as const) {
             const forme = normalize(e[lang]);
@@ -236,8 +260,9 @@ const INDEX_INVERSE: { forme: string; fr: string }[] = (() => {
     }
     // Les plus longues d'abord : « Bremsscheiben » ne doit pas être coupé
     // par une entrée plus courte qui en serait un préfixe.
-    return out.sort((a, b) => b.forme.length - a.forme.length);
-})();
+    INDEX_INVERSE = out.sort((a, b) => b.forme.length - a.forme.length);
+}
+reconstruireIndexInverse();
 
 /**
  * Rend un TITRE d'annonce étrangère lisible en français.
