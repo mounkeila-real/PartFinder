@@ -87,9 +87,11 @@ describe('part_glossary — traduction déterministe des requêtes', () => {
     });
 
     it('préfère un terme plus court mais TRADUIT à un terme long incomplet', () => {
-        // « plaquettes de frein avant » (importé, sans italien) ne doit pas
-        // masquer « plaquettes de frein » (d'origine, traduit en italien),
-        // sinon on perdrait le marché italien sur un terme pourtant couvert.
+        // Un terme importé plus précis mais incomplet dans une langue ne doit
+        // pas masquer un terme plus court qui, lui, y est traduit — sinon on
+        // perdrait un marché entier sur un terme pourtant couvert.
+        // (Cas observé sur l'italien à l'import ; le mécanisme protège toute
+        // langue et tout import futur incomplet.)
         const it = translateQuery('plaquettes de frein avant BMW', 'it');
         expect(it.matched).toBe(true);
         expect(it.query).toContain('pastiglie');
@@ -107,6 +109,12 @@ describe('part_glossary — traduction déterministe des requêtes', () => {
         // Prix en livres + douane/TVA depuis le Brexit : le prix « tout
         // compris » ne modélise ni l'un ni l'autre.
         expect(MARKETPLACES.map(m => m.id)).not.toContain('EBAY_GB');
-        expect(MARKETPLACES).toHaveLength(4);
+    });
+
+    it('n\'interroge pas l\'Italie (décision métier)', () => {
+        // Retrait volontaire, pas un oubli : ce test empêche une
+        // réactivation par inadvertance.
+        expect(MARKETPLACES.map(m => m.id)).not.toContain('EBAY_IT');
+        expect(MARKETPLACES.map(m => m.id)).toEqual(['EBAY_FR', 'EBAY_DE', 'EBAY_ES']);
     });
 });

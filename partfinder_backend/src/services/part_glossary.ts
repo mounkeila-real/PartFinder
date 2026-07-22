@@ -220,8 +220,12 @@ export function translateQuery(query: string, lang: Lang): TranslationResult {
 export const MARKETPLACES: { id: string; lang: Lang; pays: string }[] = [
     { id: 'EBAY_FR', lang: 'fr', pays: 'France' },
     { id: 'EBAY_DE', lang: 'de', pays: 'Allemagne' },
-    { id: 'EBAY_IT', lang: 'it', pays: 'Italie' },
     { id: 'EBAY_ES', lang: 'es', pays: 'Espagne' },
+    // eBay Italie RETIRÉ sur décision métier. Les traductions italiennes
+    // restent dans le glossaire : réactiver le marché ne demande que de
+    // remettre cette ligne. Ne pas le « rétablir » sans arbitrage — c'est un
+    // choix, pas un oubli.
+    // { id: 'EBAY_IT', lang: 'it', pays: 'Italie' },
 ];
 
 export const GLOSSARY_SIZE = GLOSSARY.length + GLOSSAIRE_IMPORTE.length;
