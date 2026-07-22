@@ -1163,7 +1163,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     + '<span class="v"' + (isOem ? '' : ' data-tr') + '>' + a.value + '</span></div>';
             }).join('') + '</div>'
             : '';
-        const rawDesc = (d.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        // Le serveur a déjà nettoyé le HTML et structuré le texte en lignes.
+        // Écraser tous les espaces (\s+ inclut \n) détruisait cette structure
+        // et produisait un pavé illisible — d'où le style white-space:pre-line
+        // qui n'avait alors plus rien à préserver.
+        const rawDesc = (d.description || '')
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/[ \t]+/g, ' ')          // espaces horizontaux seulement
+            .replace(/ *\n */g, '\n')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
         const descHtml = rawDesc ? '<h2>Description</h2><div class="desc" data-tr>' + rawDesc + '</div>' : '';
         // Bouton de traduction : Chrome exige un GESTE UTILISATEUR pour
         // télécharger le modèle de traduction. Une traduction automatique
