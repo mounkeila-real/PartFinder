@@ -1020,8 +1020,14 @@ document.addEventListener('DOMContentLoaded', () => {
         win.document.close();
 
         // Langue connue depuis la recherche : elle évite une détection.
-        const source = allItems.find(r => String(r.id) === String(itemId));
-        const langue = (source && source.langue) || 'fr';
+        // Lecture défensive : la fiche doit s'afficher même si la liste des
+        // résultats n'est plus disponible — sans traduction, mais affichée.
+        let langue = 'fr';
+        try {
+            const source = (window.currentSearchResults || [])
+                .find(r => String(r.id) === String(itemId));
+            if (source && source.langue) langue = source.langue;
+        } catch { /* langue par défaut */ }
 
         fetch(`${API_BASE_URL}/parts/item/${encodeURIComponent(itemId)}`)
             .then(r => r.ok ? r.json() : Promise.reject(new Error('not found')))
