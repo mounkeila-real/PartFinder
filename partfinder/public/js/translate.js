@@ -24,6 +24,27 @@
         return typeof self !== 'undefined' && 'Translator' in self;
     }
 
+    /**
+     * Détecte la langue réelle d'un texte.
+     *
+     * Le marché d'origine n'est qu'un INDICE : eBay France liste quantité
+     * d'annonces rédigées en allemand. S'y fier menait soit à ne rien
+     * traduire, soit à demander une traduction fr→fr sans effet.
+     * Renvoie null si la détection n'est pas disponible ou peu sûre.
+     */
+    let detecteur;
+    async function detecterLangue(texte) {
+        if (typeof self === 'undefined' || !('LanguageDetector' in self)) return null;
+        try {
+            if (!detecteur) detecteur = self.LanguageDetector.create();
+            const d = await detecteur;
+            const res = await d.detect(texte.slice(0, 400));
+            const best = Array.isArray(res) ? res[0] : null;
+            if (best && best.confidence > 0.5) return best.detectedLanguage;
+            return null;
+        } catch { return null; }
+    }
+
     async function traducteurPour(langue) {
         if (traducteurs.has(langue)) return traducteurs.get(langue);
         const p = (async () => {
@@ -51,21 +72,39 @@
         const sortie = entrees.map(e => e.texte);
         const aFaire = [];
 
+        // Langue réelle : détectée sur le texte le plus long (le plus fiable
+        // pour la détection), sinon l'indice du marché d'origine.
+        const plusLong = entrees.reduce((a, b) => (b.texte || '').length > (a.texte || '').length ? b : a, entrees[0]);
+        const detectee = await detecterLangue((plusLong && plusLong.texte) || '');
+        const langueReelle = detectee || null;
+
+        // Langue retenue, exposée à l'appelant : le message affiché doit
+        // distinguer « déjà en français » d'un « échec de traduction ».
+        traduire.derniereLangue = langueReelle;
+
+        // Détection sûre indiquant du français : rien à traduire, et le dire
+        // vaut mieux que de lancer une traduction fr→fr sans effet.
+        if (langueReelle === 'fr') return sortie;
+
         entrees.forEach((e, i) => {
             if (!e.texte || !e.texte.trim()) return;
-            // Déjà en français : rien à faire.
-            if (!e.langue || e.langue === 'fr') return;
-            const cle = e.langue + '|' + e.texte;
+            // Sans détection, l'indice du marché sert de repli ; s'il vaut
+            // « fr » alors qu'aucune détection ne l'a confirmé, on tente quand
+            // même : le serveur (DeepL) détecte la langue de son côté.
+            const langue = langueReelle || (e.langue && e.langue !== 'fr' ? e.langue : null);
+            const cle = (langue || 'auto') + '|' + e.texte;
             if (cache.has(cle)) { sortie[i] = cache.get(cle); return; }
-            aFaire.push({ i, ...e, cle });
+            aFaire.push({ i, texte: e.texte, langue, cle });
         });
 
         if (!aFaire.length) return sortie;
 
         // 1) Navigateur — par langue, pour réutiliser chaque traducteur.
+        //    Sans langue source identifiée, l'API n'est pas utilisable : on
+        //    passe directement au serveur, qui sait détecter.
         if (navigateurCompatible()) {
             const parLangue = new Map();
-            aFaire.forEach(x => {
+            aFaire.filter(x => x.langue).forEach(x => {
                 if (!parLangue.has(x.langue)) parLangue.set(x.langue, []);
                 parLangue.get(x.langue).push(x);
             });

@@ -1059,9 +1059,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const etat = doc.getElementById('trad-etat');
         if (!btn) return;
 
-        if (langue === 'fr' || !window.pfTraduire) {
+        // Le bouton est TOUJOURS proposé quand la traduction est disponible.
+        // Le marché d'origine n'est qu'un indice, pas la langue : eBay France
+        // liste beaucoup d'annonces de vendeurs allemands, et les masquer sur
+        // ce seul critère privait le client de traduction sur des fiches
+        // entièrement en allemand.
+        if (!window.pfTraduire) {
             btn.remove();
-            if (etat && langue === 'fr') etat.textContent = '';
             return;
         }
 
@@ -1095,10 +1099,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 if (etat) {
                     // Ne jamais laisser croire à une traduction qui n'a pas eu
-                    // lieu : l'état réel de la pièce en dépend.
+                    // lieu : l'état réel de la pièce en dépend. Et distinguer
+                    // « déjà en français » d'un échec, sans quoi le message
+                    // inquiéterait sur une fiche parfaitement lisible.
+                    const dejaFr = window.pfTraduire.derniereLangue === 'fr';
                     etat.textContent = n
                         ? `${n} élément(s) traduits — survolez pour voir l'original.`
-                        : 'Traduction indisponible — texte d\'origine conservé.';
+                        : dejaFr
+                            ? 'Cette fiche est déjà en français.'
+                            : 'Traduction indisponible — texte d\'origine conservé.';
                 }
                 btn.textContent = n ? 'Traduit' : 'Réessayer';
                 btn.disabled = !!n;
