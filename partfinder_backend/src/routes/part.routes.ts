@@ -467,7 +467,10 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
             // client ne peut ni les lire ni les falsifier.
             const {
                 itemWebUrl, seller, source, price, sourcePrice,
-                shippingCost, shippingType, vendeurPro, ...rest
+                shippingCost, shippingType, vendeurPro,
+                // Vocabulaire propre à la place de marché : ne sort jamais.
+                buyingOptions, currentBidEur,
+                ...rest
             } = r;
             return {
                 ...rest,

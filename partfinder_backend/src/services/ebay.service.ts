@@ -44,7 +44,30 @@ export interface NormalizedPart {
     shippingCost?: number | null;
     /** FIXED (montant ferme) | CALCULATED (dépend de l'adresse) | null (inconnu). */
     shippingType?: string | null;
+    /** Modes d'achat (FIXED_PRICE / AUCTION / BEST_OFFER) — INTERNE. */
+    buyingOptions?: string[] | null;
+    /** Enchère en cours, le cas échéant — sert à détecter un prix ambigu. */
+    currentBidEur?: number | null;
     isMock?: boolean;
+}
+
+/**
+ * Une annonce est-elle achetable immédiatement à un prix ferme ?
+ *
+ * Une annonce mixte « enchère + achat immédiat » est CONSERVÉE : elle est
+ * réellement achetable au prix affiché. En revanche elle est écartée si
+ * l'enchère a dépassé ce prix — le montant affiché n'est alors plus celui
+ * auquel on peut acheter, et le prix annoncé au client serait faux.
+ */
+export function estPrixFerme(p: {
+    buyingOptions?: string[] | null; price?: number | null; currentBidEur?: number | null;
+}): boolean {
+    const opts = p.buyingOptions;
+    // Champ absent (mock, autre source) : on ne bloque pas.
+    if (!opts || !opts.length) return true;
+    if (!opts.includes('FIXED_PRICE')) return false;
+    if (p.currentBidEur != null && p.price != null && p.currentBidEur >= p.price) return false;
+    return true;
 }
 
 interface SearchOptions {
@@ -60,6 +83,43 @@ interface SearchOptions {
 
 /** Plafond eBay sur le filtre `sellers` : au-delà, la requête est rejetée. */
 export const MAX_SELLERS_PER_QUERY = 30;
+
+/**
+ * N'accepter QUE les annonces à prix fixe (« Buy It Now »).
+ *
+ * PartFinder annonce au client un prix ferme, tout compris. Sur une enchère,
+ * ce prix n'a aucun sens : le montant final est inconnu et la vente peut être
+ * perdue au profit d'un autre enchérisseur, après qu'un engagement a été pris.
+ * Désactivable par EBAY_FIXED_PRICE_ONLY=0 sans redéploiement.
+ */
+const FIXED_PRICE_ONLY = process.env.EBAY_FIXED_PRICE_ONLY !== '0';
+
+/**
+ * Construit le paramètre `filter` de la Browse API (valeurs séparées par des
+ * virgules). Extrait pour être testable sans appel réseau.
+ */
+export function buildSearchFilter(opts: { sellers?: string[] } = {}): string {
+    const filtres: string[] = [];
+
+    // Livrable en France : l'entrepôt de réception y est. Sans ce filtre,
+    // l'opérateur découvrait au moment d'acheter que le vendeur n'expédie pas.
+    filtres.push(`deliveryCountry:${DELIVERY_COUNTRY}`);
+
+    if (FIXED_PRICE_ONLY) {
+        // Une annonce « enchère + achat immédiat » possède les deux options :
+        // elle est conservée, car elle EST achetable au prix affiché.
+        filtres.push('buyingOptions:{FIXED_PRICE}');
+    }
+
+    if (opts.sellers && opts.sellers.length) {
+        // Ciblage nominatif de vendeurs professionnels : une recherche
+        // générale noie les grosses casses parmi les particuliers.
+        // eBay plafonne cette liste — au-delà, la requête est rejetée.
+        filtres.push(`sellers:{${opts.sellers.slice(0, MAX_SELLERS_PER_QUERY).join('|')}}`);
+    }
+
+    return filtres.join(',');
+}
 
 export class EbayService {
 
@@ -136,14 +196,7 @@ export class EbayService {
             sellers,
         } = options;
 
-        // Filtres cumulés (séparés par des virgules dans la Browse API).
-        const filtres = [`deliveryCountry:${DELIVERY_COUNTRY}`];
-        if (sellers && sellers.length) {
-            // Ciblage nominatif de vendeurs professionnels : une recherche
-            // générale noie les grosses casses parmi les particuliers.
-            // eBay plafonne cette liste — au-delà, la requête est rejetée.
-            filtres.push(`sellers:{${sellers.slice(0, MAX_SELLERS_PER_QUERY).join('|')}}`);
-        }
+        const filtre = buildSearchFilter({ sellers });
 
         try {
             const token = await this.getAccessToken();
@@ -165,7 +218,7 @@ export class EbayService {
                         // nous — après avoir annoncé un prix au client.
                         // On ne filtre PAS sur le pays du VENDEUR : les pièces
                         // d'occasion viennent massivement d'Allemagne/Italie.
-                        filter: filtres.join(','),
+                        filter: filtre,
                     },
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -179,6 +232,16 @@ export class EbayService {
 
             const summaries = response.data?.itemSummaries || [];
             let results: NormalizedPart[] = summaries.map((s: any) => this.normalizeSummary(s));
+
+            // Second rempart : le filtre eBay devrait suffire, mais une annonce
+            // dont l'enchère a dépassé le prix d'achat immédiat passerait au
+            // travers. Le prix annoncé au client doit toujours être achetable.
+            if (FIXED_PRICE_ONLY) {
+                const avant = results.length;
+                results = results.filter((r) => estPrixFerme(r));
+                const ecartes = avant - results.length;
+                if (ecartes > 0) console.warn(`[eBay] ${ecartes} annonce(s) sans prix ferme écartée(s)`);
+            }
 
             // Enrichissement via getItem — VOLONTAIREMENT limite aux N premiers seulement,
             // pour maitriser la consommation du quota eBay (1 getItem = 1 appel).
@@ -329,6 +392,9 @@ export class EbayService {
             condition: s.condition || null,
             itemWebUrl: s.itemWebUrl || null,
             seller: s.seller?.username || null,
+            buyingOptions: Array.isArray(s.buyingOptions) ? s.buyingOptions : null,
+            currentBidEur: s.currentBidPrice?.value != null
+                ? parseFloat(s.currentBidPrice.value) : null,
             shortDescription: s.shortDescription || null,
             fullDescription: null,
             shippingCost: shipping.shippingCost,
