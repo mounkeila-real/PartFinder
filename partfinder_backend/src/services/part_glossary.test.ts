@@ -115,6 +115,15 @@ describe('part_glossary — traduction déterministe des requêtes', () => {
         // Retrait volontaire, pas un oubli : ce test empêche une
         // réactivation par inadvertance.
         expect(MARKETPLACES.map(m => m.id)).not.toContain('EBAY_IT');
-        expect(MARKETPLACES.map(m => m.id)).toEqual(['EBAY_FR', 'EBAY_DE', 'EBAY_ES']);
+        expect(MARKETPLACES.map(m => m.pays)).toEqual(['France', 'Allemagne', 'Espagne', 'Belgique']);
+    });
+
+    it('interroge la Belgique en français (site bilingue)', () => {
+        const be = MARKETPLACES.find(m => m.pays === 'Belgique');
+        expect(be).toBeDefined();
+        // En français, aucune traduction n'est nécessaire : la requête part
+        // telle quelle, donc un terme hors glossaire n'exclut pas ce marché.
+        expect(be!.lang).toBe('fr');
+        expect(translateQuery('bidule inexistant', be!.lang).matched).toBe(true);
     });
 });

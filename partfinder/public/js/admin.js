@@ -347,6 +347,18 @@
                         </div>
                     </div>`;
                 };
+                // État par marché : révèle un identifiant de marché invalide,
+                // qui sinon ferait remonter des données factices en silence.
+                const marches = (d.marches || []).map(m => `
+                    <div class="src-row ${m.ok ? 'src-ok' : 'src-ko'}">
+                        <strong>${esc(m.pays)}</strong>
+                        <span class="acc-status ${m.ok ? 'st-done' : 'st-cancel'}">${m.ok ? 'OK' : 'À VÉRIFIER'}</span>
+                        <div class="adm-row-meta">
+                            ${esc(m.marche)} · ${m.resultats} résultat(s)
+                            ${m.note ? `<br><span class="src-err">${esc(m.note)}</span>` : ''}
+                        </div>
+                    </div>`).join('');
+
                 const trad = (d.traductions || []).map(t => `
                     <div class="src-trad ${t.reconnu ? '' : 'src-trad-ko'}">
                         <strong>${esc(t.pays)}</strong> :
@@ -365,6 +377,7 @@
                         + `erreur   : ${esc((ae.diagnostic && ae.diagnostic.error) || '—')}\n`
                         + `réponse  : ${esc(ae.reponseBrute || '—')}`
                       + '</pre></details>'
+                    + (marches ? `<div class="pr-hint" style="margin-top:14px">État par marché :</div>${marches}` : '')
                     + (trad ? `<div class="src-trads"><div class="pr-hint">Requêtes envoyées aux marchés étrangers :</div>${trad}</div>` : '');
             } catch (e) {
                 box.innerHTML = `<p class="acc-empty">${esc(e.message)}</p>`;

@@ -335,7 +335,12 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
                         // getItem chacune, sur des résultats souvent écartés.
                         withDescriptions: false,
                     });
-                    return r.map((x: any) => ({ ...x, langue: m.lang }));
+                    // Un marché en échec (identifiant invalide, API HS) fait
+                    // retomber le service sur des données FACTICES. Acceptable
+                    // en dernier recours sur la recherche principale, jamais
+                    // ici : ce serait inventer des annonces étrangères.
+                    return r.filter((x: any) => !x.isMock)
+                            .map((x: any) => ({ ...x, langue: m.lang }));
                 } catch {
                     return []; // un marché en échec ne casse pas la recherche
                 }
@@ -374,7 +379,9 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
                                 sellers: vendeursPro.map((v) => v.username),
                                 withDescriptions: false,
                             });
-                            return r.map((x: any) => ({ ...x, langue: m?.lang || 'fr' }));
+                            // Jamais de données factices ici (cf. plus haut).
+                            return r.filter((x: any) => !x.isMock)
+                                    .map((x: any) => ({ ...x, langue: m?.lang || 'fr' }));
                         } catch {
                             return []; // la recherche générale reste servie
                         }
@@ -593,9 +600,37 @@ router.get('/debug-sources', requireAdmin, async (req: express.Request, res: exp
             return { marche: m.id, pays: m.pays, reconnu: t.matched, requete: t.matched ? t.query : null };
         });
 
+        // État de CHAQUE marché : un identifiant invalide ou une API en échec
+        // ne remonte aucune erreur — le service retombe silencieusement sur
+        // des données factices. Seul un test par marché le révèle.
+        const marches = await Promise.all(MARKETPLACES.map(async (m) => {
+            const t = m.lang === 'fr' ? { matched: true, query: q } : translateQuery(q, m.lang);
+            if (!t.matched) {
+                return { marche: m.id, pays: m.pays, ok: false, resultats: 0, note: 'terme absent du glossaire' };
+            }
+            try {
+                const r = await EbayService.searchParts(t.query, {
+                    limit: 3, marketplaceId: m.id, withDescriptions: false,
+                });
+                const factices = r.some((x: any) => x.isMock);
+                const reels = r.filter((x: any) => !x.isMock).length;
+                return {
+                    marche: m.id, pays: m.pays,
+                    ok: reels > 0 && !factices,
+                    resultats: reels,
+                    note: factices
+                        ? 'DONNEES FACTICES — identifiant de marche probablement invalide'
+                        : (reels === 0 ? 'aucun resultat' : null),
+                };
+            } catch (e: any) {
+                return { marche: m.id, pays: m.pays, ok: false, resultats: 0, note: e.message };
+            }
+        }));
+
         res.json({
             query: q,
             traductions,
+            marches,
             ebay: {
                 configure: EbayService.isConfigured(),
                 environnement: EbayService.currentEnv(),

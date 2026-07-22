@@ -221,6 +221,12 @@ export const MARKETPLACES: { id: string; lang: Lang; pays: string }[] = [
     { id: 'EBAY_FR', lang: 'fr', pays: 'France' },
     { id: 'EBAY_DE', lang: 'de', pays: 'Allemagne' },
     { id: 'EBAY_ES', lang: 'es', pays: 'Espagne' },
+    // Belgique : site bilingue, interrogé en FRANÇAIS (les annonces
+    // francophones y sont nombreuses et aucune traduction n'est nécessaire).
+    // ⚠️ L'identifiant exact peut être EBAY_BE, EBAY_BE_FR ou EBAY_BE_NL
+    // selon l'API : surchargeable par EBAY_MARKETPLACE_BE, et vérifiable
+    // d'un clic via « Tester les sources » en admin.
+    { id: process.env.EBAY_MARKETPLACE_BE || 'EBAY_BE', lang: 'fr', pays: 'Belgique' },
     // eBay Italie RETIRÉ sur décision métier. Les traductions italiennes
     // restent dans le glossaire : réactiver le marché ne demande que de
     // remettre cette ligne. Ne pas le « rétablir » sans arbitrage — c'est un
