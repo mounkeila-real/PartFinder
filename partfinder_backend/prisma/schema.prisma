@@ -240,6 +240,23 @@ model AiClassification {
   @@index([valideParOperateur])
 }
 
+// Traductions déjà obtenues — une description n'est jamais retraduite.
+// Le quota DeepL gratuit est limité : sans ce cache, chaque consultation
+// d'une même annonce le consommerait à nouveau.
+model TranslationCache {
+  id           Int      @id @default(autoincrement())
+  sourceHash   String   @unique              // sha1 du texte source
+  sourceLang   String?                       // détectée par le moteur
+  targetLang   String   @default("FR")
+  texteTraduit String
+  moteur       String   @default("deepl")
+  nbCaracteres Int      @default(0)          // suivi de consommation du quota
+  createdAt    DateTime @default(now())
+
+  @@index([targetLang])
+  @@map("translation_cache")
+}
+
 // Vendeurs professionnels ciblés en priorité (casses européennes).
 // Une recherche générale noie les grosses casses parmi les particuliers :
 // on interroge donc AUSSI ces vendeurs nommément.

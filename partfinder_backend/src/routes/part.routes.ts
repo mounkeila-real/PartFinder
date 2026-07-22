@@ -9,6 +9,7 @@ import { signOffer } from '../services/offer_token';
 import { translateQuery, MARKETPLACES } from '../services/part_glossary';
 import { TERRITOIRES } from '../services/territoires';
 import { getActiveSellers } from '../services/supplier_sellers.service';
+import { translateToFrench } from '../services/translation.service';
 
 const router = express.Router();
 
@@ -133,6 +134,28 @@ router.get('/image/:token', async (req: express.Request, res: express.Response) 
     } catch {
         // Visuel indisponible : le frontend affiche son propre repli.
         return res.status(404).end();
+    }
+});
+
+/**
+ * POST /api/parts/translate — traduction de repli (PUBLIC).
+ *
+ * Le navigateur traduit en priorité, sur l'appareil du client et sans rien
+ * coûter. Cette route ne sert QUE les navigateurs non compatibles (Firefox,
+ * Safari, mobile). Bornée par le service (nombre de textes, longueur) et par
+ * un plafond mensuel : elle ne doit pas devenir un service de traduction
+ * gratuit pour des tiers.
+ */
+router.post('/translate', async (req: express.Request, res: express.Response) => {
+    try {
+        const textes = Array.isArray(req.body?.textes) ? req.body.textes : [];
+        if (!textes.length) return res.json({ textes: [], moteurs: [], quotaAtteint: false });
+        const r = await translateToFrench(textes);
+        res.json(r);
+    } catch (e: any) {
+        console.error('[parts] translate:', e.message);
+        // Jamais d'échec visible : le client garde les textes d'origine.
+        res.json({ textes: req.body?.textes || [], moteurs: [], quotaAtteint: false });
     }
 });
 
@@ -268,7 +291,10 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
         for (const q of candidates) {
             const r = await EbayService.searchParts(q, { limit });
             if (r && r.length > 0) {
-                rawResults = r;
+                // Langue du marché d'origine : connue ici avec certitude, elle
+                // évite au navigateur du client d'avoir à la deviner pour
+                // traduire (une détection ratée = pas de traduction).
+                rawResults = r.map((x: any) => ({ ...x, langue: 'fr' }));
                 usedQuery = q;
                 break;
             }
@@ -301,13 +327,14 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
                 if (!q) return [];
                 traductions.push({ marketplace: m.id, query: q });
                 try {
-                    return await EbayService.searchParts(q, {
+                    const r = await EbayService.searchParts(q, {
                         limit,
                         marketplaceId: m.id,
                         // Descriptions inutiles ici : elles coûtent un appel
                         // getItem chacune, sur des résultats souvent écartés.
                         withDescriptions: false,
                     });
+                    return r.map((x: any) => ({ ...x, langue: m.lang }));
                 } catch {
                     return []; // un marché en échec ne casse pas la recherche
                 }
@@ -340,12 +367,13 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
                         }
                         if (!q) return [];
                         try {
-                            return await EbayService.searchParts(q, {
+                            const r = await EbayService.searchParts(q, {
                                 limit,
                                 marketplaceId: mid,
                                 sellers: vendeursPro.map((v) => v.username),
                                 withDescriptions: false,
                             });
+                            return r.map((x: any) => ({ ...x, langue: m?.lang || 'fr' }));
                         } catch {
                             return []; // la recherche générale reste servie
                         }
@@ -408,7 +436,8 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
         // Résultats fusionnés : eBay puis AliExpress, dans une seule liste homogène.
         const merged = [
             ...rawResults.map((r) => withMargin(r, 'ebay')),
-            ...aliexpressResults.map((r) => withMargin(r, 'aliexpress')),
+            // Titres AliExpress massivement en anglais.
+            ...aliexpressResults.map((r) => ({ ...withMargin(r, 'aliexpress'), langue: 'en' })),
         ].map((r: any) => ({ ...r, vendeurPro: itemsPro.has(String(r.itemId)) }));
 
         // Tarification tout compris (aucun appel IA : interdit sur une liste).

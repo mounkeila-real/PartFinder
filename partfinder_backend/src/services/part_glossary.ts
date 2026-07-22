@@ -193,3 +193,91 @@ export const MARKETPLACES: { id: string; lang: Lang; pays: string }[] = [
 ];
 
 export const GLOSSARY_SIZE = GLOSSARY.length;
+
+/* ── Traduction INVERSE : titre étranger → français ──────────────────
+ * Les annonces étrangères remontent avec un titre allemand ou italien.
+ * Le glossaire sert déjà FR→XX ; le lire à l'envers rend les titres
+ * compréhensibles sans aucun appel réseau ni jeton d'IA.
+ *
+ * On ne traduit PAS la phrase entière : marques, modèles et codes moteur
+ * (E90, F20, 1.6 HDi) doivent rester intacts — ce sont eux qui permettent
+ * au client de reconnaître sa pièce.
+ */
+
+/** Mots courants des titres d'annonces, hors vocabulaire pièces. */
+const MODIFICATEURS: Record<string, string> = {
+    // Allemand
+    vorne: 'avant', vorn: 'avant', vorderer: 'avant', vordere: 'avant',
+    hinten: 'arrière', hinterer: 'arrière', hintere: 'arrière',
+    links: 'gauche', linke: 'gauche', rechts: 'droite', rechte: 'droite',
+    satz: 'jeu', paar: 'paire', neu: 'neuf', gebraucht: 'occasion',
+    für: 'pour', fur: 'pour', und: 'et', mit: 'avec',
+    // Italien
+    anteriore: 'avant', posteriore: 'arrière', sinistro: 'gauche', destro: 'droite',
+    coppia: 'paire', nuovo: 'neuf', usato: 'occasion', per: 'pour', con: 'avec',
+    // Espagnol
+    delantero: 'avant', trasero: 'arrière', izquierdo: 'gauche', derecho: 'droite',
+    juego: 'jeu', par: 'paire', nuevo: 'neuf', usado: 'occasion', para: 'pour',
+    // Anglais
+    front: 'avant', rear: 'arrière', left: 'gauche', right: 'droite',
+    set: 'jeu', pair: 'paire', new: 'neuf', used: 'occasion', for: 'pour', with: 'avec',
+};
+
+/** Index inverse : forme étrangère normalisée → libellé français. */
+const INDEX_INVERSE: { forme: string; fr: string }[] = (() => {
+    const out: { forme: string; fr: string }[] = [];
+    for (const e of GLOSSARY) {
+        // Première forme française = libellé de référence, remis en majuscule initiale.
+        const fr = e.fr[0].charAt(0).toUpperCase() + e.fr[0].slice(1);
+        for (const lang of ['de', 'es', 'it', 'en'] as const) {
+            const forme = normalize(e[lang]);
+            if (forme) out.push({ forme, fr });
+        }
+    }
+    // Les plus longues d'abord : « Bremsscheiben » ne doit pas être coupé
+    // par une entrée plus courte qui en serait un préfixe.
+    return out.sort((a, b) => b.forme.length - a.forme.length);
+})();
+
+/**
+ * Rend un TITRE d'annonce étrangère lisible en français.
+ *
+ * ⚠️ RÉSERVÉ AUX TITRES. Ne jamais appliquer à une description : ce sont des
+ * titres formulaires (marque + pièce + position + codes) où la substitution
+ * terme à terme fonctionne. Sur de la prose — état réel de la pièce, réserves
+ * du vendeur, conditions de garantie — elle produirait un texte qui RESSEMBLE
+ * à une traduction tout en étant faux, ce qui est pire que l'original : le
+ * client achèterait sur une compréhension erronée de l'état du bien.
+ * Les descriptions passent par un moteur de traduction réel (translation.service).
+ *
+ * Renvoie null si rien n'a été reconnu — inutile d'afficher une variante
+ * identique à l'original.
+ */
+export function frenchifyTitle(titre: string): string | null {
+    if (!titre || !titre.trim()) return null;
+
+    let restant = normalize(titre);
+    let touche = false;
+
+    // 1) Termes de pièces (plusieurs mots possibles).
+    for (const { forme, fr } of INDEX_INVERSE) {
+        if (restant.includes(forme)) {
+            restant = restant.split(forme).join(`  ${fr}  `);
+            touche = true;
+        }
+    }
+
+    // 2) Mots courants, sur les mots isolés uniquement.
+    const mots = restant.split(/\s+/).map((m) => {
+        if (m.startsWith(' ')) return m;
+        const t = MODIFICATEURS[m];
+        if (t) { touche = true; return t; }
+        return m;
+    });
+
+    if (!touche) return null;
+
+    const sortie = mots.join(' ').replace(/ /g, '').replace(/\s+/g, ' ').trim();
+    if (!sortie) return null;
+    return sortie.charAt(0).toUpperCase() + sortie.slice(1);
+}

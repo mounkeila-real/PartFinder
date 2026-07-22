@@ -830,6 +830,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     // scellé dans ce jeton signé par le serveur, renvoyé tel
                     // quel avec la commande (illisible et infalsifiable ici).
                     offerToken: item.offerToken || null,
+                    // Langue du titre : évite au navigateur de la deviner.
+                    langue: item.langue || 'fr',
                     // Vendeur professionnel : information utile au client
                     // (stock, délais), sans jamais nommer la place de marché.
                     vendeurPro: !!item.vendeurProfessionnel,
@@ -944,7 +946,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="offer-body">
                     <span class="offer-brand">${item.brand}</span>
-                    <h4 class="offer-title">${item.name}</h4>
+                    <h4 class="offer-title" data-titre-id="${item.id}">${item.name}</h4>
                     ${descHtml}
                     <div class="offer-footer">
                         <div class="offer-price">${displayPrice} <span>€ TTC</span>${portSuffix}</div>
@@ -974,6 +976,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 openItemDetail(e.currentTarget.getAttribute('data-detail'));
             });
         });
+
+        traduireTitres(results);
+    }
+
+    /**
+     * Traduit les titres étrangers APRÈS affichage : les résultats s'affichent
+     * immédiatement, les titres se mettent à jour ensuite. Attendre la
+     * traduction pour afficher rendrait la recherche perceptiblement plus lente.
+     */
+    async function traduireTitres(results) {
+        if (!window.pfTraduire) return;
+        const aTraduire = results.filter(r => r.langue && r.langue !== 'fr');
+        if (!aTraduire.length) return;
+        try {
+            const textes = await window.pfTraduire(
+                aTraduire.map(r => ({ texte: r.name, langue: r.langue }))
+            );
+            aTraduire.forEach((r, i) => {
+                const t = textes[i];
+                if (!t || t === r.name) return;
+                const el = offersGrid.querySelector(`[data-titre-id="${CSS.escape(String(r.id))}"]`);
+                if (!el) return;
+                el.textContent = t;
+                // L'original reste consultable : sur une pièce technique, une
+                // référence peut se perdre à la traduction.
+                el.title = r.name;
+                r.nameFr = t;
+            });
+        } catch { /* les titres d'origine restent affichés */ }
     }
 
     // Ouvre une page interne PartFinder avec les informations de la piece
@@ -988,9 +1019,43 @@ document.addEventListener('DOMContentLoaded', () => {
         win.document.write('<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Fiche piece</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet"><style>' + detailStyles() + '</style></head><body><div class="wrap"><p class="loading">Chargement de la fiche...</p></div></body></html>');
         win.document.close();
 
+        // Langue connue depuis la recherche : elle évite une détection.
+        const source = allItems.find(r => String(r.id) === String(itemId));
+        const langue = (source && source.langue) || 'fr';
+
         fetch(`${API_BASE_URL}/parts/item/${encodeURIComponent(itemId)}`)
             .then(r => r.ok ? r.json() : Promise.reject(new Error('not found')))
-            .then(d => { const w = win.document.querySelector('.wrap'); if (w) w.innerHTML = detailHtml(d); })
+            .then(async (d) => {
+                const w = win.document.querySelector('.wrap');
+                if (!w) return;
+                w.innerHTML = detailHtml(d);
+
+                // La description porte l'état RÉEL de la pièce (rayures,
+                // kilométrage, garantie) : elle doit être traduite par un
+                // vrai moteur, jamais approximée.
+                if (langue !== 'fr' && d.description && window.pfTraduire) {
+                    const zone = win.document.querySelector('.desc');
+                    if (zone) {
+                        zone.insertAdjacentHTML('beforebegin',
+                            '<p id="trad-etat" style="color:#94A3B8;font-size:.85rem;margin:0 0 8px">Traduction en cours…</p>');
+                        try {
+                            const [trad] = await window.pfTraduire([{ texte: d.description, langue }]);
+                            const etat = win.document.getElementById('trad-etat');
+                            if (trad && trad !== d.description) {
+                                zone.textContent = trad;
+                                if (etat) etat.textContent = 'Description traduite automatiquement — texte d\'origine sous réserve.';
+                            } else if (etat) {
+                                // Ne pas laisser croire à une traduction qui
+                                // n'a pas eu lieu : l'état de la pièce en dépend.
+                                etat.textContent = 'Traduction indisponible — description dans sa langue d\'origine.';
+                            }
+                        } catch {
+                            const etat = win.document.getElementById('trad-etat');
+                            if (etat) etat.textContent = 'Traduction indisponible — description dans sa langue d\'origine.';
+                        }
+                    }
+                }
+            })
             .catch(() => { const w = win.document.querySelector('.wrap'); if (w) w.innerHTML = '<p class="loading">Fiche indisponible pour cet article.</p>'; });
     }
 
