@@ -830,6 +830,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     // scellé dans ce jeton signé par le serveur, renvoyé tel
                     // quel avec la commande (illisible et infalsifiable ici).
                     offerToken: item.offerToken || null,
+                    // Vendeur professionnel : information utile au client
+                    // (stock, délais), sans jamais nommer la place de marché.
+                    vendeurPro: !!item.vendeurProfessionnel,
                     isMock: !!item.isMock
                 };
             });
@@ -923,6 +926,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const descHtml = shortDesc ? `<p class="offer-desc">${shortDesc}</p>` : '';
             const linkHtml = `<button type="button" class="offer-link" data-detail="${item.id}">Voir la fiche</button>`;
             const mockBadge = item.isMock ? '<span class="offer-mock" title="Résultat de démonstration">DÉMO</span>' : '';
+            const proBadge = item.vendeurPro
+                ? '<span class="offer-pro" title="Vendeur professionnel : stock important et délais tenus"><i class="ph ph-seal-check"></i> Pro</span>'
+                : '';
             // Aucune source d'approvisionnement n'est exposee au client.
             const sourceBadge = '';
 
@@ -933,6 +939,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="offer-condition cond-${item.condition}">${item.condition === 'new' ? 'Neuf' : 'Occasion'}</span>
                     ${sourceBadge}
                     ${mockBadge}
+                    ${proBadge}
                     <img src="${item.img}" alt="${item.name}" loading="lazy" onerror="this.onerror=null;this.src=window.PF_FALLBACK_IMG">
                 </div>
                 <div class="offer-body">

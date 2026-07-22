@@ -489,6 +489,17 @@
             <!-- Tarification : simulateur, paramètres, grille Colissimo -->
             <div class="display-none" data-adm-panel="pricing">
 
+                <h3 class="acc-sub">Casses professionnelles <span class="pr-hint">(recherche ciblée en plus de la recherche générale)</span></h3>
+                <div class="sel-add">
+                    <input type="text" id="sel-username" placeholder="Identifiant vendeur (ex. usedautocarparts)">
+                    <input type="text" id="sel-label" placeholder="Libellé interne (ex. Ovoko/RRR — Lituanie)">
+                    <input type="text" id="sel-pays" placeholder="Pays" maxlength="2" class="sel-pays">
+                    <button class="adm-mini-btn adm-mini-primary" id="sel-add">Ajouter</button>
+                </div>
+                <p class="pr-hint">⚠ Un identifiant inexact est accepté sans erreur et ne remonte jamais rien : vérifiez chaque vendeur après l'avoir ajouté.</p>
+                <div id="sel-result"></div>
+                <div id="sel-list"><p class="acc-empty">Chargement…</p></div>
+
                 <h3 class="acc-sub">État des sources <span class="pr-hint">(les pannes sont silencieuses : à vérifier régulièrement)</span></h3>
                 <div class="src-check">
                     <input type="text" id="src-q" value="plaquettes de frein BMW" placeholder="Requête de test">

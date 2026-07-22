@@ -21,6 +21,10 @@ export interface OfferData {
     sourcePriceEur: number | null;
     sourceShippingEur: number | null;
     sourceShippingType: string | null;
+    /** Vendeur (casse) — usage back-office : savoir chez qui acheter. */
+    vendeur?: string | null;
+    /** Annonce issue d'une casse professionnelle de la whitelist. */
+    vendeurPro?: boolean;
     ts: number;                   // émission (ms epoch)
 }
 

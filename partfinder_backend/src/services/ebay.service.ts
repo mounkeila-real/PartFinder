@@ -54,7 +54,12 @@ interface SearchOptions {
     /** Récupère la description complète (getItem) pour les N premiers résultats. */
     withDescriptions?: boolean;
     descriptionCount?: number;
+    /** Restreint la recherche à ces vendeurs (casses professionnelles). */
+    sellers?: string[];
 }
+
+/** Plafond eBay sur le filtre `sellers` : au-delà, la requête est rejetée. */
+export const MAX_SELLERS_PER_QUERY = 30;
 
 export class EbayService {
 
@@ -128,7 +133,17 @@ export class EbayService {
             marketplaceId = EBAY_MARKETPLACE_ID,
             withDescriptions = true,
             descriptionCount = 3,
+            sellers,
         } = options;
+
+        // Filtres cumulés (séparés par des virgules dans la Browse API).
+        const filtres = [`deliveryCountry:${DELIVERY_COUNTRY}`];
+        if (sellers && sellers.length) {
+            // Ciblage nominatif de vendeurs professionnels : une recherche
+            // générale noie les grosses casses parmi les particuliers.
+            // eBay plafonne cette liste — au-delà, la requête est rejetée.
+            filtres.push(`sellers:{${sellers.slice(0, MAX_SELLERS_PER_QUERY).join('|')}}`);
+        }
 
         try {
             const token = await this.getAccessToken();
@@ -150,7 +165,7 @@ export class EbayService {
                         // nous — après avoir annoncé un prix au client.
                         // On ne filtre PAS sur le pays du VENDEUR : les pièces
                         // d'occasion viennent massivement d'Allemagne/Italie.
-                        filter: `deliveryCountry:${DELIVERY_COUNTRY}`,
+                        filter: filtres.join(','),
                     },
                     headers: {
                         'Authorization': `Bearer ${token}`,

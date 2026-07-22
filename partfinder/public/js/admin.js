@@ -57,6 +57,7 @@
             if (name === 'pricing') loadPricing();
             if (name === 'warehouse' && window.pfLoadWarehouse) window.pfLoadWarehouse();
             if (name === 'shipping' && window.pfLoadShipping) window.pfLoadShipping();
+            if (name === 'pricing' && window.pfLoadSellers) window.pfLoadSellers();
         }
         tabs.forEach(t => t.addEventListener('click', () => switchTab(t.getAttribute('data-adm-tab'))));
 
@@ -158,6 +159,99 @@
                     cats.map(c => `<option value="${esc(c.code)}">${esc(c.labelFr)} — ${Number(c.poidsKg)} kg${c.horsGabarit ? ' ⚠ hors gabarit' : ''}</option>`).join('');
             } catch (e) { sel.innerHTML = '<option value="">Erreur de chargement</option>'; }
         }
+
+        // ── Casses professionnelles (whitelist vendeurs) ─────────────
+        // Une recherche générale noie les grosses casses parmi les
+        // particuliers : on les interroge aussi nommément.
+        async function loadSellers() {
+            const box = document.getElementById('sel-list');
+            box.innerHTML = '<p class="acc-empty">Chargement…</p>';
+            try {
+                const d = await api('/admin/sellers', { method: 'GET' });
+                const list = d.sellers || [];
+                if (!list.length) {
+                    box.innerHTML = '<p class="acc-empty">Aucune casse ciblée. La recherche générale reste active.</p>';
+                    return;
+                }
+                box.innerHTML = list.map(s => {
+                    // Statut de vérification : jamais vérifié / OK / suspect.
+                    let etat = '<span class="acc-status st-pending">Non vérifié</span>';
+                    if (s.verifieLe) {
+                        etat = s.dernierNbResultats > 0
+                            ? `<span class="acc-status st-done">Vérifié · ${s.dernierNbResultats} annonces</span>`
+                            : '<span class="acc-status st-cancel">0 annonce — identifiant douteux</span>';
+                    }
+                    return `<div class="adm-row" data-sid="${s.id}">
+                        <div class="adm-row-main">
+                            <strong>${esc(s.labelInterne)}</strong>
+                            ${etat}
+                            ${s.actif ? '' : '<span class="acc-status st-cancel">Désactivé</span>'}
+                            <div class="adm-row-meta">
+                                ${esc(s.sellerUsername)}${s.pays ? ' · ' + esc(s.pays) : ''} ·
+                                priorité ${s.priorite} · fiabilité ${Number(s.fiabiliteScore).toFixed(2)}
+                                ${s.verifieLe ? ' · contrôlé le ' + new Date(s.verifieLe).toLocaleDateString('fr-FR') : ''}
+                            </div>
+                        </div>
+                        <div class="adm-validate-actions">
+                            <button class="adm-mini-btn" data-sact="verify">Vérifier</button>
+                            <button class="adm-mini-btn" data-sact="toggle">${s.actif ? 'Désactiver' : 'Activer'}</button>
+                            <button class="adm-mini-btn" data-sact="del">Supprimer</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (e) { box.innerHTML = `<p class="acc-empty">${esc(e.message)}</p>`; }
+        }
+        window.pfLoadSellers = loadSellers;
+
+        document.getElementById('sel-add').addEventListener('click', async () => {
+            const res = document.getElementById('sel-result');
+            const username = document.getElementById('sel-username').value.trim();
+            const label = document.getElementById('sel-label').value.trim();
+            if (!username || !label) {
+                res.innerHTML = '<div class="wh-warn">Identifiant et libellé requis.</div>';
+                return;
+            }
+            try {
+                await api('/admin/sellers', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        sellerUsername: username, labelInterne: label,
+                        pays: document.getElementById('sel-pays').value.trim() || null,
+                    }),
+                });
+                document.getElementById('sel-username').value = '';
+                document.getElementById('sel-label').value = '';
+                document.getElementById('sel-pays').value = '';
+                res.innerHTML = '<div class="wh-ok">✓ Ajouté. Vérifiez-le pour confirmer que l\'identifiant est exact.</div>';
+                loadSellers();
+            } catch (e) { res.innerHTML = `<div class="wh-warn">${esc(e.message)}</div>`; }
+        });
+
+        document.getElementById('sel-list').addEventListener('click', async (e) => {
+            const btn = e.target.closest('[data-sact]');
+            if (!btn) return;
+            const row = btn.closest('[data-sid]');
+            const id = row.getAttribute('data-sid');
+            const act = btn.getAttribute('data-sact');
+            const res = document.getElementById('sel-result');
+            btn.disabled = true;
+            try {
+                if (act === 'verify') {
+                    res.innerHTML = '<p class="acc-empty">Vérification en cours…</p>';
+                    const r = await api(`/admin/sellers/${id}/verify`, { method: 'POST', body: JSON.stringify({}) });
+                    res.innerHTML = `<div class="${r.ok ? 'wh-ok' : 'wh-warn'}">${esc(r.message)}</div>`;
+                } else if (act === 'toggle') {
+                    const actif = btn.textContent.trim() === 'Activer';
+                    await api(`/admin/sellers/${id}`, { method: 'PATCH', body: JSON.stringify({ actif }) });
+                } else if (act === 'del') {
+                    if (!confirm('Retirer cette casse de la recherche ciblée ?')) { btn.disabled = false; return; }
+                    await api(`/admin/sellers/${id}`, { method: 'DELETE' });
+                }
+                loadSellers();
+            } catch (err) {
+                res.innerHTML = `<div class="wh-warn">${esc(err.message)}</div>`;
+            } finally { btn.disabled = false; }
+        });
 
         // État des sources d'approvisionnement. eBay retombe sur des données
         // FACTICES en cas de panne et AliExpress renvoie [] : sans ce contrôle,

@@ -8,6 +8,7 @@ import { requireAdmin } from '../middleware/auth.middleware';
 import { signOffer } from '../services/offer_token';
 import { translateQuery, MARKETPLACES } from '../services/part_glossary';
 import { TERRITOIRES } from '../services/territoires';
+import { getActiveSellers } from '../services/supplier_sellers.service';
 
 const router = express.Router();
 
@@ -307,6 +308,45 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
             })
         );
 
+        // 3) Casses professionnelles : recherche NOMINATIVE sur les vendeurs
+        //    de la whitelist. La recherche générale classe par pertinence et
+        //    noie ces vendeurs parmi les particuliers, alors que leurs stocks
+        //    sont profonds et leurs délais tenus.
+        //    Marchés limités à FR + DE (paramétrable) : les grosses casses
+        //    européennes y sont présentes, et le quota eBay reste tenable.
+        const vendeursPro = await getActiveSellers('EBAY');
+        const usernamesPro = new Set(vendeursPro.map((v) => v.username.toLowerCase()));
+        const itemsPro = new Set<string>();
+
+        const lotsPro = vendeursPro.length
+            ? await Promise.all(
+                (process.env.EBAY_WHITELIST_MARKETPLACES || 'EBAY_FR,EBAY_DE')
+                    .split(',').map((s) => s.trim()).filter(Boolean)
+                    .map(async (mid) => {
+                        const m = MARKETPLACES.find((x) => x.id === mid);
+                        let q = baseQuery;
+                        if (request.oem && String(request.oem).trim()) {
+                            q = String(request.oem).trim();
+                        } else if (m && m.lang !== 'fr') {
+                            const t = translateQuery(baseQuery, m.lang);
+                            if (!t.matched) return [];
+                            q = t.query;
+                        }
+                        if (!q) return [];
+                        try {
+                            return await EbayService.searchParts(q, {
+                                limit,
+                                marketplaceId: mid,
+                                sellers: vendeursPro.map((v) => v.username),
+                                withDescriptions: false,
+                            });
+                        } catch {
+                            return []; // la recherche générale reste servie
+                        }
+                    })
+            )
+            : [];
+
         // Fusion + déduplication : la même annonce peut remonter sur plusieurs
         // marchés (les listings transfrontaliers sont visibles des deux côtés).
         const vus = new Set<string>(rawResults.map((r: any) => String(r.itemId)));
@@ -324,6 +364,27 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
                 rawResults.push(item);
             }
         }
+        // Annonces des casses professionnelles (ajout + marquage).
+        for (const lot of lotsPro) {
+            for (const r of lot) {
+                const item = r as any;
+                if (item.currency && item.currency !== 'EUR') { ecartesDevise++; continue; }
+                const id = String(item.itemId);
+                itemsPro.add(id);
+                if (vus.has(id)) continue;
+                vus.add(id);
+                rawResults.push(item);
+            }
+        }
+        // Marque aussi celles déjà remontées par la recherche générale : sinon
+        // la même annonce serait « pro » ou non selon la requête qui l'a
+        // trouvée en premier.
+        for (const r of rawResults as any[]) {
+            if (r.seller && usernamesPro.has(String(r.seller).toLowerCase())) {
+                itemsPro.add(String(r.itemId));
+            }
+        }
+
         if (ecartesDevise > 0) {
             console.warn(`[parts] ${ecartesDevise} annonce(s) écartée(s) : devise non EUR`);
         }
@@ -342,7 +403,7 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
         const merged = [
             ...rawResults.map((r) => withMargin(r, 'ebay')),
             ...aliexpressResults.map((r) => withMargin(r, 'aliexpress')),
-        ];
+        ].map((r: any) => ({ ...r, vendeurPro: itemsPro.has(String(r.itemId)) }));
 
         // Tarification tout compris (aucun appel IA : interdit sur une liste).
         // La zone conditionne le port outre-mer ; OM1 par défaut.
@@ -381,6 +442,21 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
             console.error('[parts] tarification:', e.message);
         }
 
+        // Remontée des casses professionnelles à prix comparable.
+        // Le bonus est un POURCENTAGE, pas un montant fixe : sur une pièce à
+        // 30 € comme sur une boîte de vitesses à 800 €, « comparable » n'a pas
+        // la même valeur absolue.
+        const boost = Number(process.env.WHITELIST_BOOST_PCT || '12') / 100;
+        const prixDe = (r: any) => {
+            const p = r.prixClientEur ?? r.prixHorsPortEur ?? r.finalPrice;
+            return p != null ? Number(p) : Number.POSITIVE_INFINITY;
+        };
+        results = [...results].sort((a: any, b: any) => {
+            const pa = prixDe(a) * (a.vendeurPro ? 1 - boost : 1);
+            const pb = prixDe(b) * (b.vendeurPro ? 1 - boost : 1);
+            return pa - pb;
+        });
+
         // Point de passage OBLIGE : rien qui désigne le fournisseur ne sort
         // d'ici, quel que soit le chemin emprunté au-dessus (y compris
         // tarification en échec, qui retombait sur les résultats bruts).
@@ -391,10 +467,13 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
             // client ne peut ni les lire ni les falsifier.
             const {
                 itemWebUrl, seller, source, price, sourcePrice,
-                shippingCost, shippingType, ...rest
+                shippingCost, shippingType, vendeurPro, ...rest
             } = r;
             return {
                 ...rest,
+                // Badge NEUTRE : signale un vendeur professionnel sans jamais
+                // nommer la place de marché ni la casse.
+                vendeurProfessionnel: !!vendeurPro,
                 image: proxifyImage(r.image, req),
                 thumbnail: proxifyImage(r.thumbnail, req),
                 // Descriptions redigees par le vendeur : nettoyees du HTML et
@@ -407,6 +486,10 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
                     sourcePriceEur: price != null ? Number(price) : null,
                     sourceShippingEur: shippingCost != null ? Number(shippingCost) : null,
                     sourceShippingType: shippingType || null,
+                    // Le vendeur remonte à l'opérateur, scellé : il saura chez
+                    // qui acheter sans que le client puisse le lire.
+                    vendeur: seller ? String(seller) : null,
+                    vendeurPro: !!vendeurPro,
                 }),
             };
         });

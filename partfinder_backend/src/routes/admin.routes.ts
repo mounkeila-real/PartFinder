@@ -8,6 +8,7 @@ import { requireAdmin, AuthedRequest } from '../middleware/auth.middleware';
 import { getActiveRates, replaceGrid, checkGridFreshness, activeProvider } from '../services/colissimo.service';
 import { refreshColissimoRates } from '../jobs/scheduler';
 import * as pricing from '../services/pricing';
+import { invalidateSellersCache, verifierVendeur } from '../services/supplier_sellers.service';
 
 /**
  * Administration (Phase 3) — toutes les routes exigent le rôle ADMIN.
@@ -497,6 +498,97 @@ router.post('/pricing/colissimo/refresh', async (_req: AuthedRequest, res: expre
         res.json({ ok: true, freshness });
     } catch (e: any) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+/* ── Casses professionnelles (whitelist vendeurs) ─────────────────── */
+
+/** GET /api/admin/sellers — liste des vendeurs ciblés. */
+router.get('/sellers', async (_req: express.Request, res: express.Response) => {
+    try {
+        const sellers = await prisma.supplierSeller.findMany({
+            orderBy: [{ actif: 'desc' }, { priorite: 'desc' }, { id: 'asc' }],
+        });
+        res.json({ sellers });
+    } catch (e: any) {
+        console.error('[admin] sellers:', e.message);
+        res.status(500).json({ error: 'Erreur lors du chargement des vendeurs.' });
+    }
+});
+
+/** POST /api/admin/sellers — ajoute une casse à cibler. */
+router.post('/sellers', async (req: express.Request, res: express.Response) => {
+    try {
+        const sellerUsername = String(req.body?.sellerUsername || '').trim();
+        const labelInterne = String(req.body?.labelInterne || '').trim();
+        if (!sellerUsername) return res.status(400).json({ error: 'Nom du vendeur requis.' });
+        if (!labelInterne) return res.status(400).json({ error: 'Libellé interne requis.' });
+
+        const seller = await prisma.supplierSeller.create({
+            data: {
+                supplierCode: String(req.body?.supplierCode || 'EBAY'),
+                sellerUsername,
+                labelInterne,
+                pays: req.body?.pays ? String(req.body.pays).toUpperCase().slice(0, 2) : null,
+                priorite: Number(req.body?.priorite) || 0,
+                fiabiliteScore: req.body?.fiabiliteScore != null ? Number(req.body.fiabiliteScore) : 1.0,
+                notes: req.body?.notes ? String(req.body.notes) : null,
+                actif: req.body?.actif !== false,
+            },
+        });
+        invalidateSellersCache();
+        res.status(201).json({ seller });
+    } catch (e: any) {
+        if (e.code === 'P2002') return res.status(409).json({ error: 'Ce vendeur est déjà dans la liste.' });
+        console.error('[admin] create seller:', e.message);
+        res.status(500).json({ error: 'Erreur lors de l\'ajout.' });
+    }
+});
+
+/** PATCH /api/admin/sellers/:id — activation, priorité, fiabilité, notes. */
+router.patch('/sellers/:id', async (req: express.Request, res: express.Response) => {
+    try {
+        const data: any = {};
+        if (req.body?.actif !== undefined) data.actif = !!req.body.actif;
+        if (req.body?.priorite !== undefined) data.priorite = Number(req.body.priorite) || 0;
+        if (req.body?.fiabiliteScore !== undefined) data.fiabiliteScore = Number(req.body.fiabiliteScore);
+        if (req.body?.labelInterne !== undefined) data.labelInterne = String(req.body.labelInterne);
+        if (req.body?.notes !== undefined) data.notes = String(req.body.notes || '') || null;
+
+        const seller = await prisma.supplierSeller.update({
+            where: { id: Number(req.params.id) }, data,
+        });
+        invalidateSellersCache();
+        res.json({ seller });
+    } catch (e: any) {
+        console.error('[admin] update seller:', e.message);
+        res.status(500).json({ error: 'Erreur lors de la mise à jour.' });
+    }
+});
+
+/** DELETE /api/admin/sellers/:id */
+router.delete('/sellers/:id', async (req: express.Request, res: express.Response) => {
+    try {
+        await prisma.supplierSeller.delete({ where: { id: Number(req.params.id) } });
+        invalidateSellersCache();
+        res.json({ ok: true });
+    } catch (e: any) {
+        res.status(500).json({ error: 'Erreur lors de la suppression.' });
+    }
+});
+
+/**
+ * POST /api/admin/sellers/:id/verify — contrôle que le vendeur existe.
+ * Un nom erroné est ACCEPTÉ par l'API et renvoie simplement 0 résultat : la
+ * casse serait « configurée » sans jamais être interrogée, sans aucune erreur.
+ */
+router.post('/sellers/:id/verify', async (req: express.Request, res: express.Response) => {
+    try {
+        const r = await verifierVendeur(Number(req.params.id), req.body?.marketplaceId);
+        res.json(r);
+    } catch (e: any) {
+        console.error('[admin] verify seller:', e.message);
+        res.status(500).json({ error: e.message || 'Vérification impossible.' });
     }
 });
 

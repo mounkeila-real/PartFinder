@@ -1612,6 +1612,24 @@ textarea:focus {
     .adm-row-meta { white-space: normal; }
 }
 
+/* Badge « vendeur professionnel » sur une offre */
+.offer-pro {
+    position: absolute; top: 10px; right: 10px; z-index: 2;
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 8px; border-radius: 999px;
+    background: rgba(16, 122, 87, 0.92); color: #fff;
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.02em;
+}
+
+/* Casses professionnelles (admin) */
+.sel-add { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.sel-add input {
+    flex: 1; min-width: 150px; height: 40px; padding: 0 12px;
+    background: var(--bg-surface); border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.9rem;
+}
+.sel-add .sel-pays { flex: 0 0 70px; min-width: 70px; text-transform: uppercase; }
+
 /* ── État des sources (admin) ────────────────────────────────────── */
 .src-check { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 .src-check input {

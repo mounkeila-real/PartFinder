@@ -240,6 +240,30 @@ model AiClassification {
   @@index([valideParOperateur])
 }
 
+// Vendeurs professionnels ciblés en priorité (casses européennes).
+// Une recherche générale noie les grosses casses parmi les particuliers :
+// on interroge donc AUSSI ces vendeurs nommément.
+model SupplierSeller {
+  id                 Int       @id @default(autoincrement())
+  supplierCode       String    @default("EBAY")
+  sellerUsername     String
+  labelInterne       String                          // ex. "Ovoko/RRR — casse europeenne"
+  pays               String?
+  actif              Boolean   @default(true)
+  priorite           Int       @default(0)           // tri a prix comparable
+  fiabiliteScore     Decimal   @default(1.0) @db.Decimal(3, 2)
+  notes              String?
+  // Verification : un username errone renvoie 0 resultat SANS erreur.
+  // On garde la trace du dernier controle pour rendre la panne visible.
+  verifieLe          DateTime?
+  dernierNbResultats Int?
+  createdAt          DateTime  @default(now())
+
+  @@unique([supplierCode, sellerUsername])
+  @@index([supplierCode, actif])
+  @@map("supplier_sellers")
+}
+
 // Adresses de livraison du client (la zone pilote le tarif Colissimo).
 model Address {
   id           Int      @id @default(autoincrement())
