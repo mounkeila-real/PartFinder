@@ -180,9 +180,16 @@
                         </div>
                     </div>`;
                 };
+                const trad = (d.traductions || []).map(t => `
+                    <div class="src-trad ${t.reconnu ? '' : 'src-trad-ko'}">
+                        <strong>${esc(t.pays)}</strong> :
+                        ${t.reconnu ? esc(t.requete) : '<em>terme absent du glossaire — requête non traduite</em>'}
+                    </div>`).join('');
+
                 box.innerHTML =
                     ligne('eBay', d.ebay, d.ebay.donneesFactices ? ' · <strong>⚠ DONNÉES FACTICES</strong>' : ` · ${esc(d.ebay.environnement || '')}`)
-                    + ligne('AliExpress', d.aliexpress, '');
+                    + ligne('AliExpress', d.aliexpress, '')
+                    + (trad ? `<div class="src-trads"><div class="pr-hint">Requêtes envoyées aux marchés étrangers :</div>${trad}</div>` : '');
             } catch (e) {
                 box.innerHTML = `<p class="acc-empty">${esc(e.message)}</p>`;
             }

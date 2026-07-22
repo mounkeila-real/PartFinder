@@ -6,6 +6,7 @@ import { PartAiService, VehicleContext, PartRequest } from '../services/part_ai.
 import * as pricing from '../services/pricing';
 import { requireAdmin } from '../middleware/auth.middleware';
 import { signOffer } from '../services/offer_token';
+import { translateQuery, MARKETPLACES } from '../services/part_glossary';
 
 const router = express.Router();
 
@@ -239,6 +240,8 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
         const aeQuery = [pn, vehicle.make, vehicle.model].filter(Boolean).join(' ') || request.oem || part.ebayQuery || '';
         const aliexpressPromise = AliexpressService.searchProducts(aeQuery, limit || 20);
 
+        // 1) Marché français : cascade du plus précis au plus large.
+        //    eBay exige que TOUS les mots correspondent — d'où la cascade.
         let rawResults: any[] = [];
         let usedQuery = part.ebayQuery;
         for (const q of candidates) {
@@ -248,6 +251,67 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
                 usedQuery = q;
                 break;
             }
+        }
+
+        // 2) Marchés étrangers : UNE requête ciblée par pays, traduite via le
+        //    glossaire (déterministe, aucun appel IA). Une pièce d'occasion est
+        //    massivement listée en Allemagne : « Bremsbeläge » ouvre un
+        //    catalogue que « plaquettes de frein » ne touchera jamais.
+        //    Une seule requête par marché : la cascade complète multiplierait
+        //    le quota eBay par 5.
+        const baseQuery = [pn, vehicle.make, vehicle.model].filter(Boolean).join(' ');
+        const foreign = MARKETPLACES.filter((m) => m.id !== 'EBAY_FR');
+        const traductions: { marketplace: string; query: string }[] = [];
+
+        const foreignResults = await Promise.all(
+            foreign.map(async (m) => {
+                // La référence OEM est universelle : quand elle existe, c'est
+                // la meilleure clé transfrontalière, sans traduction.
+                let q: string;
+                if (request.oem && String(request.oem).trim()) {
+                    q = String(request.oem).trim();
+                } else {
+                    const t = translateQuery(baseQuery, m.lang);
+                    // Terme inconnu du glossaire : traduire n'apporterait rien
+                    // et gaspillerait du quota sur une requête francaise.
+                    if (!t.matched) return [];
+                    q = t.query;
+                }
+                if (!q) return [];
+                traductions.push({ marketplace: m.id, query: q });
+                try {
+                    return await EbayService.searchParts(q, {
+                        limit,
+                        marketplaceId: m.id,
+                        // Descriptions inutiles ici : elles coûtent un appel
+                        // getItem chacune, sur des résultats souvent écartés.
+                        withDescriptions: false,
+                    });
+                } catch {
+                    return []; // un marché en échec ne casse pas la recherche
+                }
+            })
+        );
+
+        // Fusion + déduplication : la même annonce peut remonter sur plusieurs
+        // marchés (les listings transfrontaliers sont visibles des deux côtés).
+        const vus = new Set<string>(rawResults.map((r: any) => String(r.itemId)));
+        let ecartesDevise = 0;
+        for (const lot of foreignResults) {
+            for (const r of lot) {
+                const item = r as any;
+                // Garde-fou : toute la tarification raisonne en euros. Laisser
+                // passer une autre devise reviendrait à facturer « 50 » sans
+                // savoir que ce sont des livres ou des zlotys.
+                if (item.currency && item.currency !== 'EUR') { ecartesDevise++; continue; }
+                const id = String(item.itemId);
+                if (vus.has(id)) continue;
+                vus.add(id);
+                rawResults.push(item);
+            }
+        }
+        if (ecartesDevise > 0) {
+            console.warn(`[parts] ${ecartesDevise} annonce(s) écartée(s) : devise non EUR`);
         }
 
         const aliexpressResults = await aliexpressPromise;
@@ -368,8 +432,17 @@ router.get('/debug-sources', requireAdmin, async (req: express.Request, res: exp
         const ebayDiag = EbayService.lastDiagnostic;
         const aeDiag = AliexpressService.lastDiagnostic;
 
+        // Aperçu des traductions : permet de repérer un terme absent du
+        // glossaire (la requête part alors en français sur un marché étranger,
+        // donc pour rien).
+        const traductions = MARKETPLACES.filter((m) => m.id !== 'EBAY_FR').map((m) => {
+            const t = translateQuery(q, m.lang);
+            return { marche: m.id, pays: m.pays, reconnu: t.matched, requete: t.matched ? t.query : null };
+        });
+
         res.json({
             query: q,
+            traductions,
             ebay: {
                 configure: EbayService.isConfigured(),
                 environnement: EbayService.currentEnv(),

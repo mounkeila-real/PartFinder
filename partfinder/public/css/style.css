@@ -1627,6 +1627,9 @@ textarea:focus {
 .src-row.src-ok { border-left-color: var(--success); }
 .src-row.src-ko { border-left-color: var(--danger); }
 .src-err { color: var(--danger); font-size: 0.78rem; word-break: break-word; }
+.src-trads { margin-top: 10px; padding: 10px 14px; background: var(--overlay-soft); border-radius: var(--radius-sm); }
+.src-trad { font-size: 0.82rem; color: var(--text-secondary); padding: 2px 0; }
+.src-trad-ko { color: var(--text-tertiary); }
 
 /* ── Cookies & pages légales ─────────────────────────────────────── */
 .ck-banner {
