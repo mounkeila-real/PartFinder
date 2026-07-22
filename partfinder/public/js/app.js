@@ -1031,38 +1031,82 @@ document.addEventListener('DOMContentLoaded', () => {
 
         fetch(`${API_BASE_URL}/parts/item/${encodeURIComponent(itemId)}`)
             .then(r => r.ok ? r.json() : Promise.reject(new Error('not found')))
-            .then(async (d) => {
+            .then((d) => {
                 const w = win.document.querySelector('.wrap');
                 if (!w) return;
                 w.innerHTML = detailHtml(d);
-
-                // La description porte l'état RÉEL de la pièce (rayures,
-                // kilométrage, garantie) : elle doit être traduite par un
-                // vrai moteur, jamais approximée.
-                if (langue !== 'fr' && d.description && window.pfTraduire) {
-                    const zone = win.document.querySelector('.desc');
-                    if (zone) {
-                        zone.insertAdjacentHTML('beforebegin',
-                            '<p id="trad-etat" style="color:#94A3B8;font-size:.85rem;margin:0 0 8px">Traduction en cours…</p>');
-                        try {
-                            const [trad] = await window.pfTraduire([{ texte: d.description, langue }]);
-                            const etat = win.document.getElementById('trad-etat');
-                            if (trad && trad !== d.description) {
-                                zone.textContent = trad;
-                                if (etat) etat.textContent = 'Description traduite automatiquement — texte d\'origine sous réserve.';
-                            } else if (etat) {
-                                // Ne pas laisser croire à une traduction qui
-                                // n'a pas eu lieu : l'état de la pièce en dépend.
-                                etat.textContent = 'Traduction indisponible — description dans sa langue d\'origine.';
-                            }
-                        } catch {
-                            const etat = win.document.getElementById('trad-etat');
-                            if (etat) etat.textContent = 'Traduction indisponible — description dans sa langue d\'origine.';
-                        }
-                    }
-                }
+                brancherTraduction(win, langue);
             })
             .catch(() => { const w = win.document.querySelector('.wrap'); if (w) w.innerHTML = '<p class="loading">Fiche indisponible pour cet article.</p>'; });
+    }
+
+    /**
+     * Branche le bouton « Traduire » de la fiche détaillée.
+     *
+     * Traduit TOUT ce qui est marqué data-tr : titre, libellés et valeurs des
+     * caractéristiques, description. Le tableau des caractéristiques est la
+     * partie la plus dense en information — le laisser en allemand vidait la
+     * fiche de son intérêt.
+     *
+     * Déclenché par un clic, jamais automatiquement : Chrome exige un geste
+     * utilisateur pour télécharger le modèle de traduction, une tentative
+     * automatique échouerait donc à la première utilisation. Le clic rend
+     * aussi l'usage du quota DeepL explicite.
+     */
+    function brancherTraduction(win, langue) {
+        const doc = win.document;
+        const btn = doc.getElementById('btn-trad');
+        const etat = doc.getElementById('trad-etat');
+        if (!btn) return;
+
+        if (langue === 'fr' || !window.pfTraduire) {
+            btn.remove();
+            if (etat && langue === 'fr') etat.textContent = '';
+            return;
+        }
+
+        // Références et dimensions n'ont rien à traduire : les envoyer
+        // gaspillerait du quota pour un résultat identique.
+        const traduisible = (t) => {
+            const s = (t || '').trim();
+            if (s.length < 3) return false;
+            const lettres = (s.match(/[a-zà-ÿ]/gi) || []).length;
+            return lettres >= 3 && lettres / s.length > 0.4;
+        };
+
+        btn.addEventListener('click', async () => {
+            const cibles = [...doc.querySelectorAll('[data-tr]')]
+                .filter(el => traduisible(el.textContent));
+            if (!cibles.length) { if (etat) etat.textContent = 'Rien à traduire.'; return; }
+
+            btn.disabled = true;
+            if (etat) etat.textContent = 'Traduction en cours…';
+            try {
+                const textes = await window.pfTraduire(
+                    cibles.map(el => ({ texte: el.textContent.trim(), langue }))
+                );
+                let n = 0;
+                cibles.forEach((el, i) => {
+                    const t = textes[i];
+                    if (!t || t === el.textContent.trim()) return;
+                    el.title = el.textContent.trim();   // original en infobulle
+                    el.textContent = t;
+                    n++;
+                });
+                if (etat) {
+                    // Ne jamais laisser croire à une traduction qui n'a pas eu
+                    // lieu : l'état réel de la pièce en dépend.
+                    etat.textContent = n
+                        ? `${n} élément(s) traduits — survolez pour voir l'original.`
+                        : 'Traduction indisponible — texte d\'origine conservé.';
+                }
+                btn.textContent = n ? 'Traduit' : 'Réessayer';
+                btn.disabled = !!n;
+            } catch {
+                if (etat) etat.textContent = 'Traduction indisponible — texte d\'origine conservé.';
+                btn.disabled = false;
+            }
+        });
     }
 
     function detailStyles() {
@@ -1090,6 +1134,11 @@ document.addEventListener('DOMContentLoaded', () => {
             .spec.oem { background:#10233b; }
             .spec.oem .v { color:#7DD3FC; }
             .desc { font-size:.92rem; line-height:1.7; color:#CBD5E1; background:#0F1626; border:1px solid rgba(255,255,255,.06); border-radius:12px; padding:18px 20px; white-space:pre-line; }
+            .trad-bar { display:flex; align-items:center; gap:12px; margin:14px 0 4px; flex-wrap:wrap; }
+            .btn-trad { background:#1F5FD6; color:#fff; border:0; border-radius:8px; padding:9px 16px; font-family:'Inter',sans-serif; font-size:.85rem; font-weight:600; cursor:pointer; }
+            .btn-trad:hover { background:#1a52ba; }
+            .btn-trad:disabled { opacity:.55; cursor:default; }
+            #trad-etat { font-size:.82rem; color:#94A3B8; }
             @media (max-width:640px){ .specs{ grid-template-columns:1fr; } .price{ font-size:1.6rem; } .head{ flex-direction:column; } .pricebox{ text-align:left; } }
         `;
     }
@@ -1108,12 +1157,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const specsHtml = aspects.length
             ? '<h2>Caractéristiques</h2><div class="specs">' + aspects.map(a => {
                 const isOem = /(oe|oem|référence|reference|part)/i.test(a.name);
-                return '<div class="spec' + (isOem ? ' oem' : '') + '"><span class="k">' + a.name + '</span><span class="v">' + a.value + '</span></div>';
+                // data-tr marque ce qui peut être traduit à la demande.
+                return '<div class="spec' + (isOem ? ' oem' : '') + '">'
+                    + '<span class="k" data-tr>' + a.name + '</span>'
+                    + '<span class="v"' + (isOem ? '' : ' data-tr') + '>' + a.value + '</span></div>';
             }).join('') + '</div>'
             : '';
         const rawDesc = (d.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-        const descHtml = rawDesc ? '<h2>Description</h2><div class="desc">' + rawDesc + '</div>' : '';
-        return '<div class="head"><h1>' + (d.title || 'Pièce') + '</h1><div class="pricebox"><div class="price">' + priceStr + '</div>' + cond + '</div></div>' + gallery + specsHtml + descHtml;
+        const descHtml = rawDesc ? '<h2>Description</h2><div class="desc" data-tr>' + rawDesc + '</div>' : '';
+        // Bouton de traduction : Chrome exige un GESTE UTILISATEUR pour
+        // télécharger le modèle de traduction. Une traduction automatique
+        // échouerait donc silencieusement à la première utilisation.
+        const btnTrad = '<button id="btn-trad" class="btn-trad">Traduire en français</button>';
+        return '<div class="head"><h1 data-tr>' + (d.title || 'Pièce') + '</h1>'
+            + '<div class="pricebox"><div class="price">' + priceStr + '</div>' + cond + '</div></div>'
+            + '<div class="trad-bar">' + btnTrad + '<span id="trad-etat"></span></div>'
+            + gallery + specsHtml + descHtml;
     }
 
     // --- Cart / Order Logic ---
