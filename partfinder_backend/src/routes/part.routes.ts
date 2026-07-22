@@ -530,9 +530,17 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
 router.get('/debug-sources', requireAdmin, async (req: express.Request, res: express.Response) => {
     try {
         const q = String(req.query.q || 'plaquettes de frein BMW');
+
+        // Un test MANUEL doit toujours interroger réellement la source :
+        // sinon le coupe-circuit renverrait un résultat vide sans appel, et
+        // l'opérateur ne saurait pas si la correction a fonctionné.
+        AliexpressService.rearmer();
+
+        // AliExpress est interrogé en anglais, comme dans le parcours réel.
+        const traductionAe = translateQuery(q, 'en');
         const [ebayResults, aeResults] = await Promise.all([
             EbayService.searchParts(q, { limit: 5 }),
-            AliexpressService.searchProducts(q, 5),
+            AliexpressService.searchProducts(traductionAe.matched ? traductionAe.query : q, 5),
         ]);
 
         const ebayDiag = EbayService.lastDiagnostic;
@@ -566,6 +574,8 @@ router.get('/debug-sources', requireAdmin, async (req: express.Request, res: exp
                 // Forme brute de la réponse : indispensable tant que
                 // l'intégration n'est pas validée (le mapping en dépend).
                 reponseBrute: aeDiag?.rawExcerpt || null,
+                methodeAppelee: process.env.ALIEXPRESS_SEARCH_METHOD || 'aliexpress.ds.text.search',
+                requeteEnvoyee: traductionAe.matched ? traductionAe.query : q,
             },
             verdict: [
                 EbayService.isConfigured() && !ebayResults.some((r: any) => r.isMock)
