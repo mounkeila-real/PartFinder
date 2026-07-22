@@ -19,6 +19,9 @@ const EBAY_APP_ID = process.env.EBAY_APP_ID;
 const EBAY_CERT_ID = process.env.EBAY_CERT_ID;
 const EBAY_MARKETPLACE_ID = process.env.EBAY_MARKETPLACE_ID || 'EBAY_FR';
 
+// Pays de livraison : l'entrepôt de réception est en France (Sarralbe).
+const DELIVERY_COUNTRY = process.env.EBAY_DELIVERY_COUNTRY || 'FR';
+
 const IS_SANDBOX = EBAY_ENV === 'sandbox';
 const API_BASE = IS_SANDBOX ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com';
 
@@ -141,6 +144,13 @@ export class EbayService {
                         q: query,
                         category_ids: categoryId,
                         limit,
+                        // N'expose QUE les annonces effectivement livrables en
+                        // France : sans ce filtre, l'opérateur découvrait au
+                        // moment d'acheter que le vendeur n'expédie pas chez
+                        // nous — après avoir annoncé un prix au client.
+                        // On ne filtre PAS sur le pays du VENDEUR : les pièces
+                        // d'occasion viennent massivement d'Allemagne/Italie.
+                        filter: `deliveryCountry:${DELIVERY_COUNTRY}`,
                     },
                     headers: {
                         'Authorization': `Bearer ${token}`,
