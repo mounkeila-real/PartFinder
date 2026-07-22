@@ -1612,6 +1612,22 @@ textarea:focus {
     .adm-row-meta { white-space: normal; }
 }
 
+/* ── État des sources (admin) ────────────────────────────────────── */
+.src-check { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.src-check input {
+    flex: 1; min-width: 200px; height: 40px; padding: 0 12px;
+    background: var(--bg-surface); border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.9rem;
+}
+.src-row {
+    padding: 12px 14px; margin-bottom: 8px;
+    border: 1px solid var(--border-color); border-left-width: 4px;
+    border-radius: var(--radius-sm); background: var(--bg-surface);
+}
+.src-row.src-ok { border-left-color: var(--success); }
+.src-row.src-ko { border-left-color: var(--danger); }
+.src-err { color: var(--danger); font-size: 0.78rem; word-break: break-word; }
+
 /* ── Cookies & pages légales ─────────────────────────────────────── */
 .ck-banner {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 3000;

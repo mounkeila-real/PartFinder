@@ -350,6 +350,54 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
 });
 
 /**
+ * GET /api/parts/debug-sources?q=... — ETAT DES SOURCES (admin).
+ *
+ * Les deux services echouent en SILENCE par conception (eBay retombe sur des
+ * mocks, AliExpress renvoie []) pour ne jamais casser le parcours client.
+ * Consequence : une source morte est invisible. Cette route interroge les deux
+ * et rapporte ce qui s'est reellement passe.
+ */
+router.get('/debug-sources', requireAdmin, async (req: express.Request, res: express.Response) => {
+    try {
+        const q = String(req.query.q || 'plaquettes de frein BMW');
+        const [ebayResults, aeResults] = await Promise.all([
+            EbayService.searchParts(q, { limit: 5 }),
+            AliexpressService.searchProducts(q, 5),
+        ]);
+
+        const ebayDiag = EbayService.lastDiagnostic;
+        const aeDiag = AliexpressService.lastDiagnostic;
+
+        res.json({
+            query: q,
+            ebay: {
+                configure: EbayService.isConfigured(),
+                environnement: EbayService.currentEnv(),
+                resultats: ebayResults.length,
+                // Signale explicitement les donnees factices : sans cela, un
+                // echec eBay ressemble a une recherche qui marche.
+                donneesFactices: ebayResults.some((r: any) => r.isMock),
+                diagnostic: ebayDiag,
+            },
+            aliexpress: {
+                configure: AliexpressService.isConfigured(),
+                resultats: aeResults.length,
+                diagnostic: aeDiag,
+            },
+            verdict: [
+                EbayService.isConfigured() && !ebayResults.some((r: any) => r.isMock)
+                    ? 'eBay : OK' : 'eBay : EN ECHEC (donnees factices ou non configure)',
+                AliexpressService.isConfigured()
+                    ? (aeDiag?.ok && aeResults.length > 0 ? 'AliExpress : OK' : 'AliExpress : EN ECHEC ou 0 resultat')
+                    : 'AliExpress : NON CONFIGURE',
+            ],
+        });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
  * Diagnostic: montre la reponse brute du fournisseur (pour verifier les images).
  *
  * RESERVE AUX ADMINS : cette reponse expose la source d'approvisionnement

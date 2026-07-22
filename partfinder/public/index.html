@@ -444,6 +444,13 @@
             <!-- Tarification : simulateur, paramètres, grille Colissimo -->
             <div class="display-none" data-adm-panel="pricing">
 
+                <h3 class="acc-sub">État des sources <span class="pr-hint">(les pannes sont silencieuses : à vérifier régulièrement)</span></h3>
+                <div class="src-check">
+                    <input type="text" id="src-q" value="plaquettes de frein BMW" placeholder="Requête de test">
+                    <button class="adm-mini-btn adm-mini-primary" id="src-run">Tester les sources</button>
+                </div>
+                <div id="src-result"></div>
+
                 <h3 class="acc-sub">Simulateur de prix <span class="pr-hint">(usage interne — vérifier la marge)</span></h3>
                 <div class="pr-sim-grid">
                     <label>Prix pièce (€)

@@ -53,8 +53,25 @@ export class AliexpressService {
         return crypto.createHmac('sha256', APP_SECRET).update(base, 'utf8').digest('hex').toUpperCase();
     }
 
+    /**
+     * Dernier diagnostic d'appel — l'échec est volontairement silencieux pour
+     * ne jamais casser le flux principal, ce qui rend la panne INVISIBLE.
+     * Cette trace permet à l'admin de savoir si la source répond vraiment.
+     */
+    static lastDiagnostic: {
+        at: string; ok: boolean; count: number; error: string | null; rawExcerpt: string | null;
+    } | null = null;
+
     static async searchProducts(query: string, limit = 20): Promise<NormalizedPart[]> {
-        if (!this.isConfigured() || !query || !query.trim()) return [];
+        if (!this.isConfigured()) {
+            this.lastDiagnostic = {
+                at: new Date().toISOString(), ok: false, count: 0,
+                error: 'NON CONFIGURE (ALIEXPRESS_APP_KEY / ALIEXPRESS_APP_SECRET absents)',
+                rawExcerpt: null,
+            };
+            return [];
+        }
+        if (!query || !query.trim()) return [];
 
         try {
             const params: Record<string, string> = {
@@ -90,9 +107,32 @@ export class AliexpressService {
                 [];
 
             const arr = Array.isArray(products) ? products : [];
+
+            // Le gateway répond souvent 200 AVEC une erreur applicative dans le
+            // corps (clé non approuvée...) : sans ce test, un échec passerait
+            // pour un simple « 0 résultat ».
+            const apiError = data?.error_response
+                || (data && typeof data === 'object' && (data as any).code && (data as any).code !== '0'
+                    ? { code: (data as any).code, msg: (data as any).msg || (data as any).sub_msg }
+                    : null);
+
+            this.lastDiagnostic = {
+                at: new Date().toISOString(),
+                ok: !apiError,
+                count: arr.length,
+                error: apiError ? JSON.stringify(apiError).slice(0, 300) : null,
+                rawExcerpt: JSON.stringify(data).slice(0, 400),
+            };
+
             return arr.map((p: any) => this.normalize(p));
         } catch (err: any) {
-            console.error('[AliExpress] product.query échec:', err.response?.data || err.message);
+            const detail = err.response?.data || err.message;
+            console.error('[AliExpress] product.query échec:', detail);
+            this.lastDiagnostic = {
+                at: new Date().toISOString(), ok: false, count: 0,
+                error: (typeof detail === 'string' ? detail : JSON.stringify(detail)).slice(0, 300),
+                rawExcerpt: null,
+            };
             return []; // n'impacte jamais le flux eBay
         }
     }

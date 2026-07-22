@@ -159,6 +159,35 @@
             } catch (e) { sel.innerHTML = '<option value="">Erreur de chargement</option>'; }
         }
 
+        // État des sources d'approvisionnement. eBay retombe sur des données
+        // FACTICES en cas de panne et AliExpress renvoie [] : sans ce contrôle,
+        // une source morte ressemble à une recherche qui fonctionne.
+        document.getElementById('src-run').addEventListener('click', async () => {
+            const box = document.getElementById('src-result');
+            box.innerHTML = '<p class="acc-empty">Test en cours…</p>';
+            try {
+                const q = encodeURIComponent(document.getElementById('src-q').value.trim() || 'plaquettes de frein');
+                const d = await api('/parts/debug-sources?q=' + q, { method: 'GET' });
+                const ligne = (nom, s, extra) => {
+                    const ok = s.configure && s.resultats > 0 && !s.donneesFactices && (s.diagnostic ? s.diagnostic.ok !== false : true);
+                    return `<div class="src-row ${ok ? 'src-ok' : 'src-ko'}">
+                        <strong>${nom}</strong>
+                        <span class="acc-status ${ok ? 'st-done' : 'st-cancel'}">${ok ? 'OK' : 'EN ÉCHEC'}</span>
+                        <div class="adm-row-meta">
+                            ${s.configure ? 'configuré' : '<strong>NON CONFIGURÉ</strong>'} ·
+                            ${s.resultats} résultat(s)${extra || ''}
+                            ${s.diagnostic && s.diagnostic.error ? `<br><span class="src-err">${esc(s.diagnostic.error)}</span>` : ''}
+                        </div>
+                    </div>`;
+                };
+                box.innerHTML =
+                    ligne('eBay', d.ebay, d.ebay.donneesFactices ? ' · <strong>⚠ DONNÉES FACTICES</strong>' : ` · ${esc(d.ebay.environnement || '')}`)
+                    + ligne('AliExpress', d.aliexpress, '');
+            } catch (e) {
+                box.innerHTML = `<p class="acc-empty">${esc(e.message)}</p>`;
+            }
+        });
+
         document.getElementById('sim-run').addEventListener('click', async () => {
             const box = document.getElementById('sim-result');
             const portVal = document.getElementById('sim-port').value.trim();

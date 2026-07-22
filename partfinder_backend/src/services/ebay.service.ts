@@ -55,6 +55,16 @@ interface SearchOptions {
 
 export class EbayService {
 
+    /**
+     * Dernier diagnostic d'appel. En cas d'échec, searchParts renvoie des
+     * données MOCK : sans cette trace, une panne d'API ressemble à une
+     * recherche qui fonctionne (résultats plausibles, mais faux).
+     */
+    static lastDiagnostic: {
+        at: string; ok: boolean; count: number; marketplace: string;
+        error: string | null; mock: boolean;
+    } | null = null;
+
     private static cachedToken: { value: string; expiresAt: number } | null = null;
 
     static isConfigured(): boolean {
@@ -174,9 +184,20 @@ export class EbayService {
                 );
             }
 
+            this.lastDiagnostic = {
+                at: new Date().toISOString(), ok: true, count: results.length,
+                marketplace: marketplaceId, error: null, mock: false,
+            };
             return results;
         } catch (error: any) {
-            console.error('[eBay] Échec recherche:', error.response?.data || error.message);
+            const detail = error.response?.data || error.message;
+            console.error('[eBay] Échec recherche:', detail);
+            this.lastDiagnostic = {
+                at: new Date().toISOString(), ok: false, count: 0,
+                marketplace: marketplaceId,
+                error: (typeof detail === 'string' ? detail : JSON.stringify(detail)).slice(0, 300),
+                mock: true,
+            };
             // Fallback mock pour ne pas casser le MVP.
             return this.generateMockEbayResults(query);
         }
