@@ -1,13 +1,12 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthedRequest } from '../middleware/auth.middleware';
+import { prisma } from '../lib/prisma';
 
 /**
  * Mon garage — véhicules enregistrés d'un compte (toutes routes requireAuth).
  */
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 router.use(requireAuth);
 

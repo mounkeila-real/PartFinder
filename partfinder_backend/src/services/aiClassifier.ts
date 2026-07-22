@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import crypto from 'crypto';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
 /**
  * Classification d'une pièce à partir du TITRE et de la DESCRIPTION d'annonce.
@@ -18,7 +18,6 @@ import { PrismaClient } from '@prisma/client';
  *   - Confiance < 0,6 -> marqué pour revue opérateur.
  */
 
-const prisma = new PrismaClient();
 
 const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';

@@ -1,7 +1,7 @@
 import express from 'express';
 import Stripe from 'stripe';
-import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthedRequest } from '../middleware/auth.middleware';
+import { prisma } from '../lib/prisma';
 
 /**
  * Appels de fonds — côté CLIENT (requireAuth).
@@ -11,7 +11,6 @@ import { requireAuth, AuthedRequest } from '../middleware/auth.middleware';
  */
 
 const router = express.Router();
-const prisma = new PrismaClient();
 router.use(requireAuth);
 
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY || '';

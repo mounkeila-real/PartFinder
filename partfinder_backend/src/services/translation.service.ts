@@ -1,7 +1,7 @@
 import axios from 'axios';
 import crypto from 'crypto';
-import { PrismaClient } from '@prisma/client';
 import { frenchifyTitle } from './part_glossary';
+import { prisma } from '../lib/prisma';
 
 /**
  * Traduction des annonces étrangères vers le français.
@@ -14,7 +14,6 @@ import { frenchifyTitle } from './part_glossary';
  * Aucun jeton d'IA n'est consommé.
  */
 
-const prisma = new PrismaClient();
 
 const DEEPL_KEY = process.env.DEEPL_API_KEY || '';
 // Les clés gratuites finissent par « :fx » et utilisent un hôte distinct.

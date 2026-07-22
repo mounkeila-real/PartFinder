@@ -1,9 +1,9 @@
 import express from 'express';
 import Stripe from 'stripe';
-import { PrismaClient } from '@prisma/client';
 import { requireAdmin, AuthedRequest } from '../middleware/auth.middleware';
 import { EmailService } from '../services/email.service';
 import * as pricing from '../services/pricing';
+import { prisma } from '../lib/prisma';
 import {
     activeLabelProvider, buildCn23, DEFAULT_CODE_SH,
     type Cn23Line,
@@ -17,7 +17,6 @@ import {
  */
 
 const router = express.Router();
-const prisma = new PrismaClient();
 router.use(requireAdmin);
 
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY || '';

@@ -1,8 +1,8 @@
 import cron from 'node-cron';
-import { PrismaClient } from '@prisma/client';
 import { EmailService } from '../services/email.service';
 import { checkGridFreshness, replaceGrid, activeProvider } from '../services/colissimo.service';
 import * as pricing from '../services/pricing';
+import { prisma } from '../lib/prisma';
 
 /**
  * Tâches planifiées.
@@ -11,7 +11,6 @@ import * as pricing from '../services/pricing';
  * sans cela chaque replica exécuterait le job).
  */
 
-const prisma = new PrismaClient();
 
 /** Destinataire des alertes : ADMIN_ALERT_EMAIL, sinon le premier compte ADMIN. */
 async function adminEmail(): Promise<string | null> {

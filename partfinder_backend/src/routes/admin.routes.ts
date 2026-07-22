@@ -1,7 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
 import Stripe from 'stripe';
-import { PrismaClient } from '@prisma/client';
 import { AuthService } from '../services/auth.service';
 import { EmailService } from '../services/email.service';
 import { requireAdmin, AuthedRequest } from '../middleware/auth.middleware';
@@ -12,6 +11,7 @@ import { invalidateSellersCache, verifierVendeur } from '../services/supplier_se
 import { candidats, statistiques, termesValides } from '../services/glossary_learning.service';
 import { traduireVers } from '../services/translation.service';
 import { chargerTermesAppris } from '../services/part_glossary';
+import { prisma } from '../lib/prisma';
 
 /**
  * Administration (Phase 3) — toutes les routes exigent le rôle ADMIN.
@@ -20,7 +20,6 @@ import { chargerTermesAppris } from '../services/part_glossary';
  */
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 router.use(requireAdmin);
 

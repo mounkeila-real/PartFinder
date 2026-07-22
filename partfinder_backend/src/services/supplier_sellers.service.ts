@@ -1,5 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { EbayService, MAX_SELLERS_PER_QUERY } from './ebay.service';
+import { prisma } from '../lib/prisma';
 
 /**
  * Vendeurs professionnels ciblés (casses européennes).
@@ -10,7 +10,6 @@ import { EbayService, MAX_SELLERS_PER_QUERY } from './ebay.service';
  * fiables et les délais tenus.
  */
 
-const prisma = new PrismaClient();
 
 // Cache court : la liste change rarement, mais elle est lue à chaque
 // recherche et sur chaque marché interrogé.

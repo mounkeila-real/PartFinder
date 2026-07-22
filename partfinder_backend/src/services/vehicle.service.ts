@@ -1,9 +1,8 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import { decodeVinLocal } from '../utils/vin_decoder';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
-const prisma = new PrismaClient();
 
 const RAPID_API_KEY = process.env.RAPID_API_KEY;
 

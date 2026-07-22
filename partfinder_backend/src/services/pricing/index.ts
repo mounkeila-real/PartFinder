@@ -1,5 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { classifyPart, cacheKey as aiCacheKey } from '../aiClassifier';
+import { prisma } from '../../lib/prisma';
 import {
     computeTotalPrice, computeShipping, findProcessingFee, computeInsurance,
     computePriceWithoutShipping, getPriceRegime, computeWeightDeviation, selectTranche,
@@ -14,7 +14,6 @@ import {
  * ici on ne fait que charger les grilles/paramètres et orchestrer.
  */
 
-const prisma = new PrismaClient();
 
 export * from './compute';
 

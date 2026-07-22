@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import { EU_WMI_EXTRA } from './wmi_extra';
+import { prisma } from '../lib/prisma';
 
-const prisma = new PrismaClient();
 
 const MODEL_YEAR_MAP: Record<string, number> = {
     "A": 2010, "B": 2011, "C": 2012, "D": 2013, "E": 2014,

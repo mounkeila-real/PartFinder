@@ -1,12 +1,11 @@
 import express from 'express';
 import crypto from 'crypto';
-import { PrismaClient } from '@prisma/client';
 import { AuthService } from '../services/auth.service';
 import { requireAuth, AuthedRequest } from '../middleware/auth.middleware';
 import { EmailService } from '../services/email.service';
+import { prisma } from '../lib/prisma';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

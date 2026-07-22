@@ -1,5 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { normalize, GLOSSARY_SIZE } from './part_glossary';
+import { prisma } from '../lib/prisma';
 
 /**
  * Enrichissement du glossaire par la pratique.
@@ -13,7 +13,6 @@ import { normalize, GLOSSARY_SIZE } from './part_glossary';
  * étrangers, faisant perdre des annonces sans rien signaler.
  */
 
-const prisma = new PrismaClient();
 
 /** Mots ignorés : trop courts, numériques, ou codes de modèle (E90, F20, 1.6). */
 const IGNORES = new Set([

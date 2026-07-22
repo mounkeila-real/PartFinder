@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
 /**
  * Grille tarifaire Colissimo Outre-mer.
@@ -18,7 +18,6 @@ import { PrismaClient } from '@prisma/client';
  *      est signé : le rafraîchissement deviendra alors réellement automatique.
  */
 
-const prisma = new PrismaClient();
 
 export type Zone = 'OM1' | 'OM2';
 

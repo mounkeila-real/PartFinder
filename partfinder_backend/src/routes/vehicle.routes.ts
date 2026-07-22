@@ -1,6 +1,7 @@
 import express from 'express';
 import axios from 'axios';
 import { VehicleService } from '../services/vehicle.service';
+import { prisma } from '../lib/prisma';
 
 const router = express.Router();
 
@@ -112,9 +113,7 @@ router.get('/ktype/:id', async (req: express.Request, res: express.Response) => 
 
 // --- LOCAL DB ENDPOINTS ---
 
-import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
 
 // Get all makes (auto-remplissage depuis NHTSA si la table est quasi vide)
 router.get('/makes', async (req: express.Request, res: express.Response) => {

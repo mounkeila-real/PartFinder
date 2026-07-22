@@ -1,9 +1,9 @@
 import express from 'express';
 import Stripe from 'stripe';
-import { PrismaClient } from '@prisma/client';
 import { requireAuth, AuthedRequest } from '../middleware/auth.middleware';
 import { verifyOffer } from '../services/offer_token';
 import { validerAdresse, formatAdresse } from '../services/territoires';
+import { prisma } from '../lib/prisma';
 
 /**
  * Extrait le coût d'acquisition d'un article depuis son jeton d'offre signé.
@@ -46,7 +46,6 @@ function costsFromToken(item: any): {
  */
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY || '';
 const stripe = STRIPE_SECRET ? new Stripe(STRIPE_SECRET) : null;

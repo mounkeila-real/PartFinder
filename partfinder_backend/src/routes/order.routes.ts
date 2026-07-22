@@ -1,10 +1,9 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
 import { AuthService } from '../services/auth.service';
 import { requireAuth, AuthedRequest } from '../middleware/auth.middleware';
+import { prisma } from '../lib/prisma';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Lit un userId depuis un token Bearer optionnel (commande liée au compte si connecté).
 function optionalUserId(req: express.Request): number | null {
