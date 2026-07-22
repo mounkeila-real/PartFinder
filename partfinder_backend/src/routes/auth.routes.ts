@@ -10,6 +10,60 @@ const prisma = new PrismaClient();
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * POST /api/auth/bootstrap-admin — attribue le rôle ADMIN à un compte.
+ *
+ * Dépannage : permet de retrouver un accès administrateur sans console de
+ * base de données (le rôle peut se perdre lors d'une réinitialisation de
+ * schéma, le script de build exécutant `prisma db push`).
+ *
+ * TROIS PROTECTIONS, car c'est une élévation de privilège :
+ *  1. la route N'EXISTE PAS tant que ADMIN_BOOTSTRAP_TOKEN n'est pas défini —
+ *     elle répond 404, sans même révéler son existence ;
+ *  2. le jeton est comparé en TEMPS CONSTANT (une comparaison naïve laisse
+ *     deviner le secret caractère par caractère) ;
+ *  3. chaque usage, réussi ou non, est journalisé.
+ *
+ * ⚠️ RETIRER la variable d'environnement juste après usage.
+ */
+router.post('/bootstrap-admin', async (req: express.Request, res: express.Response) => {
+    const attendu = process.env.ADMIN_BOOTSTRAP_TOKEN || '';
+    if (!attendu) return res.status(404).end();
+
+    try {
+        const fourni = String(req.header('x-bootstrap-token') || '');
+        const a = Buffer.from(fourni);
+        const b = Buffer.from(attendu);
+        if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+            console.warn('[auth] bootstrap-admin : jeton invalide');
+            return res.status(403).json({ error: 'Jeton invalide.' });
+        }
+
+        const email = String(req.body?.email || '').trim().toLowerCase();
+        if (!email) return res.status(400).json({ error: 'Email requis.' });
+
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (!user) return res.status(404).json({ error: 'Compte introuvable.' });
+
+        const maj = await prisma.user.update({
+            where: { email },
+            data: { role: 'ADMIN' },
+            select: { id: true, email: true, role: true },
+        });
+
+        console.warn(`[auth] BOOTSTRAP ADMIN : ${maj.email} promu ADMIN — retirer ADMIN_BOOTSTRAP_TOKEN.`);
+        res.json({
+            ok: true,
+            user: maj,
+            rappel: 'Retirez ADMIN_BOOTSTRAP_TOKEN de Railway, puis reconnectez-vous '
+                + '(le rôle est lu à la connexion, un rechargement ne suffit pas).',
+        });
+    } catch (e: any) {
+        console.error('[auth] bootstrap-admin:', e.message);
+        res.status(500).json({ error: 'Erreur lors de l\'attribution du rôle.' });
+    }
+});
+
 // Champs publics d'un utilisateur (jamais le passwordHash).
 function publicUser(u: any) {
     return {

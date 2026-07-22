@@ -67,6 +67,10 @@
             if (userName) userName.textContent = 'Non connecté';
             if (userRole) userRole.textContent = 'Cliquer pour se connecter';
             if (userAvatar) userAvatar.textContent = '?';
+            // Prévenir aussi de la DÉCONNEXION : sans cet événement, les
+            // éléments réservés (lien Admin) restaient affichés jusqu'au
+            // rechargement, y compris après expiration du jeton.
+            window.dispatchEvent(new CustomEvent('pf-auth-changed', { detail: { user: null } }));
         }
 
         // --- API ---
