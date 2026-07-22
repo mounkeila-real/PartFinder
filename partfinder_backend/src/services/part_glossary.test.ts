@@ -67,6 +67,37 @@ describe('part_glossary — traduction déterministe des requêtes', () => {
         expect(translateQuery('ampoules led', 'en').query).toContain('LED headlight');
     });
 
+    it('intègre le glossaire importé (vocabulaire technique étendu)', () => {
+        expect(translateQuery('vilebrequin BMW', 'de').query).toContain('Kurbelwelle');
+        expect(translateQuery('capteur ABS Renault', 'es').query).toContain('Sensor ABS');
+        expect(translateQuery('joint de culasse', 'en').query).toContain('gasket');
+    });
+
+    it('n\'envoie JAMAIS une requête avec une langue manquante', () => {
+        // Le glossaire importé n'a pas d'italien : le marché italien doit
+        // simplement être ignoré, jamais recevoir « undefined BMW ».
+        for (const terme of ['vilebrequin BMW', 'capteur ABS', 'joint de culasse', 'bielle']) {
+            for (const lang of ['de', 'es', 'it', 'en'] as const) {
+                const r = translateQuery(terme, lang);
+                expect(r.query).not.toContain('undefined');
+                expect(r.query).not.toContain('null');
+                if (!r.matched) expect(r.query).toBe(terme); // requête d'origine intacte
+            }
+        }
+    });
+
+    it('préfère un terme plus court mais TRADUIT à un terme long incomplet', () => {
+        // « plaquettes de frein avant » (importé, sans italien) ne doit pas
+        // masquer « plaquettes de frein » (d'origine, traduit en italien),
+        // sinon on perdrait le marché italien sur un terme pourtant couvert.
+        const it = translateQuery('plaquettes de frein avant BMW', 'it');
+        expect(it.matched).toBe(true);
+        expect(it.query).toContain('pastiglie');
+        // En allemand, le terme importé plus précis reste utilisé.
+        expect(translateQuery('plaquettes de frein avant BMW', 'de').query)
+            .toMatch(/Bremsbel/);
+    });
+
     it('couvre les marchés visés et un glossaire non trivial', () => {
         expect(MARKETPLACES.map(m => m.id)).toContain('EBAY_DE');
         expect(GLOSSARY_SIZE).toBeGreaterThan(50);

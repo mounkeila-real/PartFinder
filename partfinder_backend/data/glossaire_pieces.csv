@@ -1,0 +1,125 @@
+Catégorie,Français,Anglais,Allemand,Espagnol
+Moteur,Bloc moteur,Engine block,Motorblock,Bloque motor
+Moteur,Culasse,Cylinder head,Zylinderkopf,Culata
+Moteur,Arbre à cames,Camshaft,Nockenwelle,Árbol de levas
+Moteur,Vilebrequin,Crankshaft,Kurbelwelle,Cigüeñal
+Moteur,Piston,Piston,Kolben,Pistón
+Moteur,Bielle,Connecting rod,Pleuelstange,Biela
+Moteur,Segment de piston,Piston ring,Kolbenring,Anillo de pistón
+Moteur,Carter d'huile,Oil pan,Ölwanne,Cárter de aceite
+Moteur,Soupape d'admission,Intake valve,Einlassventil,Válvula de admisión
+Moteur,Soupape d'échappement,Exhaust valve,Auslassventil,Válvula de escape
+Moteur,Poussoir hydraulique,Hydraulic lifter,Hydrostößel,Taqué hidráulico
+Moteur,Joint de culasse,Cylinder head gasket,Zylinderkopfdichtung,Junta de culata
+Moteur,Pompe à huile,Oil pump,Ölpumpe,Bomba de aceite
+Moteur,Reniflard d'huile,PCV valve,Kurbelgehäuseentlüftung,Válvula PCV
+Distribution,Courroie de distribution,Timing belt,Zahnriemen,Correa de distribución
+Distribution,Chaîne de distribution,Timing chain,Steuerkette,Cadena de distribución
+Distribution,Galet tendeur,Tensioner pulley,Spannrolle,Rodillo tensor
+Distribution,Galet enrouleur,Idler pulley,Umlenkrolle,Rodillo guía
+Distribution,Courroie d'accessoire,Serpentine belt,Keilrippenriemen,Correa de accesorios
+Distribution,Poulie Damper,Crankshaft pulley,Riemenscheibe,Polea del cigüeñal
+Alimentation,Pompe à carburant,Fuel pump,Kraftstoffpumpe,Bomba de combustible
+Alimentation,Injecteur,Fuel injector,Einspritzventil,Inyector
+Alimentation,Rampe d'injection,Fuel rail,Kraftstoffverteilerrohr,Rampa de inyección
+Alimentation,Régulateur de pression de carburant,Fuel pressure regulator,Kraftstoffdruckregler,Regulador de presión de combustible
+Alimentation,Boîtier papillon,Throttle body,Drosselklappe,Cuerpo de mariposa
+Alimentation,Réservoir de carburant,Fuel tank,Kraftstofftank,Depósito de combustible
+Alimentation,Filtre à carburant,Fuel filter,Kraftstofffilter,Filtro de combustible
+Échappement,Collecteur d'échappement,Exhaust manifold,Abgaskrümmer,Colector de escape
+Échappement,Turbocompresseur,Turbocharger,Turbolader,Turbocompresor
+Échappement,Échangeur thermique (Intercooler),Intercooler,Ladeluftkühler,Intercooler
+Échappement,Catalyseur,Catalytic converter,Katalysator,Catalizador
+Échappement,Filtre à particules (FAP),Particulate filter (DPF),Partikelfilter (DPF),Filtro de partículas
+Échappement,Sonde lambda,Oxygen sensor (O2),Lambdasonde,Sonda lambda
+Échappement,Vanne EGR,EGR valve,AGR-Ventil,Válvula EGR
+Échappement,Silencieux central,Center muffler,Mittelschalldämpfer,Silenciador central
+Échappement,Silencieux arrière,Rear muffler,Endschalldämpfer,Silenciador trasero
+Échappement,Silentbloc d'échappement,Exhaust hanger,Auspuffgummi,Soporte de escape
+Refroidissement,Radiateur,Radiator,Wasserkühler,Radiador
+Refroidissement,Thermostat,Thermostat,Thermostat,Termostato
+Refroidissement,Pompe à eau,Water pump,Wasserpumpe,Bomba de agua
+Refroidissement,Ventilateur de refroidissement,Cooling fan,Kühlerlüfter,Ventilador del radiador
+Refroidissement,Vase d'expansion,Expansion tank,Ausgleichsbehälter,Vaso de expansión
+Refroidissement,Bouchon de radiateur,Radiator cap,Kühlerdeckel,Tapón del radiador
+Refroidissement,Durite de radiateur,Radiator hose,Kühlerschlauch,Manguito de radiador
+Refroidissement,Radiateur de chauffage,Heater core,Wärmetauscher,Radiador de calefacción
+Transmission,Boîte de vitesses manuelle,Manual transmission,Schaltgetriebe,Caja de cambios manual
+Transmission,Boîte de vitesses automatique,Automatic transmission,Automatikgetriebe,Caja de cambios automática
+Transmission,Embrayage,Clutch,Kupplung,Embrague
+Transmission,Volant moteur (Bi-masse),Dual-mass flywheel,Zweimassenschwungrad,Volante bimasa
+Transmission,Butée d'embrayage,Release bearing,Ausrücklager,Collarín de embrague
+Transmission,Émetteur d'embrayage,Clutch master cylinder,Kupplungsgeberzylinder,Cilindro emisor de embrague
+Transmission,Récepteur d'embrayage,Clutch slave cylinder,Kupplungsnehmerzylinder,Cilindro receptor de embrague
+Transmission,Arbre de transmission (Cardan),Driveshaft / CV Axle,Antriebswelle,Árbol de transmisión / Palier
+Transmission,Soufflet de cardan,CV boot,Achsmanschette,Fuelle de palier
+Transmission,Joint homocinétique,CV joint,Gleichlaufgelenk,Junta homocinética
+Transmission,Différentiel,Differential,Differential,Diferencial
+Transmission,Boîte de transfert,Transfer case,Verteilergetriebe,Caja de transferencia
+Suspension,Amortisseur avant,Front shock absorber,Stoßdämpfer vorne,Amortiguador delantero
+Suspension,Amortisseur arrière,Rear shock absorber,Stoßdämpfer hinten,Amortiguador trasero
+Suspension,Ressort hélicoïdal,Coil spring,Fahrwerksfeder,Muelle helicoidal
+Suspension,Coupelle d'amortisseur,Strut mount,Domlager,Copela de amortiguador
+Suspension,Triangle de suspension,Control arm,Querlenker,Brazo de suspensión
+Suspension,Rotule de suspension,Ball joint,Traggelenk,Rótula de suspensión
+Suspension,Barre stabilisatrice,Sway bar / Stabilizer bar,Stabilisator,Barra estabilizadora
+Suspension,Biellette de barre stabilisatrice,Sway bar link,Koppelstange,Bieleta de suspensión
+Suspension,Crémaillère de direction,Steering rack,Lenkgetriebe,Cremallera de dirección
+Suspension,Pompe de direction assistée,Power steering pump,Servopumpe,Bomba de dirección
+Suspension,Rotule de direction,Tie rod end,Spurstangenkopf,Rótula de dirección
+Suspension,Biellette de direction,Inner tie rod,Axialgelenk,Bieleta de dirección
+Suspension,Roulement de roue,Wheel bearing,Radlager,Rodamiento de rueda
+Suspension,Moyeu de roue,Wheel hub,Radnabe,Cubo de rueda
+Freinage,Plaquettes de frein avant,Front brake pads,Bremsbeläge vorne,Pastillas de freno delanteras
+Freinage,Plaquettes de frein arrière,Rear brake pads,Bremsbeläge hinten,Pastillas de freno traseras
+Freinage,Disque de frein,Brake rotor / Disc,Bremsscheibe,Disco de freno
+Freinage,Étrier de frein,Brake caliper,Bremssattel,Pinza de freno
+Freinage,Piston d'étrier,Caliper piston,Bremskolben,Pistón de pinza
+Freinage,Maître-cylindre de frein,Brake master cylinder,Hauptbremszylinder,Cilindro maestro de frenos
+Freinage,Servofrein (Mastervac),Brake booster,Bremskraftverstärker,Servofreno
+Freinage,Liquide de frein,Brake fluid,Bremsflüssigkeit,Líquido de frenos
+Freinage,Flexible de frein,Brake hose,Bremsschlauch,Latiguillo de freno
+Freinage,Câble de frein à main,Parking brake cable,Handbremsseil,Cable de freno de mano
+Freinage,Tambour de frein,Brake drum,Bremstrommel,Tambor de freno
+Freinage,Mâchoires de frein,Brake shoes,Bremsbacken,Zapatas de freno
+Freinage,Cylindre de roue,Wheel cylinder,Radbremszylinder,Bombín de freno
+Électricité,Batterie,Battery,Batterie,Batería
+Électricité,Alternateur,Alternator,Lichtmaschine,Alternador
+Électricité,Démarreur,Starter motor,Anlasser,Motor de arranque
+Électricité,Bougie d'allumage,Spark plug,Zündkerze,Bujía de encendido
+Électricité,Bougie de préchauffage,Glow plug,Glühkerze,Bujía de precalentamiento
+Électricité,Bobine d'allumage,Ignition coil,Zündspule,Bobina de encendido
+Électricité,Faisceau d'allumage,Ignition cable kit,Zündkabel,Cables de encendido
+Électricité,Fusible,Fuse,Sicherung,Fusible
+Électricité,Relais,Relay,Relais,Relé
+Électricité,Calculateur moteur (ECU),Engine Control Unit (ECU),Motorsteuergerät,Unidad de control de motor (ECU)
+Électricité,Prise OBD2,OBD2 port,OBD2-Stecker,Puerto OBD2
+Électricité,Faisceau électrique,Wiring harness,Kabelbaum,Mazo de cables
+Capteurs,Débitmètre d'air (MAF),Mass Air Flow sensor,Luftmassenmesser,Caudalímetro
+Capteurs,Capteur de pression absolue (MAP),MAP sensor,Saugrohrdrucksensor,Sensor MAP
+Capteurs,Capteur PMH (Vilebrequin),Crankshaft position sensor,Kurbelwellensensor,Sensor del cigüeñal
+Capteurs,Capteur d'arbre à cames,Camshaft position sensor,Nockenwellensensor,Sensor del árbol de levas
+Capteurs,Capteur de température d'eau,Coolant temperature sensor,Kühlmitteltemperatursensor,Sensor de temperatura del refrigerante
+Capteurs,Capteur ABS,ABS sensor,ABS-Sensor,Sensor ABS
+Capteurs,Capteur de cliquetis,Knock sensor,Klopfsensor,Sensor de detonación
+Capteurs,Capteur de pression d'huile,Oil pressure switch,Öldruckschalter,Sensor de presión de aceite
+Capteurs,Capteur de position du papillon,Throttle position sensor,Drosselklappenpotentiometer,Sensor de posición de mariposa
+Carrosserie,Phare avant,Headlight,Scheinwerfer,Faro delantero
+Carrosserie,Feu arrière,Tail light,Rückleuchte,Piloto trasero
+Carrosserie,Clignotant,Turn signal / Indicator,Blinker,Intermitente
+Carrosserie,"Ampoule (H7, LED, etc.)",Bulb,Glühbirne,Bombilla
+Carrosserie,Pare-chocs avant,Front bumper,Stoßstange vorne,Parachoques delantero
+Carrosserie,Pare-chocs arrière,Rear bumper,Stoßstange hinten,Parachoques trasero
+Carrosserie,Aile,Fender,Kotflügel,Aleta
+Carrosserie,Capot,Hood,Motorhaube,Capó
+Carrosserie,Rétroviseur,Rear-view mirror,Rückspiegel,Espejo retrovisor
+Carrosserie,Vérin de hayon / capot,Gas strut / Tailgate strut,Gasfeder,Amortiguador de maletero
+Carrosserie,Lève-vitre,Window regulator,Fensterheber,Elevalunas
+Carrosserie,Moteur d'essuie-glace,Wiper motor,Wischermotor,Motor del limpiaparabrisas
+Carrosserie,Balai d'essuie-glace,Wiper blade,Scheibenwischer,Escobilla limpiaparabrisas
+Climatisation,Compresseur de climatisation,A/C Compressor,Klimakompressor,Compresor de aire acondicionado
+Climatisation,Condenseur,A/C Condenser,Klimakondensator,Condensador
+Climatisation,Évaporateur,Evaporator,Verdampfer,Evaporador
+Climatisation,Détendeur,Expansion valve,Expansionsventil,Válvula de expansión
+Climatisation,Filtre déshydratant,Receiver drier,Trockner,Filtro deshidratador
+Climatisation,Pulseur d'air (Ventilateur habitacle),Blower motor,Gebläsemotor,Ventilador del habitáculo

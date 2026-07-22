@@ -12,15 +12,20 @@
  * Clés alignées sur les codes de PartCategory (voir scripts/seed_pricing.ts).
  */
 
+import { GLOSSAIRE_IMPORTE } from './part_glossary_data';
+
 export type Lang = 'fr' | 'de' | 'es' | 'it' | 'en';
 
-interface Entry {
+export interface Entry {
     /** Formes françaises reconnues dans la requête (sans accent, minuscules). */
     fr: string[];
-    de: string;
-    es: string;
-    it: string;
-    en: string;
+    // Une langue peut manquer sur un terme importé : dans ce cas le marché
+    // correspondant n'est simplement pas interrogé. Renvoyer une requête
+    // « undefined … » serait bien pire qu'une absence de résultat.
+    de?: string | null;
+    es?: string | null;
+    it?: string | null;
+    en?: string | null;
 }
 
 // Termes les plus recherchés en pièce d'occasion. Les traductions retenues
@@ -137,7 +142,7 @@ let INDEX: { form: string; entry: Entry }[] = [];
 function reconstruireIndex(): void {
     // Les plus longues d'abord : « plaquettes de frein » doit primer sur
     // « frein » seul, sinon la traduction serait tronquée.
-    INDEX = [...GLOSSARY, ...APPRIS]
+    INDEX = [...GLOSSARY, ...GLOSSAIRE_IMPORTE, ...APPRIS]
         .flatMap((entry) => entry.fr.map((form) => ({ form: normalize(form), entry })))
         .sort((a, b) => b.form.length - a.form.length);
 }
@@ -174,10 +179,15 @@ export function translateQuery(query: string, lang: Lang): TranslationResult {
     if (!norm) return { query: '', matched: false, term: null };
     if (lang === 'fr') return { query, matched: true, term: null };
 
-    const hit = INDEX.find((i) => norm.includes(i.form));
+    // On retient la correspondance la plus longue QUI POSSÈDE la langue visée.
+    // Sans cette condition, un terme importé plus précis mais incomplet
+    // (« plaquettes de frein avant », sans italien) masquerait un terme plus
+    // court qui, lui, est traduit (« plaquettes de frein ») : on perdrait un
+    // marché entier sur un terme pourtant couvert.
+    const hit = INDEX.find((i) => norm.includes(i.form) && i.entry[lang]);
     if (!hit) return { query, matched: false, term: null };
 
-    const translated = hit.entry[lang];
+    const translated = hit.entry[lang] as string;
 
     // Reste de la requête = marque, modèle, motorisation, OEM : on garde.
     const reste = norm.replace(hit.form, ' ')
@@ -214,7 +224,7 @@ export const MARKETPLACES: { id: string; lang: Lang; pays: string }[] = [
     { id: 'EBAY_ES', lang: 'es', pays: 'Espagne' },
 ];
 
-export const GLOSSARY_SIZE = GLOSSARY.length;
+export const GLOSSARY_SIZE = GLOSSARY.length + GLOSSAIRE_IMPORTE.length;
 
 /* ── Traduction INVERSE : titre étranger → français ──────────────────
  * Les annonces étrangères remontent avec un titre allemand ou italien.
@@ -250,11 +260,13 @@ let INDEX_INVERSE: { forme: string; fr: string }[] = [];
 
 function reconstruireIndexInverse(): void {
     const out: { forme: string; fr: string }[] = [];
-    for (const e of [...GLOSSARY, ...APPRIS]) {
+    for (const e of [...GLOSSARY, ...GLOSSAIRE_IMPORTE, ...APPRIS]) {
         // Première forme française = libellé de référence, majuscule initiale.
         const fr = e.fr[0].charAt(0).toUpperCase() + e.fr[0].slice(1);
         for (const lang of ['de', 'es', 'it', 'en'] as const) {
-            const forme = normalize(e[lang]);
+            const valeur = e[lang];
+            if (!valeur) continue;              // langue absente sur ce terme
+            const forme = normalize(valeur);
             if (forme) out.push({ forme, fr });
         }
     }
