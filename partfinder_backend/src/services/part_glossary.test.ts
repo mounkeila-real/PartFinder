@@ -58,6 +58,15 @@ describe('part_glossary — traduction déterministe des requêtes', () => {
         expect(translateQuery(q, 'fr').query).toBe(q);
     });
 
+    it('traduit en anglais les catégories où le neuf importé domine', () => {
+        // La requête AliExpress part en anglais : ses titres le sont
+        // massivement, une requête française y ramène beaucoup moins.
+        expect(translateQuery('autoradio android BMW Serie 1', 'en').query)
+            .toContain('Android car stereo');
+        expect(translateQuery('camera de recul', 'en').query).toContain('reversing camera');
+        expect(translateQuery('ampoules led', 'en').query).toContain('LED headlight');
+    });
+
     it('couvre les marchés visés et un glossaire non trivial', () => {
         expect(MARKETPLACES.map(m => m.id)).toContain('EBAY_DE');
         expect(GLOSSARY_SIZE).toBeGreaterThan(50);

@@ -250,9 +250,15 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
             .map(c => (c || '').trim())
             .filter(c => c.length > 0 && !seen.has(c.toLowerCase()) && !!seen.add(c.toLowerCase()));
 
-        // Requête AliExpress : la plus parlante (nom pièce + véhicule), lancée EN PARALLÈLE
-        // de la cascade eBay pour ne pas ralentir. Renvoie [] si non configuré / échec.
-        const aeQuery = [pn, vehicle.make, vehicle.model].filter(Boolean).join(' ') || request.oem || part.ebayQuery || '';
+        // Requête AliExpress, lancée EN PARALLÈLE de la cascade eBay.
+        // EN ANGLAIS : les titres AliExpress le sont massivement, et une
+        // requête française y ramène beaucoup moins. La référence OEM, elle,
+        // est universelle et prime quand elle existe.
+        const aeBase = [pn, vehicle.make, vehicle.model].filter(Boolean).join(' ');
+        const aeTrad = translateQuery(aeBase, 'en');
+        const aeQuery = request.oem?.trim()
+            || (aeTrad.matched ? aeTrad.query : aeBase)
+            || part.ebayQuery || '';
         const aliexpressPromise = AliexpressService.searchProducts(aeQuery, limit || 20);
 
         // 1) Marché français : cascade du plus précis au plus large.

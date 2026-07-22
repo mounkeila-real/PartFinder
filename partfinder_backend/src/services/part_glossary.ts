@@ -85,6 +85,22 @@ const GLOSSARY: Entry[] = [
     { fr: ['roulement de roue', 'roulement'], de: 'Radlager', es: 'rodamiento rueda', it: 'cuscinetto ruota', en: 'wheel bearing' },
     { fr: ['moyeu'], de: 'Radnabe', es: 'buje', it: 'mozzo', en: 'wheel hub' },
     { fr: ['jante', 'jantes'], de: 'Felge', es: 'llanta', it: 'cerchio', en: 'alloy wheel' },
+
+    // Électronique et accessoires : catégories où le neuf importé est
+    // nettement moins cher qu'en Europe. La traduction anglaise sert
+    // directement la recherche AliExpress.
+    { fr: ['autoradio android', 'autoradio', 'poste radio', 'auto radio'], de: 'Autoradio Android', es: 'radio de coche Android', it: 'autoradio Android', en: 'Android car stereo head unit' },
+    { fr: ['camera de recul', 'camera recul'], de: 'Rückfahrkamera', es: 'cámara de marcha atrás', it: 'telecamera retromarcia', en: 'reversing camera' },
+    { fr: ['radar de recul', 'capteur de stationnement', 'capteurs de recul'], de: 'Einparkhilfe Sensor', es: 'sensor de aparcamiento', it: 'sensore parcheggio', en: 'parking sensor' },
+    { fr: ['ampoules led', 'ampoule led', 'kit led'], de: 'LED Lampen', es: 'bombillas LED', it: 'lampadine LED', en: 'LED headlight bulbs' },
+    { fr: ['kit mains libres', 'bluetooth'], de: 'Freisprecheinrichtung', es: 'manos libres', it: 'vivavoce', en: 'hands-free car kit' },
+    { fr: ['tapis de sol', 'tapis'], de: 'Fußmatten', es: 'alfombrillas', it: 'tappetini', en: 'car floor mats' },
+    { fr: ['housse de siege', 'housses de sieges'], de: 'Sitzbezüge', es: 'fundas de asiento', it: 'coprisedili', en: 'car seat covers' },
+    { fr: ['valise diagnostic', 'outil diagnostic', 'obd'], de: 'Diagnosegerät OBD', es: 'escáner diagnóstico OBD', it: 'diagnosi OBD', en: 'OBD2 diagnostic scanner' },
+    { fr: ['support telephone', 'support smartphone'], de: 'Handyhalterung', es: 'soporte de móvil', it: 'supporto telefono', en: 'car phone holder' },
+    { fr: ['chargeur allume cigare', 'chargeur usb'], de: 'KFZ Ladegerät', es: 'cargador de coche', it: 'caricabatterie auto', en: 'car USB charger' },
+    { fr: ['barre de toit', 'barres de toit'], de: 'Dachträger', es: 'barras de techo', it: 'barre portatutto', en: 'roof rack bars' },
+    { fr: ['attelage', 'crochet remorque'], de: 'Anhängerkupplung', es: 'enganche de remolque', it: 'gancio traino', en: 'tow bar' },
 ];
 
 /** Mots-outils français à retirer d'une requête traduite (bruit dans un titre étranger). */
