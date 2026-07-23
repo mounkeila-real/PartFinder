@@ -34,6 +34,35 @@ const TOKEN_API_BASE = 'https://api-sg.aliexpress.com/rest';
 // service de recherche). Ré-export pour compatibilité des imports existants.
 export { getAliexpressToken };
 
+// Callback effectivement configuré côté AliExpress.
+const REDIRECT_URI = process.env.ALIEXPRESS_REDIRECT_URI
+    || 'https://partfinder-backend-production-c0af.up.railway.app/api/aliexpress/callback';
+
+// Page d'autorisation OAuth d'AliExpress. SURCHARGEABLE : le domaine exact a
+// changé au fil des versions de la plateforme — si celui-ci renvoie une
+// erreur, la bonne URL figure dans la console développeur (section
+// « App Authorization »), et se pose via ALIEXPRESS_AUTH_URL sans redéploiement.
+const AUTH_URL = process.env.ALIEXPRESS_AUTH_URL
+    || 'https://api-sg.aliexpress.com/oauth/authorize';
+
+/**
+ * GET /api/aliexpress/authorize — lance l'autorisation OAuth.
+ *
+ * Redirige vers la page de consentement AliExpress. Après approbation,
+ * AliExpress renvoie vers /callback avec un `code`, échangé contre le token.
+ * À ouvrir UNE FOIS pour activer la recherche produits (API Drop Shipping).
+ */
+router.get('/authorize', (_req: express.Request, res: express.Response) => {
+    if (!APP_KEY) {
+        return res.status(500).send('ALIEXPRESS_APP_KEY non configuré.');
+    }
+    const url = `${AUTH_URL}?response_type=code&force_auth=true`
+        + `&client_id=${encodeURIComponent(APP_KEY)}`
+        + `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+    console.log('[AliExpress] redirection autorisation ->', url);
+    res.redirect(url);
+});
+
 /**
  * Signature IOP AliExpress (sign_method = sha256) :
  *  1. Trier les params par clé (ordre alphabétique).
