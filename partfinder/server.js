@@ -35,7 +35,7 @@ const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.0-flash';
 app.post('/api/extract-carte-grise', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: "No image provided" });
-        if (!gemini.isConfigured()) return res.status(500).json({ error: "API Key missing" });
+        if (!gemini.isConfigured()) return res.status(500).json({ error: "API Key missing", hint: "GEMINI_API_KEY absente du service frontend (PartFinder) — la vision tourne ici, pas sur le backend." });
 
         const prompt = `Voici une photo d'une carte grise de véhicule (certificat d'immatriculation français ou européen).
         Tu dois UNIQUEMENT extraire les informations suivantes et répondre au format JSON strict. 
@@ -76,7 +76,7 @@ app.post('/api/extract-carte-grise', upload.single('image'), async (req, res) =>
 app.post('/api/identify-part', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: "No image provided" });
-        if (!gemini.isConfigured()) return res.status(500).json({ error: "API Key missing" });
+        if (!gemini.isConfigured()) return res.status(500).json({ error: "API Key missing", hint: "GEMINI_API_KEY absente du service frontend (PartFinder) — la vision tourne ici, pas sur le backend." });
 
         const { make, model, year, engine } = req.body || {};
         const vehicleLine = [make, model, year, engine].filter(Boolean).join(' ') || 'non precise';
@@ -128,7 +128,7 @@ Si la piece est illisible ou non identifiable, mets "description" a null.`;
 app.post('/api/chat', async (req, res) => {
     try {
         const { text, context } = req.body;
-        if (!gemini.isConfigured()) return res.status(500).json({ error: "API Key missing" });
+        if (!gemini.isConfigured()) return res.status(500).json({ error: "API Key missing", hint: "GEMINI_API_KEY absente du service frontend (PartFinder) — la vision tourne ici, pas sur le backend." });
 
         const prompt = `Tu es l'assistant de PartFinder, un outil pro pour trouver des pièces auto.
         L'utilisateur a écrit ce message : "${text}"
