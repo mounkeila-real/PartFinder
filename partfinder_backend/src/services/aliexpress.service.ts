@@ -37,6 +37,14 @@ const LOCAL = process.env.ALIEXPRESS_LOCAL || 'fr_FR';
  */
 const SEARCH_METHOD = process.env.ALIEXPRESS_SEARCH_METHOD || 'aliexpress.ds.text.search';
 
+/**
+ * Tri. VIDE par défaut : « orders,desc » déclenchait NGSELECTION_SEARCH_ERROR
+ * (valeur probablement non supportée par le moteur de sélection). Sans tri,
+ * AliExpress applique son classement par défaut. Surchargeable pour tester
+ * une valeur valide (ex. « min_price,asc ») sans redéploiement.
+ */
+const SORT_BY = process.env.ALIEXPRESS_SORT_BY || '';
+
 // Gateway "système" AliExpress (Singapour).
 const GATEWAY = 'https://api-sg.aliexpress.com/sync';
 
@@ -218,7 +226,7 @@ export class AliexpressService {
                 currency: CURRENCY,
                 pageSize: String(Math.min(limit, 50)),
                 pageIndex: '1',
-                sortBy: 'orders,desc',
+                ...(SORT_BY ? { sortBy: SORT_BY } : {}),
                 ...(accessToken ? { access_token: accessToken } : {}),
             };
             params.sign = this.sign(params);
@@ -271,10 +279,10 @@ export class AliexpressService {
                 error: apiError ? this.expliquer(texteErreur) : null,
                 // Clés de haut niveau + statut business : de quoi voir la
                 // structure sans dumper toute la charge utile.
-                rawExcerpt: `access_token=${accessToken ? 'present' : 'ABSENT (autorisation OAuth requise)'} `
-                    + `| cles=${Object.keys(data || {}).join(',')} `
+                rawExcerpt: `access_token=${accessToken ? 'present' : 'ABSENT'} `
+                    + `| local=${LOCAL} pays=${SHIP_TO} devise=${CURRENCY} sortBy=${SORT_BY || '(aucun)'} `
                     + `| rsp_code=${rspCode} rsp_msg=${rspMsg} `
-                    + `| ${JSON.stringify(data).slice(0, 500)}`,
+                    + `| ${JSON.stringify(data).slice(0, 450)}`,
                 permanent: ERREURS_PERMANENTES.test(texteErreur),
                 coupeJusqua: null,
             };
