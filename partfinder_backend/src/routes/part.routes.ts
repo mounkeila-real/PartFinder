@@ -227,7 +227,9 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
         // EN ANGLAIS : les titres AliExpress le sont massivement, et une
         // requête française y ramène beaucoup moins. La référence OEM, elle,
         // est universelle et prime quand elle existe.
-        const aeBase = [pn, vehicle.make, vehicle.model].filter(Boolean).join(' ');
+        // L'ANNÉE est incluse : sur AliExpress (grand public), « … Classe B
+        // 2017 » cible bien mieux qu'un modèle sans millésime.
+        const aeBase = [pn, vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' ');
         const aeTrad = translateQuery(aeBase, 'en');
         const aeQuery = request.oem?.trim()
             || (aeTrad.matched ? aeTrad.query : aeBase)
@@ -503,11 +505,31 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
         // aucun écran ne les consommait ; les requêtes construites restent
         // visibles dans les logs serveur pour le débogage.
         const { ebayQuery, source: partSource, ...partPublic } = (part || {}) as any;
+
+        // Diagnostic de qualité (uniquement sur ?debug=1) : montre EXACTEMENT
+        // les requêtes construites, pour comprendre pourquoi une recherche
+        // remonte peu. Absent de la réponse normale — ces noms désignent les
+        // fournisseurs et ne doivent pas fuiter côté client.
+        const debug = (req.query.debug === '1' || req.body?.debug)
+            ? {
+                partNameDetermine: part?.partName || null,
+                ebayQueryEssayees: candidates,
+                ebayQueryRetenue: usedQuery,
+                aliexpressQuery: aeQuery,
+                aliexpressTraduit: aeTrad.matched,
+                comptes: {
+                    ebay: rawResults.filter((r: any) => r.source !== 'aliexpress').length,
+                    aliexpress: aliexpressResults.length,
+                },
+            }
+            : undefined;
+
         res.json({
             part: partPublic,
             aiConfigured: PartAiService.isConfigured(),
             count: results.length,
             results,
+            ...(debug ? { debug } : {}),
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
