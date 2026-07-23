@@ -216,7 +216,20 @@ export class AliexpressService {
             };
             params.sign = this.sign(params);
 
-            const resp = await axios.post(GATEWAY, null, { params, timeout: 15000 });
+            const resp = await axios.post(GATEWAY, null, {
+                params,
+                // ENCODAGE RFC 3986 : axios encode les espaces en « + » (style
+                // formulaire). AliExpress attend « %20 » (encodeURIComponent).
+                // La signature reste valide — elle est calculée sur les valeurs
+                // BRUTES, et AliExpress decode %20 -> espace avant de verifier —
+                // mais la recherche metier recevait sinon « Android+Auto+... »
+                // avec des « + » litteraux, d'ou EXCEPTION_TEXT_SEARCH_FOR_DS.
+                paramsSerializer: (p: Record<string, string>) =>
+                    Object.keys(p)
+                        .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(p[k])}`)
+                        .join('&'),
+                timeout: 15000,
+            });
             const data = resp.data;
 
             // Journalisé tant que l'intégration n'est pas validée : c'est cet
