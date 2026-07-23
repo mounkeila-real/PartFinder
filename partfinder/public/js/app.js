@@ -1127,12 +1127,34 @@ document.addEventListener('DOMContentLoaded', () => {
         // Langue connue depuis la recherche : elle évite une détection.
         // Lecture défensive : la fiche doit s'afficher même si la liste des
         // résultats n'est plus disponible — sans traduction, mais affichée.
-        let langue = 'fr';
-        try {
-            const source = (window.currentSearchResults || [])
-                .find(r => String(r.id) === String(itemId));
-            if (source && source.langue) langue = source.langue;
-        } catch { /* langue par défaut */ }
+        const source = (window.currentSearchResults || [])
+            .find(r => String(r.id) === String(itemId));
+        const langue = (source && source.langue) || 'fr';
+
+        // La fiche détaillée (galerie, caractéristiques) passe par l'API eBay.
+        // Un article AliExpress (ae_…) n'existe pas côté eBay : on construit sa
+        // fiche depuis les données déjà reçues à la recherche, sinon l'appel
+        // échouait et affichait « Fiche indisponible ».
+        if (String(itemId).startsWith('ae_')) {
+            const w = win.document.querySelector('.wrap');
+            if (!w) return;
+            if (source) {
+                const prix = (source.prixClientEur ?? source.prixHorsPortEur ?? source.finalPrice);
+                w.innerHTML = detailHtml({
+                    title: source.name,
+                    price: prix != null ? Number(prix) : null,
+                    currency: 'EUR',
+                    condition: 'Neuf',
+                    images: source.img ? [source.img] : [],
+                    aspects: [],
+                    description: source.description || '',
+                });
+                brancherTraduction(win, langue);
+            } else {
+                w.innerHTML = '<p class="loading">Fiche indisponible pour cet article.</p>';
+            }
+            return;
+        }
 
         fetch(`${API_BASE_URL}/parts/item/${encodeURIComponent(itemId)}`)
             .then(r => r.ok ? r.json() : Promise.reject(new Error('not found')))
