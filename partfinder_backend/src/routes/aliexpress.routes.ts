@@ -1,7 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import axios from 'axios';
-import { setAliexpressToken, getAliexpressToken, getValidAccessToken } from '../services/aliexpress_token';
+import { setAliexpressToken, getAliexpressToken, getValidAccessToken, refreshAliexpressToken } from '../services/aliexpress_token';
 
 /**
  * AliExpress (Open Platform / Affiliates API) — OAuth callback.
@@ -76,6 +76,19 @@ router.get('/token-status', async (_req: express.Request, res: express.Response)
         valide: !!valide,
         expireLe: t?.expires_at ? new Date(t.expires_at).toISOString() : null,
         aRefreshToken: !!t?.refresh_token,
+    });
+});
+
+/**
+ * GET /api/aliexpress/token-refresh — force un renouvellement (diagnostic).
+ * Utile pour tester le refresh sans attendre le cron ni l'expiration.
+ */
+router.get('/token-refresh', async (_req: express.Request, res: express.Response) => {
+    await refreshAliexpressToken();
+    const t = getAliexpressToken();
+    res.json({
+        ok: !!(await getValidAccessToken()),
+        expireLe: t?.expires_at ? new Date(t.expires_at).toISOString() : null,
     });
 });
 

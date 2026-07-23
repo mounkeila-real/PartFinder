@@ -3,6 +3,7 @@ import { EmailService } from '../services/email.service';
 import { checkGridFreshness, replaceGrid, activeProvider } from '../services/colissimo.service';
 import * as pricing from '../services/pricing';
 import { prisma } from '../lib/prisma';
+import { refreshTokenSiBientotExpire } from '../services/aliexpress_token';
 
 /**
  * Tâches planifiées.
@@ -157,6 +158,12 @@ export function startScheduler(): void {
     // Chaque jour à 09h00 : relances des appels de fonds (J+3 et J+7).
     cron.schedule('0 9 * * *', () => {
         remindPaymentRequests().catch((e) => console.error('[cron] remindPaymentRequests:', e.message));
+    }, { timezone: 'Europe/Paris' });
+
+    // Chaque jour à 05h00 : renouvelle le token AliExpress s'il expire bientôt,
+    // pour qu'il ne tombe jamais en panne faute de re-autorisation manuelle.
+    cron.schedule('0 5 * * *', () => {
+        refreshTokenSiBientotExpire().catch((e) => console.error('[cron] refresh token AliExpress:', e.message));
     }, { timezone: 'Europe/Paris' });
 
     console.log('[cron] planificateur démarré (grille Colissimo : lundi 08:00 + 2 janvier ; stockage : quotidien 06:00)');
