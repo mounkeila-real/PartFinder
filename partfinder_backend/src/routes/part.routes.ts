@@ -535,7 +535,9 @@ router.get('/debug-sources', requireAdmin, async (req: express.Request, res: exp
         const traductionAe = translateQuery(q, 'en');
         const [ebayResults, aeResults] = await Promise.all([
             EbayService.searchParts(q, { limit: 5 }),
-            AliexpressService.searchProducts(traductionAe.matched ? traductionAe.query : q, 5),
+            // 20 : représentatif d'une vraie recherche (une page AliExpress),
+            // pas 5 qui donnait l'impression d'un catalogue vide.
+            AliexpressService.searchProducts(traductionAe.matched ? traductionAe.query : q, 20),
         ]);
 
         const ebayDiag = EbayService.lastDiagnostic;

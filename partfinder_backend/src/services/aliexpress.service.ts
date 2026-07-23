@@ -53,6 +53,11 @@ const SORT_BY = process.env.ALIEXPRESS_SORT_BY || '';
  */
 const PAGE_SIZE = Number(process.env.ALIEXPRESS_PAGE_SIZE || '50');
 
+// AliExpress sert ~20 produits par page quel que soit pageSize. On paginne
+// pour atteindre la limite demandée, sans dépasser MAX_PAGES (garde-fou quota).
+const PAGE_PAR_APPEL = 20;
+const MAX_PAGES = Number(process.env.ALIEXPRESS_MAX_PAGES || '3');
+
 // ds.text.search renvoie les prix en USD malgré currency=EUR (pool de sélection
 // en dollars). La conversion USD->EUR utilise le taux réel (getUsdToEur, source
 // BCE, avec repli statique) — voir services/exchange_rate.
@@ -213,101 +218,57 @@ export class AliexpressService {
         }
         if (!query || !query.trim()) return [];
 
+        // API Drop Shipping = contexte utilisateur : le token OAuth est requis.
+        const accessToken = await getValidAccessToken();
+
         try {
-            // API DROP SHIPPING (ds.*), la seule autorisée pour cette app.
-            // L'API Affiliate (affiliate.*) exige une permission distincte,
-            // non accordée : elle répondait InsufficientPermission à chaque
-            // recherche, ce qui ressemblait à « 0 résultat ».
-            // API Drop Shipping = contexte utilisateur : elle exige le token
-            // OAuth. Sans lui, EXCEPTION_TEXT_SEARCH_FOR_DS (auth passerelle OK,
-            // échec métier). Le token vient du flux d'autorisation (callback).
-            const accessToken = await getValidAccessToken();
+            // PAGINATION : AliExpress plafonne à 20 produits par page (quel que
+            // soit pageSize demandé). Pour atteindre `limit`, on enchaîne les
+            // pages — dans une limite raisonnable pour ne pas exploser le quota.
+            const tous: any[] = [];
+            let pagesLues = 0;
+            let totalDispo = 0;
+            let derniereData: any = null;
+            let derniereErreur: { code: any; msg: any } | null = null;
+            let rspCode: any;
+            let rspMsg: any;
 
-            const params: Record<string, string> = {
-                method: SEARCH_METHOD,
-                app_key: APP_KEY,
-                timestamp: this.timestamp(),
-                format: 'json',
-                v: '2.0',
-                sign_method: 'hmac-sha256',
-                // Paramètres métier de ds.text.search (nommage différent de
-                // l'API Affiliate : keyWord, local, countryCode...).
-                keyWord: query,
-                local: LOCAL,
-                countryCode: SHIP_TO,
-                currency: CURRENCY,
-                // pageSize FIXE à 50 : une valeur basse (le « 5 » du testeur)
-                // fait échouer le moteur de sélection (EXCEPTION_TEXT_SEARCH_FOR_DS).
-                // On demande 50, on tronque à `limit` après réception.
-                pageSize: String(PAGE_SIZE),
-                pageIndex: '1',
-                ...(SORT_BY ? { sortBy: SORT_BY } : {}),
-                ...(accessToken ? { access_token: accessToken } : {}),
-            };
-            params.sign = this.sign(params);
+            const nbPages = Math.min(Math.ceil(limit / PAGE_PAR_APPEL), MAX_PAGES);
 
-            const resp = await axios.post(GATEWAY, null, {
-                params,
-                // ENCODAGE RFC 3986 : axios encode les espaces en « + » (style
-                // formulaire). AliExpress attend « %20 » (encodeURIComponent).
-                // La signature reste valide — elle est calculée sur les valeurs
-                // BRUTES, et AliExpress decode %20 -> espace avant de verifier —
-                // mais la recherche metier recevait sinon « Android+Auto+... »
-                // avec des « + » litteraux, d'ou EXCEPTION_TEXT_SEARCH_FOR_DS.
-                paramsSerializer: (p: Record<string, string>) =>
-                    Object.keys(p)
-                        .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(p[k])}`)
-                        .join('&'),
-                timeout: 15000,
-            });
-            const data = resp.data;
+            for (let page = 1; page <= nbPages; page++) {
+                const r = await this.fetchPage(query, page, accessToken);
+                derniereData = r.data;
+                rspCode = r.rspCode;
+                rspMsg = r.rspMsg;
+                totalDispo = r.totalCount || totalDispo;
+                pagesLues = page;
 
-            // Journalisé tant que l'intégration n'est pas validée : c'est cet
-            // extrait qui révèle la forme réelle de la réponse.
-            console.log('[AliExpress] ds.search réponse:', JSON.stringify(data).slice(0, 1500));
+                if (r.apiError) { derniereErreur = r.apiError; break; }
+                if (!r.arr.length) break;              // plus de résultats
+                tous.push(...r.arr);
+                if (tous.length >= limit) break;       // assez collecté
+                if (r.arr.length < PAGE_PAR_APPEL) break; // dernière page atteinte
+            }
 
-            // EXTRACTION ROBUSTE : plutôt que de deviner le chemin exact (qui
-            // varie selon la méthode et la version), on cherche récursivement
-            // le premier tableau dont les éléments ressemblent à des produits.
-            const arr = trouverProduits(data);
-
-            // Le gateway répond souvent 200 AVEC une erreur applicative dans le
-            // corps. On lit le statut « business » du wrapper *_response
-            // (rsp_code/rsp_msg) en plus des formes d'erreur classiques.
-            const wrapper = trouverWrapper(data);
-            const rspCode = wrapper?.rsp_code ?? wrapper?.code;
-            const rspMsg = wrapper?.rsp_msg ?? wrapper?.msg ?? wrapper?.sub_msg;
-            // Codes de SUCCÈS d'AliExpress ds.text.search : « 00 » (et variantes
-            // « 0 » / « 200 »). Mon detecteur ne reconnaissait que 2xx, donc il
-            // prenait « 00 » — le vrai code de succes — pour une erreur.
-            const codeStr = String(rspCode ?? '');
-            const rspOk = codeStr === '' || codeStr === '00' || codeStr === '0'
-                || /^2\d\d$/.test(codeStr);
-            const apiError = data?.error_response
-                || (rspCode != null && !rspOk ? { code: rspCode, msg: rspMsg } : null);
-
-            const texteErreur = apiError ? JSON.stringify(apiError) : '';
+            const texteErreur = derniereErreur ? JSON.stringify(derniereErreur) : '';
             this.lastDiagnostic = {
                 at: new Date().toISOString(),
-                ok: !apiError && arr.length > 0,
-                count: arr.length,
-                error: apiError ? this.expliquer(texteErreur) : null,
-                // Clés de haut niveau + statut business : de quoi voir la
-                // structure sans dumper toute la charge utile.
-                rawExcerpt: `access_token=${accessToken ? 'present' : 'ABSENT'} pageSize=${PAGE_SIZE} `
+                ok: !derniereErreur && tous.length > 0,
+                count: tous.length,
+                error: derniereErreur ? this.expliquer(texteErreur) : null,
+                rawExcerpt: `access_token=${accessToken ? 'present' : 'ABSENT'} `
+                    + `| pages=${pagesLues} recus=${tous.length} totalDispo=${totalDispo} `
                     + `| local=${LOCAL} pays=${SHIP_TO} devise=${CURRENCY} sortBy=${SORT_BY || '(aucun)'} `
                     + `| rsp_code=${rspCode} rsp_msg=${rspMsg} `
-                    + `| ${JSON.stringify(data).slice(0, 450)}`,
+                    + `| ${JSON.stringify(derniereData).slice(0, 350)}`,
                 permanent: ERREURS_PERMANENTES.test(texteErreur),
                 coupeJusqua: null,
             };
 
-            if (apiError) this.enregistrerEchec(texteErreur);
+            if (derniereErreur) this.enregistrerEchec(texteErreur);
             else this.rearmer();
 
-            // On a demandé 50 à AliExpress (pageSize minimal fiable) ; on tronque
-            // à ce que l'appelant voulait réellement.
-            return arr.slice(0, limit).map((p: any) => this.normalize(p));
+            return tous.slice(0, limit).map((p: any) => this.normalize(p));
         } catch (err: any) {
             const detail = err.response?.data || err.message;
             const brut = typeof detail === 'string' ? detail : JSON.stringify(detail);
@@ -322,6 +283,66 @@ export class AliexpressService {
             this.enregistrerEchec(brut);
             return []; // n'impacte jamais le flux eBay
         }
+    }
+
+    /**
+     * Récupère UNE page de résultats ds.text.search.
+     * Renvoie les produits, le total disponible, et le statut d'erreur métier.
+     */
+    private static async fetchPage(query: string, pageIndex: number, accessToken: string | null): Promise<{
+        arr: any[]; data: any; totalCount: number; rspCode: any; rspMsg: any;
+        apiError: { code: any; msg: any } | null;
+    }> {
+        const params: Record<string, string> = {
+            method: SEARCH_METHOD,
+            app_key: APP_KEY,
+            timestamp: this.timestamp(),
+            format: 'json',
+            v: '2.0',
+            sign_method: 'hmac-sha256',
+            keyWord: query,
+            local: LOCAL,
+            countryCode: SHIP_TO,
+            currency: CURRENCY,
+            // pageSize élevé : une valeur basse fait échouer le moteur de
+            // sélection (EXCEPTION_TEXT_SEARCH_FOR_DS). AliExpress plafonne de
+            // toute façon la page à ~20.
+            pageSize: String(PAGE_SIZE),
+            pageIndex: String(pageIndex),
+            ...(SORT_BY ? { sortBy: SORT_BY } : {}),
+            ...(accessToken ? { access_token: accessToken } : {}),
+        };
+        params.sign = this.sign(params);
+
+        const resp = await axios.post(GATEWAY, null, {
+            params,
+            // ENCODAGE RFC 3986 : axios encode les espaces en « + » ; AliExpress
+            // attend « %20 ». La signature reste valide (calculée sur les
+            // valeurs brutes, décodées à l'identique côté AliExpress).
+            paramsSerializer: (p: Record<string, string>) =>
+                Object.keys(p)
+                    .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(p[k])}`)
+                    .join('&'),
+            timeout: 15000,
+        });
+        const data = resp.data;
+        if (pageIndex === 1) {
+            console.log('[AliExpress] ds.search réponse:', JSON.stringify(data).slice(0, 1000));
+        }
+
+        const arr = trouverProduits(data);
+        const wrapper = trouverWrapper(data);
+        const rspCode = wrapper?.rsp_code ?? wrapper?.code;
+        const rspMsg = wrapper?.rsp_msg ?? wrapper?.msg ?? wrapper?.sub_msg;
+        const totalCount = Number(wrapper?.data?.totalCount ?? wrapper?.totalCount ?? 0) || 0;
+
+        // Codes de SUCCÈS d'AliExpress : « 00 » (et « 0 » / « 200 » / 2xx).
+        const codeStr = String(rspCode ?? '');
+        const rspOk = codeStr === '' || codeStr === '00' || codeStr === '0' || /^2\d\d$/.test(codeStr);
+        const apiError = data?.error_response
+            || (rspCode != null && !rspOk ? { code: rspCode, msg: rspMsg } : null);
+
+        return { arr, data, totalCount, rspCode, rspMsg, apiError };
     }
 
     private static normalize(p: any): NormalizedPart {
