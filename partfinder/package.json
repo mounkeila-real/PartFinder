@@ -10,7 +10,7 @@
     "watch:css": "npx tailwindcss@3 -c ./tailwind.config.js -i ./src/input.css -o ./public/css/tailwind.css --watch"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.2.1",
+    "@google/genai": "^1.0.0",
     "axios": "^1.6.8",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
