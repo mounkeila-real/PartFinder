@@ -1,17 +1,16 @@
+import { prisma } from '../lib/prisma';
+
 /**
- * Stockage du jeton OAuth AliExpress — module isolé.
+ * Jeton OAuth AliExpress — PERSISTÉ en base (survit aux redémarrages).
  *
- * Les API Drop Shipping (ds.*) agissent dans le CONTEXTE d'un compte
- * autorisé : elles exigent un `access_token` obtenu via le flux OAuth, en plus
- * de la clé d'app. Sans lui, ds.text.search répond EXCEPTION_TEXT_SEARCH_FOR_DS
- * (auth de passerelle OK, mais échec métier).
+ * Les API Drop Shipping (ds.*) agissent dans le CONTEXTE d'un compte autorisé :
+ * elles exigent un `access_token` obtenu via OAuth, en plus de la clé d'app.
+ * Stocké seulement en mémoire, il était perdu à chaque redéploiement Railway —
+ * chaque correctif poussé forçait une nouvelle autorisation, et empêchait tout
+ * test stable. On le garde donc en base, avec un cache mémoire pour la lecture.
  *
- * Isolé ici pour être partagé par la route de callback (qui l'écrit) et le
- * service de recherche (qui le lit), sans dépendance circulaire.
- *
- * ⚠️ En mémoire : perdu au redémarrage du service. Le token AliExpress expire
- * aussi (typiquement 24 h). À persister en base + rafraîchir quand
- * l'intégration sera validée — voir refresh_token.
+ * ⚠️ Le token expire (typiquement ~24 h). Le rafraîchissement via refresh_token
+ * reste à brancher une fois l'intégration confirmée.
  */
 export interface AliexpressToken {
     access_token?: string;
@@ -20,10 +19,52 @@ export interface AliexpressToken {
     raw?: any;
 }
 
+// Cache mémoire, alimenté au démarrage depuis la base.
 let token: AliexpressToken | null = null;
 
-export function setAliexpressToken(t: AliexpressToken | null): void {
+/** Charge le token persisté au démarrage du serveur. */
+export async function loadAliexpressToken(): Promise<void> {
+    try {
+        const row = await prisma.aliexpressToken.findUnique({ where: { id: 1 } });
+        if (row) {
+            token = {
+                access_token: row.accessToken,
+                refresh_token: row.refreshToken ?? undefined,
+                expires_at: row.expiresAt ? row.expiresAt.getTime() : undefined,
+                raw: row.raw ?? undefined,
+            };
+            console.log('[AliExpress] token chargé depuis la base'
+                + (row.expiresAt ? ` (expire ${row.expiresAt.toISOString()})` : ''));
+        }
+    } catch (e: any) {
+        // Table absente (avant le premier db push) : on démarre sans token.
+        console.warn('[AliExpress] chargement token:', e.message);
+    }
+}
+
+/** Mémorise ET persiste le token. */
+export async function setAliexpressToken(t: AliexpressToken | null): Promise<void> {
     token = t;
+    try {
+        if (!t || !t.access_token) {
+            await prisma.aliexpressToken.deleteMany({});
+            return;
+        }
+        const data = {
+            accessToken: t.access_token,
+            refreshToken: t.refresh_token ?? null,
+            expiresAt: t.expires_at ? new Date(t.expires_at) : null,
+            raw: t.raw ?? undefined,
+        };
+        await prisma.aliexpressToken.upsert({
+            where: { id: 1 },
+            create: { id: 1, ...data },
+            update: data,
+        });
+    } catch (e: any) {
+        // Persistance best-effort : ne jamais casser le callback OAuth.
+        console.error('[AliExpress] persistance token:', e.message);
+    }
 }
 
 export function getAliexpressToken(): AliexpressToken | null {

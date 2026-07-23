@@ -15,6 +15,7 @@ import paymentRequestRoutes from './routes/payment_requests.routes';
 import { startScheduler } from './jobs/scheduler';
 import { termesValides } from './services/glossary_learning.service';
 import { chargerTermesAppris } from './services/part_glossary';
+import { loadAliexpressToken } from './services/aliexpress_token';
 
 dotenv.config();
 
@@ -60,4 +61,8 @@ app.listen(PORT, () => {
             if (t.length) console.log(`[glossaire] ${t.length} terme(s) appris chargé(s)`);
         })
         .catch((e) => console.error('[glossaire] chargement des termes appris:', e.message));
+
+    // Token AliExpress persisté : rechargé en mémoire pour survivre aux
+    // redémarrages (sinon perdu à chaque déploiement, re-autorisation forcée).
+    loadAliexpressToken().catch((e) => console.error('[AliExpress] chargement token:', e.message));
 });

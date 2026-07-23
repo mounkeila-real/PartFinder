@@ -123,7 +123,7 @@ router.get('/callback', async (req: express.Request, res: express.Response) => {
         const accessToken = data?.access_token || data?.data?.access_token;
         if (accessToken) {
             const expiresIn = Number(data?.expires_in || data?.data?.expires_in || 0);
-            setAliexpressToken({
+            await setAliexpressToken({
                 access_token: accessToken,
                 refresh_token: data?.refresh_token || data?.data?.refresh_token,
                 expires_at: expiresIn ? Date.now() + expiresIn * 1000 : undefined,
