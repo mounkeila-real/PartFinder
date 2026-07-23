@@ -638,7 +638,30 @@ router.get('/debug-search', requireAdmin, async (req: express.Request, res: expr
  */
 router.get('/item/:itemId', async (req: express.Request, res: express.Response) => {
     try {
-        const detail: any = await EbayService.getItem(String(req.params.itemId));
+        const itemId = String(req.params.itemId);
+
+        // Article AliExpress (ae_<productId>) : détail via ds.product.get, qui
+        // fournit poids et frais de port — indispensables au prix tout compris.
+        if (itemId.startsWith('ae_')) {
+            const prod = await AliexpressService.getProduct(itemId.slice(3));
+            if (!prod) return res.status(404).json({ error: 'Article introuvable' });
+            const aspects: { name: string; value: any }[] = [];
+            if (prod.poidsKg != null) aspects.push({ name: 'Poids', value: `${prod.poidsKg} kg` });
+            if (prod.portEur != null) aspects.push({ name: 'Frais de port', value: `${prod.portEur.toFixed(2)} €` });
+            return res.json({
+                itemId,
+                title: prod.title,
+                price: prod.price,
+                currency: 'EUR',
+                condition: 'Neuf',
+                // Images servies par notre relais (jamais le domaine source).
+                images: prod.images.map((u) => proxifyImage(u, req)).filter((u): u is string => !!u),
+                description: cleanEbayDescription(prod.description || ''),
+                aspects,
+            });
+        }
+
+        const detail: any = await EbayService.getItem(itemId);
         if (!detail) return res.status(404).json({ error: 'Article introuvable' });
 
         const price = detail.price?.value != null ? parseFloat(detail.price.value) : null;

@@ -1131,30 +1131,25 @@ document.addEventListener('DOMContentLoaded', () => {
             .find(r => String(r.id) === String(itemId));
         const langue = (source && source.langue) || 'fr';
 
-        // La fiche détaillée (galerie, caractéristiques) passe par l'API eBay.
-        // Un article AliExpress (ae_…) n'existe pas côté eBay : on construit sa
-        // fiche depuis les données déjà reçues à la recherche, sinon l'appel
-        // échouait et affichait « Fiche indisponible ».
-        if (String(itemId).startsWith('ae_')) {
+        // Fiche construite à partir des données de recherche — repli si
+        // l'appel serveur échoue (surtout pour AliExpress, dont le détail
+        // dépend d'un appel réseau qui peut ne pas répondre).
+        const ficheDeSecours = () => {
             const w = win.document.querySelector('.wrap');
             if (!w) return;
-            if (source) {
-                const prix = (source.prixClientEur ?? source.prixHorsPortEur ?? source.finalPrice);
-                w.innerHTML = detailHtml({
-                    title: source.name,
-                    price: prix != null ? Number(prix) : null,
-                    currency: 'EUR',
-                    condition: 'Neuf',
-                    images: source.img ? [source.img] : [],
-                    aspects: [],
-                    description: source.description || '',
-                });
-                brancherTraduction(win, langue);
-            } else {
-                w.innerHTML = '<p class="loading">Fiche indisponible pour cet article.</p>';
-            }
-            return;
-        }
+            if (!source) { w.innerHTML = '<p class="loading">Fiche indisponible pour cet article.</p>'; return; }
+            const prix = (source.prixClientEur ?? source.prixHorsPortEur ?? source.finalPrice);
+            w.innerHTML = detailHtml({
+                title: source.name,
+                price: prix != null ? Number(prix) : null,
+                currency: 'EUR',
+                condition: source.condition === 'used' ? 'Occasion' : 'Neuf',
+                images: source.img ? [source.img] : [],
+                aspects: [],
+                description: source.description || '',
+            });
+            brancherTraduction(win, langue);
+        };
 
         fetch(`${API_BASE_URL}/parts/item/${encodeURIComponent(itemId)}`)
             .then(r => r.ok ? r.json() : Promise.reject(new Error('not found')))
@@ -1164,7 +1159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 w.innerHTML = detailHtml(d);
                 brancherTraduction(win, langue);
             })
-            .catch(() => { const w = win.document.querySelector('.wrap'); if (w) w.innerHTML = '<p class="loading">Fiche indisponible pour cet article.</p>'; });
+            .catch(ficheDeSecours);
     }
 
     /**

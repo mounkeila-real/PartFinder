@@ -102,6 +102,23 @@ function trouverProduits(node: any, profondeur = 0): any[] {
     return [];
 }
 
+/**
+ * Cherche récursivement la première valeur d'un champ parmi une liste de noms.
+ * La réponse ds.product.get est profondément imbriquée et son schéma varie :
+ * chercher par nom est plus robuste qu'un chemin fixe.
+ */
+function chercherChamp(node: any, noms: string[], profondeur = 0): any {
+    if (!node || typeof node !== 'object' || profondeur > 8) return undefined;
+    for (const nom of noms) {
+        if (node[nom] != null && typeof node[nom] !== 'object') return node[nom];
+    }
+    for (const k of Object.keys(node)) {
+        const v = chercherChamp(node[k], noms, profondeur + 1);
+        if (v !== undefined) return v;
+    }
+    return undefined;
+}
+
 /** Récupère l'objet wrapper `*_response` (contient rsp_code/rsp_msg). */
 function trouverWrapper(data: any): any {
     if (!data || typeof data !== 'object') return null;
@@ -384,5 +401,89 @@ export class AliexpressService {
             shortDescription: p.first_level_category_name || p.firstLevelCategoryName || null,
             fullDescription: null,
         };
+    }
+
+    /**
+     * Détail d'un produit (ds.product.get) : poids, images, prix, description.
+     *
+     * La recherche ne renvoie qu'un résumé ; le POIDS et les frais de port ne
+     * sont disponibles qu'ici — indispensables pour le prix « tout compris ».
+     * Extraction TOLÉRANTE : la structure de ds.product.get est riche et varie,
+     * on cherche les champs par nom plutôt que par chemin fixe (non testable
+     * depuis l'environnement de dev).
+     *
+     * @param productId identifiant nu (sans le préfixe « ae_ »)
+     */
+    static async getProduct(productId: string): Promise<{
+        title: string; price: number | null; images: string[];
+        poidsKg: number | null; description: string | null;
+        portEur: number | null; itemWebUrl: string | null;
+    } | null> {
+        if (!this.isConfigured() || !productId) return null;
+        const accessToken = await getValidAccessToken();
+        try {
+            const params: Record<string, string> = {
+                method: process.env.ALIEXPRESS_PRODUCT_METHOD || 'aliexpress.ds.product.get',
+                app_key: APP_KEY,
+                timestamp: this.timestamp(),
+                format: 'json',
+                v: '2.0',
+                sign_method: 'hmac-sha256',
+                product_id: String(productId),
+                ship_to_country: SHIP_TO,
+                target_currency: CURRENCY,
+                target_language: LOCAL.split('_')[0].toUpperCase(),
+                ...(accessToken ? { access_token: accessToken } : {}),
+            };
+            params.sign = this.sign(params);
+
+            const resp = await axios.post(GATEWAY, null, {
+                params,
+                paramsSerializer: (p: Record<string, string>) =>
+                    Object.keys(p).map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(p[k])}`).join('&'),
+                timeout: 15000,
+            });
+            const data = resp.data;
+            console.log('[AliExpress] ds.product.get réponse:', JSON.stringify(data).slice(0, 1000));
+
+            // Extraction tolérante par recherche de champ.
+            const titre = String(chercherChamp(data, ['subject', 'product_title', 'title']) || 'Pièce détachée');
+            const prixRaw = chercherChamp(data, ['target_sale_price', 'sale_price', 'salePrice', 'app_sale_price', 'min_price', 'sku_price']);
+            const deviseSrc = String(chercherChamp(data, ['target_sale_price_currency', 'sale_price_currency', 'currency']) || CURRENCY);
+            let prix = prixRaw != null ? (parseFloat(String(prixRaw)) || null) : null;
+            if (prix != null && deviseSrc.toUpperCase() === 'USD') prix = Math.round(prix * getUsdToEur() * 100) / 100;
+
+            // Poids : souvent en grammes (« gross_weight », « package_weight »).
+            const poidsRaw = chercherChamp(data, ['gross_weight', 'package_weight', 'weight', 'packageWeight']);
+            let poidsKg: number | null = null;
+            if (poidsRaw != null) {
+                const n = parseFloat(String(poidsRaw));
+                if (Number.isFinite(n) && n > 0) poidsKg = n > 20 ? n / 1000 : n; // >20 => grammes
+            }
+
+            // Frais de port : parfois dans une info logistique ; sinon null.
+            const portRaw = chercherChamp(data, ['ship_to_cost', 'freight_amount', 'shipping_fee', 'logistics_cost']);
+            let portEur: number | null = null;
+            if (portRaw != null) {
+                const n = parseFloat(String(portRaw));
+                if (Number.isFinite(n) && n >= 0) portEur = deviseSrc.toUpperCase() === 'USD'
+                    ? Math.round(n * getUsdToEur() * 100) / 100 : n;
+            }
+
+            // Images : tableau ou chaîne « url;url;url ».
+            const imgField = chercherChamp(data, ['image_urls', 'imageUrls', 'product_main_image_url', 'itemMainPic']);
+            const images = String(imgField || '').split(/[;,]/).map((s) => s.trim()).filter(Boolean);
+
+            const description = String(chercherChamp(data, ['detail', 'description', 'product_description']) || '') || null;
+
+            return {
+                title: titre, price: prix, images, poidsKg,
+                description, portEur,
+                itemWebUrl: `https://www.aliexpress.com/item/${productId}.html`,
+            };
+        } catch (err: any) {
+            console.error('[AliExpress] ds.product.get échec:', (err.response?.data || err.message)?.toString().slice(0, 200));
+            return null;
+        }
     }
 }
