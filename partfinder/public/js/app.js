@@ -676,6 +676,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function identifyPartFromPhoto(file) {
         const prevPlaceholder = partDescInput.placeholder;
         partDescInput.placeholder = '⏳ Identification de la pièce par IA...';
+        // Bloque la recherche pendant l'analyse : sans ça, un clic sur
+        // « Rechercher » partait AVANT que la description soit remplie, donc
+        // sur une requête vide ou incomplète.
+        setSearchBusy(true, 'Analyse de l\'image…');
         try {
             const fd = new FormData();
             fd.append('image', file);
@@ -725,6 +729,29 @@ document.addEventListener('DOMContentLoaded', () => {
             // Echec gracieux : la description reste editable, l'utilisateur complete a la main.
             partDescInput.placeholder = prevPlaceholder;
             showAiFeedback(null, null, err.serverHint || err.message || true);
+        } finally {
+            // Réactive la recherche quel que soit le résultat.
+            setSearchBusy(false);
+        }
+    }
+
+    /**
+     * Active/désactive le bouton de recherche pendant un traitement bloquant
+     * (analyse d'image). Empêche une recherche lancée avant que les champs
+     * soient prêts, et restaure le libellé d'origine ensuite.
+     */
+    let searchBtnLabel = null;
+    let searchBusy = false;
+    function setSearchBusy(busy, message) {
+        searchBusy = busy;   // consulté aussi par la soumission (touche Entrée)
+        if (!btnSearch) return;
+        if (busy) {
+            if (searchBtnLabel === null) searchBtnLabel = btnSearch.innerHTML;
+            btnSearch.disabled = true;
+            btnSearch.innerHTML = '<i class="ph ph-spinner-gap"></i> ' + (message || 'Veuillez patienter…');
+        } else {
+            btnSearch.disabled = false;
+            if (searchBtnLabel !== null) { btnSearch.innerHTML = searchBtnLabel; searchBtnLabel = null; }
         }
     }
 
@@ -799,6 +826,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Search Submission ---
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        // Analyse d'image en cours : on ne lance pas une recherche sur des
+        // champs pas encore remplis (protège aussi la soumission par Entrée,
+        // qu'un bouton désactivé n'empêche pas).
+        if (searchBusy) return;
 
         // Determine the query
         let query = partNumberInput.value.trim() || partDescInput.value.trim();
