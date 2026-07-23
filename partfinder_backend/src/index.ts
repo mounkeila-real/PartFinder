@@ -16,6 +16,7 @@ import { startScheduler } from './jobs/scheduler';
 import { termesValides } from './services/glossary_learning.service';
 import { chargerTermesAppris } from './services/part_glossary';
 import { loadAliexpressToken } from './services/aliexpress_token';
+import { refreshUsdToEur } from './services/exchange_rate';
 
 dotenv.config();
 
@@ -65,4 +66,8 @@ app.listen(PORT, () => {
     // Token AliExpress persisté : rechargé en mémoire pour survivre aux
     // redémarrages (sinon perdu à chaque déploiement, re-autorisation forcée).
     loadAliexpressToken().catch((e) => console.error('[AliExpress] chargement token:', e.message));
+
+    // Taux USD->EUR (conversion des prix AliExpress) chargé dès le boot, pour
+    // que la première recherche dispose d'un taux frais plutôt que du repli.
+    refreshUsdToEur().catch(() => { /* repli statique déjà géré */ });
 });

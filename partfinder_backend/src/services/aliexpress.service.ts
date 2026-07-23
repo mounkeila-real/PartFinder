@@ -2,6 +2,7 @@ import axios from 'axios';
 import crypto from 'crypto';
 import { NormalizedPart } from './ebay.service';
 import { getValidAccessToken } from './aliexpress_token';
+import { getUsdToEur } from './exchange_rate';
 
 /**
  * AliExpress Affiliate — recherche de produits.
@@ -52,14 +53,9 @@ const SORT_BY = process.env.ALIEXPRESS_SORT_BY || '';
  */
 const PAGE_SIZE = Number(process.env.ALIEXPRESS_PAGE_SIZE || '50');
 
-/**
- * Taux USD -> EUR. ds.text.search renvoie les prix en USD malgré currency=EUR
- * (le pool de sélection est en dollars). Toute la tarification raisonne en
- * euros : sans conversion, le prix serait soit écarté (garde-fou devise), soit
- * facturé comme des euros. Taux configurable ; léger sur-arrondi absorbé par la
- * marge (produits neufs bon marché). À remplacer par un taux du jour si besoin.
- */
-const USD_TO_EUR = Number(process.env.ALIEXPRESS_USD_EUR || '0.95');
+// ds.text.search renvoie les prix en USD malgré currency=EUR (pool de sélection
+// en dollars). La conversion USD->EUR utilise le taux réel (getUsdToEur, source
+// BCE, avec repli statique) — voir services/exchange_rate.
 
 // Gateway "système" AliExpress (Singapour).
 const GATEWAY = 'https://api-sg.aliexpress.com/sync';
@@ -340,9 +336,9 @@ export class AliexpressService {
         const deviseSource = p.salePriceCurrency || p.originalPriceCurrency
             || p.target_sale_price_currency || p.targetSalePriceCurrency || CURRENCY;
         let price = priceRaw != null ? (parseFloat(String(priceRaw)) || null) : null;
-        // Conversion en euros si la source est en dollars.
+        // Conversion en euros si la source est en dollars (taux du jour).
         if (price != null && String(deviseSource).toUpperCase() === 'USD') {
-            price = Math.round(price * USD_TO_EUR * 100) / 100;
+            price = Math.round(price * getUsdToEur() * 100) / 100;
         }
         const image = p.itemMainPic || p.product_main_image_url || p.productMainImageUrl
             || p.image_url || p.imageUrl || null;
