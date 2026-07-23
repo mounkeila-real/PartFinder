@@ -18,6 +18,25 @@ const router = express.Router();
 // Marge appliquée sur le prix source (33% par défaut, surchargée par env).
 const MARGIN_MULTIPLIER = Number(process.env.PART_MARGIN_MULTIPLIER || '1.33');
 
+/**
+ * Déduplique les mots d'une requête (insensible à la casse), en gardant
+ * l'ordre. « Mercedes-Benz B 180 … mercedes benz » contenait la marque deux
+ * fois : du bruit qui dilue le classement sur AliExpress.
+ */
+function dedupMots(q: string): string {
+    const vus = new Set<string>();
+    return String(q || '')
+        .split(/\s+/)
+        .filter((w) => {
+            const k = w.toLowerCase();
+            if (!k || vus.has(k)) return false;
+            vus.add(k);
+            return true;
+        })
+        .join(' ')
+        .trim();
+}
+
 /* ── Relais d'images ──────────────────────────────────────────────
  * Les visuels des annonces sont servis PAR NOUS, jamais chargés depuis le
  * domaine du fournisseur : le navigateur du client ne doit jamais émettre de
@@ -236,7 +255,7 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
             .filter(Boolean).join(' ');
         const aeTrad = translateQuery(aeBase, 'en');
         const aeQuery = request.oem?.trim()
-            || (aeTrad.matched ? aeTrad.query : aeBase)
+            || dedupMots(aeTrad.matched ? aeTrad.query : aeBase)
             || part.ebayQuery || '';
         const aliexpressPromise = AliexpressService.searchProducts(aeQuery, limit || 20);
 
@@ -569,7 +588,8 @@ router.get('/debug-query', async (req: express.Request, res: express.Response) =
         const aeBase = [pn, vehicle.make, vehicle.model, platformCode, vehicle.year]
             .filter(Boolean).join(' ');
         const aeTrad = translateQuery(aeBase, 'en');
-        const aeQuery = request.oem?.trim() || (aeTrad.matched ? aeTrad.query : aeBase) || '';
+        const aeQuery = request.oem?.trim()
+            || dedupMots(aeTrad.matched ? aeTrad.query : aeBase) || '';
 
         const produits = await AliexpressService.searchProducts(aeQuery, 10);
 

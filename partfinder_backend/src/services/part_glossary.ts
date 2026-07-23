@@ -189,20 +189,22 @@ export function translateQuery(query: string, lang: Lang): TranslationResult {
 
     const translated = hit.entry[lang] as string;
 
-    // Reste de la requête = marque, modèle, motorisation, OEM : on garde.
-    const reste = norm.replace(hit.form, ' ')
-        .split(' ')
+    // Remplace le terme SUR PLACE (préserve l'ordre : marque, modèle et
+    // millésime restent à leur position). Prépendre la traduction cassait
+    // l'ordre — « benz … » projeté en tête — et brouillait le classement.
+    const remplace = norm.replace(hit.form, ` ${translated} `);
+    const resultat = remplace
+        .split(/\s+/)
         .filter((w) => w && !STOPWORDS_FR.has(w))
         .map((w) => {
             const pos = POSITIONS[w];
             return pos ? pos[lang] : w;
-        });
+        })
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
 
-    return {
-        query: [translated, ...reste].join(' ').replace(/\s+/g, ' ').trim(),
-        matched: true,
-        term: translated,
-    };
+    return { query: resultat, matched: true, term: translated };
 }
 
 /**
