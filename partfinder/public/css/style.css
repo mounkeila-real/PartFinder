@@ -1630,6 +1630,26 @@ textarea:focus {
 }
 .sel-add .sel-pays { flex: 0 0 70px; min-width: 70px; text-transform: uppercase; }
 
+/* ── Retour d'identification IA (photo de pièce) ─────────────────── */
+.ai-feedback {
+    display: flex; align-items: flex-start; gap: 8px;
+    margin-top: 8px; padding: 10px 12px;
+    border-radius: var(--radius-sm); font-size: 0.85rem; line-height: 1.4;
+    border: 1px solid var(--border-color);
+}
+.ai-feedback i { flex-shrink: 0; font-size: 1.1rem; margin-top: 1px; }
+.ai-feedback strong { font-weight: 600; }
+.ai-feedback-ok {
+    background: color-mix(in srgb, var(--success) 8%, transparent);
+    border-color: color-mix(in srgb, var(--success) 35%, transparent);
+    color: var(--success);
+}
+.ai-feedback-warn {
+    background: color-mix(in srgb, var(--warning, #D9930B) 10%, transparent);
+    border-color: color-mix(in srgb, var(--warning, #D9930B) 40%, transparent);
+    color: var(--text-primary);
+}
+
 /* ── Glossaire (admin) ───────────────────────────────────────────── */
 .glo-row {
     padding: 12px 14px; margin-bottom: 10px;

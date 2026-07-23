@@ -693,22 +693,85 @@ document.addEventListener('DOMContentLoaded', () => {
             const desc = (data && data.description ? String(data.description) : '').trim();
             const oem = (data && data.oem ? String(data.oem) : '').trim();
 
-            if (desc || oem) {
-                let combined = desc;
-                if (oem && oem.toLowerCase() !== 'null') {
+            const hasDesc = desc && desc.toLowerCase() !== 'null';
+            const hasOem = oem && oem.toLowerCase() !== 'null';
+
+            if (hasDesc || hasOem) {
+                let combined = hasDesc ? desc : '';
+                if (hasOem) {
                     combined += (combined ? ' — ' : '') + 'Réf: ' + oem;
                     if (!partNumberInput.value.trim()) partNumberInput.value = oem;
                 }
                 partDescInput.value = combined;
-                state.part.number = oem || null;
+                state.part.number = hasOem ? oem : null;
                 refreshPartLock();
             }
             partDescInput.placeholder = prevPlaceholder;
+
+            // TRANSPARENCE : montrer ce que l'IA a compris, et surtout SIGNALER
+            // quand c'est trop vague. Sans référence lisible sur la photo, une
+            // pièce à montage critique (cardan, amortisseur...) donne une
+            // identification générique et donc des résultats approximatifs :
+            // mieux vaut le dire et inviter à préciser que laisser subir.
+            showAiFeedback(hasDesc ? desc : null, hasOem ? oem : null);
         } catch (err) {
             console.error('identify-part:', err);
             // Echec gracieux : la description reste editable, l'utilisateur complete a la main.
             partDescInput.placeholder = prevPlaceholder;
+            showAiFeedback(null, null, true);
         }
+    }
+
+    /**
+     * Affiche sous le champ Description ce que l'IA a identifié, et une
+     * invitation à préciser si l'identification est peu exploitable.
+     */
+    function showAiFeedback(desc, oem, echec) {
+        let box = document.getElementById('ai-feedback');
+        if (!box) {
+            box = document.createElement('div');
+            box.id = 'ai-feedback';
+            box.className = 'ai-feedback';
+            // Juste sous le champ Description, avant la zone référence.
+            partDescInput.closest('label, .form-group, div')?.appendChild(box);
+        }
+
+        if (echec) {
+            box.className = 'ai-feedback ai-feedback-warn';
+            box.innerHTML = '<i class="ph ph-warning-circle"></i> L\'identification a échoué. '
+                + 'Décrivez la pièce ou saisissez sa référence.';
+            return;
+        }
+        if (!desc && !oem) {
+            box.className = 'ai-feedback ai-feedback-warn';
+            box.innerHTML = '<i class="ph ph-warning-circle"></i> Pièce non reconnue sur la photo. '
+                + 'Ajoutez une description ou la référence constructeur.';
+            return;
+        }
+
+        // Une référence OEM = identification fiable. Sans elle, on juge la
+        // précision au nombre de mots utiles : « cardan » seul est trop vague.
+        const motsUtiles = (desc || '').split(/\s+/).filter(w => w.length > 2).length;
+        const precise = !!oem || motsUtiles >= 4;
+
+        if (precise) {
+            box.className = 'ai-feedback ai-feedback-ok';
+            box.innerHTML = '<i class="ph ph-check-circle"></i> Pièce identifiée'
+                + (oem ? ' — référence <strong>' + esc(oem) + '</strong>' : '')
+                + '. Vérifiez la description ci-dessus, puis lancez la recherche.';
+        } else {
+            box.className = 'ai-feedback ai-feedback-warn';
+            box.innerHTML = '<i class="ph ph-info"></i> Identification <strong>générique</strong> : '
+                + '« ' + esc(desc || '') + ' ». Pour une pièce à montage précis, '
+                + 'ajoutez la <strong>référence</strong>, le <strong>côté</strong> (avant/arrière, gauche/droite) '
+                + 'ou le <strong>code moteur</strong> dans la description.';
+        }
+    }
+
+    // Échappement HTML minimal (le champ affiche du texte issu de l'IA).
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     btnRemoveImg.addEventListener('click', () => {

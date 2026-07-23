@@ -24,13 +24,21 @@ const upload = multer({
 // Configure Gemini API
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
+// Modèles Gemini, SURCHARGEABLES par variable d'environnement — passer à une
+// version plus récente (meilleure vision) se fait alors sans redéploiement.
+//   - VISION : lecture de photo (pièce, carte grise). Le plus déterminant pour
+//     la qualité d'identification. gemini-1.5-flash était l'ancien modèle.
+//   - TEXT   : génération de texte simple.
+const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-2.0-flash';
+const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.0-flash';
+
 // Routes
 app.post('/api/extract-carte-grise', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: "No image provided" });
         if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: "API Key missing" });
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: GEMINI_VISION_MODEL });
 
         const prompt = `Voici une photo d'une carte grise de véhicule (certificat d'immatriculation français ou européen).
         Tu dois UNIQUEMENT extraire les informations suivantes et répondre au format JSON strict. 
@@ -77,7 +85,7 @@ app.post('/api/identify-part', upload.single('image'), async (req, res) => {
         const { make, model, year, engine } = req.body || {};
         const vehicleLine = [make, model, year, engine].filter(Boolean).join(' ') || 'non precise';
 
-        const aiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const aiModel = genAI.getGenerativeModel({ model: GEMINI_VISION_MODEL });
 
         const prompt = `Tu es un expert en pieces detachees automobiles.
 Voici la photo d'une piece auto. Le vehicule concerne est : ${vehicleLine}.
@@ -116,7 +124,7 @@ app.post('/api/chat', async (req, res) => {
         const { text, context } = req.body;
         if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: "API Key missing" });
 
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+        const model = genAI.getGenerativeModel({ model: GEMINI_TEXT_MODEL });
 
         const prompt = `Tu es l'assistant de PartFinder, un outil pro pour trouver des pièces auto.
         L'utilisateur a écrit ce message : "${text}"
