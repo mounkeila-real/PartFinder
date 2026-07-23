@@ -51,6 +51,38 @@ const DUREE_COUPURE_MS = 6 * 60 * 60 * 1000; // 6 h
  */
 const ERREURS_PERMANENTES = /InsufficientPermission|does not have permission|InvalidAppKey|AppCallLimit/i;
 
+/** Un objet ressemble-t-il à un produit AliExpress ? */
+function estProduit(o: any): boolean {
+    if (!o || typeof o !== 'object') return false;
+    return o.product_id != null || o.productId != null || o.itemId != null
+        || o.product_title != null || o.productTitle != null;
+}
+
+/**
+ * Cherche récursivement le premier tableau de produits dans la réponse,
+ * quel que soit le nom des clés du wrapper (selection_search_product,
+ * traffic_product_d_t_o, products…). Évite de dépendre d'un chemin exact
+ * qui casse à la moindre variation d'API.
+ */
+function trouverProduits(node: any, profondeur = 0): any[] {
+    if (!node || typeof node !== 'object' || profondeur > 6) return [];
+    if (Array.isArray(node)) {
+        return node.some(estProduit) ? node.filter(estProduit) : [];
+    }
+    for (const k of Object.keys(node)) {
+        const trouve = trouverProduits(node[k], profondeur + 1);
+        if (trouve.length) return trouve;
+    }
+    return [];
+}
+
+/** Récupère l'objet wrapper `*_response` (contient rsp_code/rsp_msg). */
+function trouverWrapper(data: any): any {
+    if (!data || typeof data !== 'object') return null;
+    const cle = Object.keys(data).find((k) => k.endsWith('_response'));
+    return cle ? data[cle] : data;
+}
+
 export class AliexpressService {
 
     /** Coupe-circuit : refus consécutifs et date de réarmement. */
@@ -189,37 +221,39 @@ export class AliexpressService {
 
             // Journalisé tant que l'intégration n'est pas validée : c'est cet
             // extrait qui révèle la forme réelle de la réponse.
-            console.log('[AliExpress] ds.search réponse:', JSON.stringify(data).slice(0, 900));
+            console.log('[AliExpress] ds.search réponse:', JSON.stringify(data).slice(0, 1500));
 
-            // Chemins de réponse tolérants : la forme exacte varie selon la
-            // méthode et la version. Le rawExcerpt du diagnostic permet de
-            // corriger vite si aucun de ces chemins ne correspond.
-            const products =
-                data?.aliexpress_ds_text_search_response?.data?.products?.selection_search_product ||
-                data?.aliexpress_ds_text_search_response?.data?.products?.product ||
-                data?.aliexpress_ds_recommend_feed_get_response?.result?.products?.traffic_product_d_t_o ||
-                data?.data?.products?.selection_search_product ||
-                data?.result?.products?.product ||
-                data?.resp_result?.result?.products?.product ||
-                [];
-
-            const arr = Array.isArray(products) ? products : [];
+            // EXTRACTION ROBUSTE : plutôt que de deviner le chemin exact (qui
+            // varie selon la méthode et la version), on cherche récursivement
+            // le premier tableau dont les éléments ressemblent à des produits.
+            const arr = trouverProduits(data);
 
             // Le gateway répond souvent 200 AVEC une erreur applicative dans le
-            // corps (clé non approuvée...) : sans ce test, un échec passerait
-            // pour un simple « 0 résultat ».
+            // corps. On lit le statut « business » du wrapper *_response
+            // (rsp_code/rsp_msg) en plus des formes d'erreur classiques.
+            const wrapper = trouverWrapper(data);
+            const rspCode = wrapper?.rsp_code ?? wrapper?.code;
+            const rspMsg = wrapper?.rsp_msg ?? wrapper?.msg ?? wrapper?.sub_msg;
             const apiError = data?.error_response
-                || (data && typeof data === 'object' && (data as any).code && (data as any).code !== '0'
+                || ((data as any)?.code && (data as any).code !== '0'
                     ? { code: (data as any).code, msg: (data as any).msg || (data as any).sub_msg }
+                    : null)
+                // rsp_code non 2xx = échec business, meme si code gateway = 0.
+                || (rspCode != null && !/^2\d\d$/.test(String(rspCode))
+                    ? { code: rspCode, msg: rspMsg }
                     : null);
 
             const texteErreur = apiError ? JSON.stringify(apiError) : '';
             this.lastDiagnostic = {
                 at: new Date().toISOString(),
-                ok: !apiError,
+                ok: !apiError && arr.length > 0,
                 count: arr.length,
                 error: apiError ? this.expliquer(texteErreur) : null,
-                rawExcerpt: JSON.stringify(data).slice(0, 400),
+                // Clés de haut niveau + statut business : de quoi voir la
+                // structure sans dumper toute la charge utile.
+                rawExcerpt: `cles=${Object.keys(data || {}).join(',')} `
+                    + `| rsp_code=${rspCode} rsp_msg=${rspMsg} `
+                    + `| ${JSON.stringify(data).slice(0, 600)}`,
                 permanent: ERREURS_PERMANENTES.test(texteErreur),
                 coupeJusqua: null,
             };
