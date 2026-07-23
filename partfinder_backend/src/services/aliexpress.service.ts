@@ -45,6 +45,13 @@ const SEARCH_METHOD = process.env.ALIEXPRESS_SEARCH_METHOD || 'aliexpress.ds.tex
  */
 const SORT_BY = process.env.ALIEXPRESS_SORT_BY || '';
 
+/**
+ * Taille de page envoyée à AliExpress. Fixée à 50 : le moteur de sélection
+ * rejette les valeurs basses (le « 5 » du testeur déclenchait
+ * EXCEPTION_TEXT_SEARCH_FOR_DS). On demande 50 puis on tronque au besoin.
+ */
+const PAGE_SIZE = Number(process.env.ALIEXPRESS_PAGE_SIZE || '50');
+
 // Gateway "système" AliExpress (Singapour).
 const GATEWAY = 'https://api-sg.aliexpress.com/sync';
 
@@ -224,7 +231,10 @@ export class AliexpressService {
                 local: LOCAL,
                 countryCode: SHIP_TO,
                 currency: CURRENCY,
-                pageSize: String(Math.min(limit, 50)),
+                // pageSize FIXE à 50 : une valeur basse (le « 5 » du testeur)
+                // fait échouer le moteur de sélection (EXCEPTION_TEXT_SEARCH_FOR_DS).
+                // On demande 50, on tronque à `limit` après réception.
+                pageSize: String(PAGE_SIZE),
                 pageIndex: '1',
                 ...(SORT_BY ? { sortBy: SORT_BY } : {}),
                 ...(accessToken ? { access_token: accessToken } : {}),
@@ -279,7 +289,7 @@ export class AliexpressService {
                 error: apiError ? this.expliquer(texteErreur) : null,
                 // Clés de haut niveau + statut business : de quoi voir la
                 // structure sans dumper toute la charge utile.
-                rawExcerpt: `access_token=${accessToken ? 'present' : 'ABSENT'} `
+                rawExcerpt: `access_token=${accessToken ? 'present' : 'ABSENT'} pageSize=${PAGE_SIZE} `
                     + `| local=${LOCAL} pays=${SHIP_TO} devise=${CURRENCY} sortBy=${SORT_BY || '(aucun)'} `
                     + `| rsp_code=${rspCode} rsp_msg=${rspMsg} `
                     + `| ${JSON.stringify(data).slice(0, 450)}`,
@@ -290,7 +300,9 @@ export class AliexpressService {
             if (apiError) this.enregistrerEchec(texteErreur);
             else this.rearmer();
 
-            return arr.map((p: any) => this.normalize(p));
+            // On a demandé 50 à AliExpress (pageSize minimal fiable) ; on tronque
+            // à ce que l'appelant voulait réellement.
+            return arr.slice(0, limit).map((p: any) => this.normalize(p));
         } catch (err: any) {
             const detail = err.response?.data || err.message;
             const brut = typeof detail === 'string' ? detail : JSON.stringify(detail);
