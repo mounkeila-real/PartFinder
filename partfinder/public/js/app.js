@@ -687,8 +687,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Endpoint servi par le serveur frontend (meme origine), pas le backend.
             const resp = await fetch('/api/identify-part', { method: 'POST', body: fd });
-            if (!resp.ok) throw new Error('identify failed (' + resp.status + ')');
-            const data = await resp.json();
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                // Remonter la cause réelle renvoyée par le serveur (modèle
+                // indisponible, quota, clé...) plutôt qu'un « échec » opaque.
+                const e = new Error(data.error || 'identify failed (' + resp.status + ')');
+                e.serverHint = data.hint || data.detail || null;
+                throw e;
+            }
 
             const desc = (data && data.description ? String(data.description) : '').trim();
             const oem = (data && data.oem ? String(data.oem) : '').trim();
@@ -718,7 +724,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('identify-part:', err);
             // Echec gracieux : la description reste editable, l'utilisateur complete a la main.
             partDescInput.placeholder = prevPlaceholder;
-            showAiFeedback(null, null, true);
+            showAiFeedback(null, null, err.serverHint || err.message || true);
         }
     }
 
@@ -738,8 +744,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (echec) {
             box.className = 'ai-feedback ai-feedback-warn';
+            // Une chaîne = détail renvoyé par le serveur : on l'affiche pour
+            // que la cause réelle soit visible, pas un message générique.
+            const detail = (typeof echec === 'string') ? echec : null;
             box.innerHTML = '<i class="ph ph-warning-circle"></i> L\'identification a échoué. '
-                + 'Décrivez la pièce ou saisissez sa référence.';
+                + 'Décrivez la pièce ou saisissez sa référence.'
+                + (detail ? '<br><small style="opacity:.75">' + esc(detail) + '</small>' : '');
             return;
         }
         if (!desc && !oem) {

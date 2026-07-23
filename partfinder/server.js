@@ -116,9 +116,11 @@ Si la piece est illisible ou non identifiable, mets "description" a null.`;
         const modeleIntrouvable = /not found|not supported|404/i.test(detail);
         res.status(500).json({
             error: "Erreur lors de l'identification de la piece.",
+            // Cause réelle remontée au client (outil pro interne) : sans elle,
+            // impossible de savoir si c'est le modèle, la clé ou le quota.
             hint: modeleIntrouvable
-                ? `Modèle Gemini « ${GEMINI_VISION_MODEL} » indisponible pour ce SDK/clé.`
-                : undefined,
+                ? `Modèle « ${GEMINI_VISION_MODEL} » indisponible (${detail.slice(0, 160)})`
+                : detail.slice(0, 200),
         });
     }
 });
