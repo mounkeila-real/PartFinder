@@ -227,9 +227,13 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
         // EN ANGLAIS : les titres AliExpress le sont massivement, et une
         // requête française y ramène beaucoup moins. La référence OEM, elle,
         // est universelle et prime quand elle existe.
-        // L'ANNÉE est incluse : sur AliExpress (grand public), « … Classe B
-        // 2017 » cible bien mieux qu'un modèle sans millésime.
-        const aeBase = [pn, vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' ');
+        // L'ANNÉE et le CODE PLATEFORME sont inclus : les annonces AliExpress
+        // d'électronique adaptable sont titrées « … B Class W246 2017 ». Le
+        // code châssis (W246) est le meilleur mot-clé, bien plus que la variante
+        // moteur (« B 180 »). On l'extrait de platform (« W246 (2011-) »).
+        const platformCode = (vehicle.platform || '').match(/[A-Z]\d{2,3}/)?.[0] || null;
+        const aeBase = [pn, vehicle.make, vehicle.model, platformCode, vehicle.year]
+            .filter(Boolean).join(' ');
         const aeTrad = translateQuery(aeBase, 'en');
         const aeQuery = request.oem?.trim()
             || (aeTrad.matched ? aeTrad.query : aeBase)
@@ -530,6 +534,53 @@ router.post('/find', async (req: express.Request, res: express.Response) => {
             count: results.length,
             results,
             ...(debug ? { debug } : {}),
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * GET /api/parts/debug-query — diagnostic de qualité, OUVRABLE DANS LE
+ * NAVIGATEUR (contrairement à /find qui est en POST).
+ *
+ * Montre la requête EXACTE construite pour AliExpress à partir d'un véhicule
+ * et d'une demande, et lance une petite recherche pour voir la couverture.
+ * Paramètres : make, model, year, engine, platform, description, oem.
+ * Exemple : /api/parts/debug-query?make=Mercedes-Benz&model=B%20180&platform=W246&year=2017&description=Grand%20ecran%20android
+ */
+router.get('/debug-query', async (req: express.Request, res: express.Response) => {
+    try {
+        const vehicle: VehicleContext = {
+            make: req.query.make ? String(req.query.make) : undefined,
+            model: req.query.model ? String(req.query.model) : undefined,
+            year: req.query.year ? String(req.query.year) : undefined,
+            engine: req.query.engine ? String(req.query.engine) : undefined,
+            platform: req.query.platform ? String(req.query.platform) : undefined,
+        } as any;
+        const request: PartRequest = {
+            description: req.query.description ? String(req.query.description) : undefined,
+            oem: req.query.oem ? String(req.query.oem) : undefined,
+        } as any;
+
+        const part = await PartAiService.determinePart(vehicle, request);
+        const pn = part.partName || request.description || '';
+        const platformCode = (vehicle.platform || '').match(/[A-Z]\d{2,3}/)?.[0] || null;
+        const aeBase = [pn, vehicle.make, vehicle.model, platformCode, vehicle.year]
+            .filter(Boolean).join(' ');
+        const aeTrad = translateQuery(aeBase, 'en');
+        const aeQuery = request.oem?.trim() || (aeTrad.matched ? aeTrad.query : aeBase) || '';
+
+        const produits = await AliexpressService.searchProducts(aeQuery, 10);
+
+        res.json({
+            entree: { vehicle, request },
+            partNameDetermine: part.partName || null,
+            codePlateforme: platformCode,
+            aliexpressQuery: aeQuery,
+            traduitEnAnglais: aeTrad.matched,
+            aliexpressResultats: produits.length,
+            echantillon: produits.slice(0, 5).map((p: any) => ({ titre: p.title, prixEur: p.price })),
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
