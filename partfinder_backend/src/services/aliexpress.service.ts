@@ -1,6 +1,7 @@
 import axios from 'axios';
 import crypto from 'crypto';
 import { NormalizedPart } from './ebay.service';
+import { getValidAccessToken } from './aliexpress_token';
 
 /**
  * AliExpress Affiliate — recherche de produits.
@@ -197,6 +198,11 @@ export class AliexpressService {
             // L'API Affiliate (affiliate.*) exige une permission distincte,
             // non accordée : elle répondait InsufficientPermission à chaque
             // recherche, ce qui ressemblait à « 0 résultat ».
+            // API Drop Shipping = contexte utilisateur : elle exige le token
+            // OAuth. Sans lui, EXCEPTION_TEXT_SEARCH_FOR_DS (auth passerelle OK,
+            // échec métier). Le token vient du flux d'autorisation (callback).
+            const accessToken = getValidAccessToken();
+
             const params: Record<string, string> = {
                 method: SEARCH_METHOD,
                 app_key: APP_KEY,
@@ -213,6 +219,7 @@ export class AliexpressService {
                 pageSize: String(Math.min(limit, 50)),
                 pageIndex: '1',
                 sortBy: 'orders,desc',
+                ...(accessToken ? { access_token: accessToken } : {}),
             };
             params.sign = this.sign(params);
 
@@ -264,9 +271,10 @@ export class AliexpressService {
                 error: apiError ? this.expliquer(texteErreur) : null,
                 // Clés de haut niveau + statut business : de quoi voir la
                 // structure sans dumper toute la charge utile.
-                rawExcerpt: `cles=${Object.keys(data || {}).join(',')} `
+                rawExcerpt: `access_token=${accessToken ? 'present' : 'ABSENT (autorisation OAuth requise)'} `
+                    + `| cles=${Object.keys(data || {}).join(',')} `
                     + `| rsp_code=${rspCode} rsp_msg=${rspMsg} `
-                    + `| ${JSON.stringify(data).slice(0, 600)}`,
+                    + `| ${JSON.stringify(data).slice(0, 500)}`,
                 permanent: ERREURS_PERMANENTES.test(texteErreur),
                 coupeJusqua: null,
             };

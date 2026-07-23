@@ -1,6 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import axios from 'axios';
+import { setAliexpressToken, getAliexpressToken } from '../services/aliexpress_token';
 
 /**
  * AliExpress (Open Platform / Affiliates API) — OAuth callback.
@@ -29,13 +30,9 @@ const APP_SECRET = process.env.ALIEXPRESS_APP_SECRET || '';
 const TOKEN_API_PATH = '/auth/token/create';
 const TOKEN_API_BASE = 'https://api-sg.aliexpress.com/rest';
 
-// Dernier token obtenu (en mémoire). À persister (Prisma) quand on branchera
-// réellement la recherche de produits AliExpress.
-let lastToken: { access_token?: string; refresh_token?: string; expires_at?: number; raw?: any } | null = null;
-
-export function getAliexpressToken() {
-    return lastToken;
-}
+// Le token est stocké dans le module partagé aliexpress_token (lu aussi par le
+// service de recherche). Ré-export pour compatibilité des imports existants.
+export { getAliexpressToken };
 
 /**
  * Signature IOP AliExpress (sign_method = sha256) :
@@ -97,12 +94,12 @@ router.get('/callback', async (req: express.Request, res: express.Response) => {
         const accessToken = data?.access_token || data?.data?.access_token;
         if (accessToken) {
             const expiresIn = Number(data?.expires_in || data?.data?.expires_in || 0);
-            lastToken = {
+            setAliexpressToken({
                 access_token: accessToken,
                 refresh_token: data?.refresh_token || data?.data?.refresh_token,
                 expires_at: expiresIn ? Date.now() + expiresIn * 1000 : undefined,
                 raw: data,
-            };
+            });
             return res.status(200).send(callbackPage('Connexion AliExpress réussie',
                 'Le token a été obtenu avec succès. Vous pouvez fermer cette page.', code));
         }
