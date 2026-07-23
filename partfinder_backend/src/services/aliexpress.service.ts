@@ -216,7 +216,7 @@ export class AliexpressService {
             // API Drop Shipping = contexte utilisateur : elle exige le token
             // OAuth. Sans lui, EXCEPTION_TEXT_SEARCH_FOR_DS (auth passerelle OK,
             // échec métier). Le token vient du flux d'autorisation (callback).
-            const accessToken = getValidAccessToken();
+            const accessToken = await getValidAccessToken();
 
             const params: Record<string, string> = {
                 method: SEARCH_METHOD,

@@ -1,7 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import axios from 'axios';
-import { setAliexpressToken, getAliexpressToken } from '../services/aliexpress_token';
+import { setAliexpressToken, getAliexpressToken, getValidAccessToken } from '../services/aliexpress_token';
 
 /**
  * AliExpress (Open Platform / Affiliates API) — OAuth callback.
@@ -61,6 +61,22 @@ router.get('/authorize', (_req: express.Request, res: express.Response) => {
         + `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
     console.log('[AliExpress] redirection autorisation ->', url);
     res.redirect(url);
+});
+
+/**
+ * GET /api/aliexpress/token-status — état du token (diagnostic, PUBLIC mais
+ * ne révèle jamais le token lui-même). Permet de voir sans deviner si
+ * l'autorisation a bien persisté.
+ */
+router.get('/token-status', async (_req: express.Request, res: express.Response) => {
+    const t = getAliexpressToken();
+    const valide = await getValidAccessToken();
+    res.json({
+        present: !!t?.access_token,
+        valide: !!valide,
+        expireLe: t?.expires_at ? new Date(t.expires_at).toISOString() : null,
+        aRefreshToken: !!t?.refresh_token,
+    });
 });
 
 /**

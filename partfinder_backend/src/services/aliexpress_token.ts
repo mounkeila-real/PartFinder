@@ -71,9 +71,24 @@ export function getAliexpressToken(): AliexpressToken | null {
     return token;
 }
 
-/** access_token encore valide, ou null (absent / expiré). */
-export function getValidAccessToken(): string | null {
+function memoireValide(): string | null {
     if (!token?.access_token) return null;
     if (token.expires_at && Date.now() > token.expires_at) return null;
     return token.access_token;
+}
+
+/**
+ * access_token encore valide, ou null (absent / expiré).
+ *
+ * Relit la BASE si le cache mémoire est vide : indispensable car le token est
+ * écrit par le callback OAuth APRÈS le démarrage, et Railway peut exécuter
+ * plusieurs instances (le callback écrit sur l'une, la recherche lit sur une
+ * autre). Sans cette relecture, le token restait « absent » côté recherche.
+ */
+export async function getValidAccessToken(): Promise<string | null> {
+    const enMemoire = memoireValide();
+    if (enMemoire) return enMemoire;
+    // Cache vide ou expiré : on retente depuis la base.
+    await loadAliexpressToken();
+    return memoireValide();
 }
