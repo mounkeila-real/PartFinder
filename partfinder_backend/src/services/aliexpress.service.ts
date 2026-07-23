@@ -52,6 +52,15 @@ const SORT_BY = process.env.ALIEXPRESS_SORT_BY || '';
  */
 const PAGE_SIZE = Number(process.env.ALIEXPRESS_PAGE_SIZE || '50');
 
+/**
+ * Taux USD -> EUR. ds.text.search renvoie les prix en USD malgré currency=EUR
+ * (le pool de sélection est en dollars). Toute la tarification raisonne en
+ * euros : sans conversion, le prix serait soit écarté (garde-fou devise), soit
+ * facturé comme des euros. Taux configurable ; léger sur-arrondi absorbé par la
+ * marge (produits neufs bon marché). À remplacer par un taux du jour si besoin.
+ */
+const USD_TO_EUR = Number(process.env.ALIEXPRESS_USD_EUR || '0.95');
+
 // Gateway "système" AliExpress (Singapour).
 const GATEWAY = 'https://api-sg.aliexpress.com/sync';
 
@@ -272,14 +281,14 @@ export class AliexpressService {
             const wrapper = trouverWrapper(data);
             const rspCode = wrapper?.rsp_code ?? wrapper?.code;
             const rspMsg = wrapper?.rsp_msg ?? wrapper?.msg ?? wrapper?.sub_msg;
+            // Codes de SUCCÈS d'AliExpress ds.text.search : « 00 » (et variantes
+            // « 0 » / « 200 »). Mon detecteur ne reconnaissait que 2xx, donc il
+            // prenait « 00 » — le vrai code de succes — pour une erreur.
+            const codeStr = String(rspCode ?? '');
+            const rspOk = codeStr === '' || codeStr === '00' || codeStr === '0'
+                || /^2\d\d$/.test(codeStr);
             const apiError = data?.error_response
-                || ((data as any)?.code && (data as any).code !== '0'
-                    ? { code: (data as any).code, msg: (data as any).msg || (data as any).sub_msg }
-                    : null)
-                // rsp_code non 2xx = échec business, meme si code gateway = 0.
-                || (rspCode != null && !/^2\d\d$/.test(String(rspCode))
-                    ? { code: rspCode, msg: rspMsg }
-                    : null);
+                || (rspCode != null && !rspOk ? { code: rspCode, msg: rspMsg } : null);
 
             const texteErreur = apiError ? JSON.stringify(apiError) : '';
             this.lastDiagnostic = {
@@ -323,25 +332,37 @@ export class AliexpressService {
         // Le nommage diffère entre l'API Affiliate et l'API Drop Shipping
         // (target_sale_price vs targetSalePrice, selon la méthode et la
         // version) : on accepte les deux plutôt que de parier sur une forme.
-        const priceRaw = p.target_sale_price ?? p.targetSalePrice
-            ?? p.target_app_sale_price ?? p.sale_price ?? p.salePrice
-            ?? p.original_price ?? p.originalPrice;
-        const price = priceRaw != null ? (parseFloat(String(priceRaw)) || null) : null;
-        const image = p.product_main_image_url || p.productMainImageUrl
+        // ds.text.search renvoie salePrice / originalPrice / itemMainPic / title.
+        // On accepte aussi les formes de l'API Affiliate (target_sale_price…).
+        const priceRaw = p.salePrice ?? p.target_sale_price ?? p.targetSalePrice
+            ?? p.target_app_sale_price ?? p.sale_price
+            ?? p.originalPrice ?? p.original_price;
+        const deviseSource = p.salePriceCurrency || p.originalPriceCurrency
+            || p.target_sale_price_currency || p.targetSalePriceCurrency || CURRENCY;
+        let price = priceRaw != null ? (parseFloat(String(priceRaw)) || null) : null;
+        // Conversion en euros si la source est en dollars.
+        if (price != null && String(deviseSource).toUpperCase() === 'USD') {
+            price = Math.round(price * USD_TO_EUR * 100) / 100;
+        }
+        const image = p.itemMainPic || p.product_main_image_url || p.productMainImageUrl
             || p.image_url || p.imageUrl || null;
+        const id = p.productId || p.product_id || p.itemId
+            || Math.random().toString(36).slice(2);
         return {
-            itemId: 'ae_' + (p.product_id || p.productId || p.itemId
-                || Math.random().toString(36).slice(2)),
+            itemId: 'ae_' + id,
             // Titre NEUTRE par défaut : « Produit AliExpress » se serait
             // affiché tel quel sur la fiche client en cas de titre manquant.
-            title: p.product_title || p.productTitle || p.subject || 'Pièce détachée',
+            title: p.title || p.product_title || p.productTitle || p.subject || 'Pièce détachée',
             price,
-            currency: p.target_sale_price_currency || p.targetSalePriceCurrency || CURRENCY,
+            // Toujours EUR en sortie : la conversion USD->EUR est déjà faite,
+            // et le garde-fou devise en aval n'écarte donc pas ces produits.
+            currency: 'EUR',
             image,
             thumbnail: image,
             condition: 'NEW',
             itemWebUrl: p.promotion_link || p.promotionLink
-                || p.product_detail_url || p.productDetailUrl || null,
+                || p.productDetailUrl || p.product_detail_url
+                || (p.productId ? `https://www.aliexpress.com/item/${p.productId}.html` : null),
             seller: 'AliExpress',
             shortDescription: p.first_level_category_name || p.firstLevelCategoryName || null,
             fullDescription: null,
