@@ -24,13 +24,16 @@ const upload = multer({
 // Configure Gemini API
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-// Modèles Gemini, SURCHARGEABLES par variable d'environnement — passer à une
-// version plus récente (meilleure vision) se fait alors sans redéploiement.
-//   - VISION : lecture de photo (pièce, carte grise). Le plus déterminant pour
-//     la qualité d'identification. gemini-1.5-flash était l'ancien modèle.
-//   - TEXT   : génération de texte simple.
-const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-2.0-flash';
-const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.0-flash';
+// Modèles Gemini, SURCHARGEABLES par variable d'environnement.
+//
+// ⚠️ Le défaut DOIT rester compatible avec le SDK installé. @google/generative-ai
+// 0.2.1 (ancien) ne connaît PAS les modèles Gemini 2.x : leur demander lève
+// « model not found » et fait échouer toute la requête (c'est ce qui donnait
+// « identification a échoué »). gemini-1.5-flash est donc le défaut SÛR avec ce
+// SDK. Pour passer à Gemini 2.x, il faut D'ABORD mettre le SDK à jour, PUIS
+// poser GEMINI_VISION_MODEL — jamais l'inverse.
+const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-1.5-flash';
+const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-1.5-pro';
 
 // Routes
 app.post('/api/extract-carte-grise', upload.single('image'), async (req, res) => {
@@ -114,8 +117,19 @@ Si la piece est illisible ou non identifiable, mets "description" a null.`;
         const data = JSON.parse(jsonString);
         res.json(data);
     } catch (error) {
-        console.error("Error identify-part:", error);
-        res.status(500).json({ error: "Erreur lors de l'identification de la piece." });
+        // Détail loggé pour distinguer une VRAIE erreur technique (modèle
+        // introuvable, quota, clé) d'une pièce simplement non identifiée.
+        // Sans ça, l'utilisateur croyait Gemini incapable de reconnaître la
+        // pièce alors que l'appel n'aboutissait même pas.
+        const detail = error?.message || String(error);
+        console.error("Error identify-part:", detail);
+        const modeleIntrouvable = /not found|not supported|404/i.test(detail);
+        res.status(500).json({
+            error: "Erreur lors de l'identification de la piece.",
+            hint: modeleIntrouvable
+                ? `Modèle Gemini « ${GEMINI_VISION_MODEL} » indisponible pour ce SDK/clé.`
+                : undefined,
+        });
     }
 });
 
