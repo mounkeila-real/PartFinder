@@ -1528,7 +1528,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Reset btn
-    document.getElementById('btn-reset').addEventListener('click', () => {
+    function resetSearch() {
         form.reset();
         vinFeedback.style.display = 'none';
         btnMoreInfo.classList.add('display-none');
@@ -1571,7 +1571,11 @@ document.addEventListener('DOMContentLoaded', () => {
         state.vehicle = { method: null, data: { make: '', model: '', year: '', engine: '', vin: '', platform: '', version: '' }, wmiDecoded: false, specifications: null };
         state.part = { method: null, number: null, hasPhoto: false };
         refreshPartLock();
-    });
+    }
+
+    document.getElementById('btn-reset').addEventListener('click', resetSearch);
+    var btnResetVehicle = document.getElementById('btn-reset-vehicle');
+    if (btnResetVehicle) btnResetVehicle.addEventListener('click', resetSearch);
 
     // Plus d'infos btn (Detailed specs window)
     btnMoreInfo.addEventListener('click', () => {
