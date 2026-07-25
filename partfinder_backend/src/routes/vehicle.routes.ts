@@ -5,6 +5,19 @@ import { prisma } from '../lib/prisma';
 
 const router = express.Router();
 
+// Marques garanties, absentes du dataset NHTSA "car" (qui ne liste que les
+// constructeurs de voitures particulieres). Les SUV/tout-terrain et les
+// utilitaires legers (camionnettes) n'y figurent pas -> on les force ici.
+// La route /makes dedoublonne (comparaison en minuscules + skipDuplicates),
+// donc inclure une marque deja presente est sans effet : aucun risque de doublon.
+const GUARANTEED_MAKES = [
+    // SUV / tout-terrain (+ Seat/Skoda : "Skoda" en ASCII pour matcher NHTSA
+    // et eviter un doublon "Skoda"/"Škoda" + garder l'API modeles fonctionnelle)
+    'Land Rover', 'Jeep', 'Dacia', 'SsangYong', 'Cupra', 'Isuzu', 'Seat', 'Skoda',
+    // Utilitaires / camionnettes legeres (marche europeen)
+    'Iveco', 'Opel', 'Vauxhall', 'Maxus', 'Piaggio', 'Man'
+];
+
 // Lookup vehicle by license plate (registration number)
 router.get('/plate/:plate', async (req: express.Request, res: express.Response) => {
     try {
@@ -149,6 +162,19 @@ router.get('/makes', async (req: express.Request, res: express.Response) => {
             } catch (seedErr: any) {
                 console.warn('Auto-seed des marques echoue:', seedErr.message);
             }
+        }
+
+        // Garantit la presence des marques que NHTSA n'expose pas sous le type "car"
+        // (ex: Land Rover). Steady-state = lecture seule : on n'ecrit que si manquant.
+        const present = new Set(makes.map(m => m.name.toLowerCase()));
+        const missing = GUARANTEED_MAKES.filter(n => !present.has(n.toLowerCase()));
+        if (missing.length) {
+            await prisma.vehicleMake.createMany({
+                data: missing.map(name => ({ name })),
+                // @ts-ignore skipDuplicates non type sur certains connecteurs
+                skipDuplicates: true
+            });
+            makes = await prisma.vehicleMake.findMany({ orderBy: { name: 'asc' } });
         }
 
         res.json(makes);
