@@ -600,7 +600,7 @@
                     // On enregistre d'abord le prix affiché, puis on génère le lien.
                     await api('/admin/orders/' + oid + '/price', { method: 'PATCH', body: pricePayload });
                     const data = await api('/admin/orders/' + oid + '/payment-link', { method: 'POST' });
-                    showSuccess('Demande de paiement envoyée au client (commande #' + oid + ').');
+                    reportPaymentRequest(oid, data);
                     if (data.paymentUrl) window.open(data.paymentUrl, '_blank', 'noopener');
                     loadOrders();
                 }
@@ -611,17 +611,36 @@
             }
         });
 
+        // Rend compte FIDELEMENT d'un appel de fonds : le client n'est prevenu
+        // par e-mail que si l'envoi a reellement abouti. Sinon on le dit, et on
+        // rappelle qu'il reste le bouton "Regler" dans son espace client.
+        function reportPaymentRequest(oid, data) {
+            if (data && data.emailSent) {
+                showSuccess('Demande de paiement envoyée au client (commande #' + oid
+                    + ') — e-mail transmis à ' + (data.emailTo || 'son adresse') + '.');
+            } else {
+                showError('Commande #' + oid + ' passée en « Paiement demandé » et lien de paiement créé,'
+                    + ' MAIS l\'e-mail n\'a pas pu être envoyé'
+                    + (data && data.emailTo ? ' à ' + data.emailTo : ' (aucune adresse client)')
+                    + '. Le client peut régler depuis son espace ; sinon transmettez-lui le lien.');
+            }
+        }
+
         ordersBox.addEventListener('change', async (e) => {
             const sel = e.target.closest('.adm-status-select');
             if (!sel) return;
             const oid = sel.closest('.adm-row').getAttribute('data-oid');
             clearMsg();
             try {
-                await api('/admin/orders/' + oid + '/status', {
+                const data = await api('/admin/orders/' + oid + '/status', {
                     method: 'PATCH',
                     body: JSON.stringify({ status: sel.value }),
                 });
-                showSuccess('Commande #' + oid + ' → ' + STATUS_FR[sel.value] + '.');
+                // Passer en "Paiement demandé" declenche un appel de fonds reel
+                // (lien Stripe + e-mail) : on en rend compte precisement.
+                if (sel.value === 'AWAITING_PAYMENT') reportPaymentRequest(oid, data);
+                else showSuccess('Commande #' + oid + ' → ' + STATUS_FR[sel.value] + '.');
+                loadOrders();
             } catch (err) { showError(err.message); loadOrders(); }
         });
     });

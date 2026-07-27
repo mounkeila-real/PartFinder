@@ -188,8 +188,11 @@ export class EmailService {
         `;
 
         if (!resend) {
+            // On renvoie false : l'e-mail n'est reellement PAS parti. Renvoyer
+            // true ici faisait croire a l'operateur que le client avait ete
+            // notifie alors qu'il ne recevait jamais rien.
             console.warn(`[EMAIL BACKUP] Demande de paiement commande #${orderId} (${montant}) pour ${email}:\n👉 ${paymentUrl}\n`);
-            return true;
+            return false;
         }
         try {
             await resend.emails.send({

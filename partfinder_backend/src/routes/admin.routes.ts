@@ -159,6 +159,22 @@ router.patch('/orders/:id/status', async (req: AuthedRequest, res: express.Respo
         if (!ORDER_STATUSES.includes(status)) {
             return res.status(400).json({ error: 'Statut invalide. Attendu: ' + ORDER_STATUSES.join(', ') });
         }
+
+        // Passer une commande en AWAITING_PAYMENT n'est pas un simple changement
+        // d'etiquette : c'est un appel de fonds. On genere donc le lien Stripe et
+        // on notifie le client. Sans cela, le client voyait "A regler" sans lien
+        // de paiement (le bouton de son espace exige paymentUrl) ni e-mail.
+        if (status === 'AWAITING_PAYMENT') {
+            const result = await createPaymentRequest(id, req.headers.origin as string | undefined);
+            if (!result.ok) return res.status(result.code).json({ error: result.error });
+            return res.json({
+                order: result.order,
+                paymentUrl: result.paymentUrl,
+                emailSent: result.emailSent,
+                emailTo: result.emailTo,
+            });
+        }
+
         const order = await prisma.order.update({ where: { id }, data: { status }, include: { items: true } });
         res.json({ order });
     } catch (e: any) {
@@ -201,57 +217,99 @@ router.patch('/orders/:id/price', async (req: AuthedRequest, res: express.Respon
     }
 });
 
+type PaymentRequestResult =
+    | { ok: false; code: number; error: string }
+    | { ok: true; order: any; paymentUrl: string; emailSent: boolean; emailTo: string | null };
+
+/**
+ * Appel de fonds : arrête le lien de paiement Stripe pour le prix validé,
+ * passe la commande en AWAITING_PAYMENT et notifie le client.
+ *
+ * Source unique de vérité, partagée par le bouton « Envoyer la demande de
+ * paiement » et par le passage manuel du statut à AWAITING_PAYMENT — les deux
+ * chemins doivent produire exactement le même effet.
+ *
+ * Renvoie emailSent : l'opérateur doit savoir si le client a réellement été
+ * notifié, sans quoi il croit la demande partie alors qu'elle ne l'est pas.
+ */
+async function createPaymentRequest(orderId: number, origin?: string): Promise<PaymentRequestResult> {
+    if (!stripe) {
+        return {
+            ok: false, code: 503,
+            error: 'Paiement non configuré (STRIPE_SECRET_KEY manquant sur le backend) : aucune demande n\'a été envoyée.',
+        };
+    }
+
+    const order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true, user: true } });
+    if (!order) return { ok: false, code: 404, error: 'Commande introuvable.' };
+
+    const amount = Number(order.quotedAmount ?? order.totalAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+        return { ok: false, code: 400, error: 'Fixez d\'abord le prix définitif.' };
+    }
+
+    const base = process.env.FRONTEND_URL
+        || origin
+        || 'https://partfinder-production.up.railway.app';
+
+    const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        line_items: [{
+            quantity: 1,
+            price_data: {
+                currency: 'eur',
+                unit_amount: Math.round(amount * 100),
+                // Libellé neutre : aucune mention d'une source d'approvisionnement.
+                product_data: { name: `Commande PartFinder #${order.id}` },
+            },
+        }],
+        success_url: `${base}/?paid=1&order=${order.id}`,
+        cancel_url: `${base}/?canceled=1&order=${order.id}`,
+        client_reference_id: String(order.id),
+        metadata: { orderId: String(order.id) },
+        customer_email: order.user?.email || undefined,
+    });
+
+    const updated = await prisma.order.update({
+        where: { id: order.id },
+        data: { stripeSessionId: session.id, paymentUrl: session.url, status: 'AWAITING_PAYMENT' },
+        include: { items: true },
+    });
+
+    // La commande est bien passée en AWAITING_PAYMENT avec son lien : un échec
+    // d'e-mail ne doit pas annuler cela (le client garde le bouton « Régler »
+    // dans son espace). En revanche on remonte l'échec au lieu de le masquer.
+    let emailSent = false;
+    const emailTo = order.user?.email || null;
+    if (emailTo && session.url) {
+        emailSent = await EmailService
+            .sendPaymentRequestEmail(emailTo, order.id, amount, session.url, order.adminNote)
+            .catch((err: any) => {
+                console.error('[admin] email demande de fonds:', err?.message);
+                return false;
+            });
+    }
+
+    return { ok: true, order: updated, paymentUrl: session.url!, emailSent, emailTo };
+}
+
 /**
  * POST /api/admin/orders/:id/payment-link — génère la demande de fonds Stripe
  * pour le prix validé, passe la commande en AWAITING_PAYMENT et notifie le client.
  */
 router.post('/orders/:id/payment-link', async (req: AuthedRequest, res: express.Response) => {
     try {
-        if (!stripe) return res.status(503).json({ error: 'Paiement non configuré (STRIPE_SECRET_KEY manquant).' });
-
-        const id = Number(req.params.id);
-        const order = await prisma.order.findUnique({ where: { id }, include: { items: true, user: true } });
-        if (!order) return res.status(404).json({ error: 'Commande introuvable.' });
-
-        const amount = Number(order.quotedAmount ?? order.totalAmount);
-        if (!Number.isFinite(amount) || amount <= 0) {
-            return res.status(400).json({ error: 'Fixez d\'abord le prix définitif.' });
-        }
-
-        const base = process.env.FRONTEND_URL
-            || (req.headers.origin as string)
-            || 'https://partfinder-production.up.railway.app';
-
-        const session = await stripe.checkout.sessions.create({
-            mode: 'payment',
-            line_items: [{
-                quantity: 1,
-                price_data: {
-                    currency: 'eur',
-                    unit_amount: Math.round(amount * 100),
-                    // Libellé neutre : aucune mention d'une source d'approvisionnement.
-                    product_data: { name: `Commande PartFinder #${order.id}` },
-                },
-            }],
-            success_url: `${base}/?paid=1&order=${order.id}`,
-            cancel_url: `${base}/?canceled=1&order=${order.id}`,
-            client_reference_id: String(order.id),
-            metadata: { orderId: String(order.id) },
-            customer_email: order.user?.email || undefined,
+        const result = await createPaymentRequest(
+            Number(req.params.id),
+            req.headers.origin as string | undefined,
+        );
+        if (!result.ok) return res.status(result.code).json({ error: result.error });
+        res.json({
+            order: result.order,
+            paymentUrl: result.paymentUrl,
+            emailSent: result.emailSent,
+            emailTo: result.emailTo,
         });
-
-        const updated = await prisma.order.update({
-            where: { id: order.id },
-            data: { stripeSessionId: session.id, paymentUrl: session.url, status: 'AWAITING_PAYMENT' },
-        });
-
-        // Notification client (best effort : n'échoue jamais la requête).
-        if (order.user?.email && session.url) {
-            EmailService.sendPaymentRequestEmail(order.user.email, order.id, amount, session.url, order.adminNote)
-                .catch((err: any) => console.error('[admin] email demande de fonds:', err?.message));
-        }
-
-        res.json({ order: updated, paymentUrl: session.url });
     } catch (e: any) {
         console.error('[admin] payment-link:', e.message);
         res.status(500).json({ error: 'Erreur lors de la création de la demande de paiement.' });
