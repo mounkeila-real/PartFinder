@@ -108,7 +108,7 @@
 
         navGarage.addEventListener('click', (e) => { e.preventDefault(); open(); });
         $('garage-close').addEventListener('click', close);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        window.pfCloseOnBackdrop(overlay, close);
 
         // Pré-remplir la recherche depuis un véhicule / supprimer
         listBox.addEventListener('click', async (e) => {

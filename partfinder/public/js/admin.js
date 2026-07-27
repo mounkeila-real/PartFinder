@@ -60,7 +60,7 @@
         });
 
         document.getElementById('admin-close').addEventListener('click', () => overlay.classList.add('display-none'));
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.add('display-none'); });
+        window.pfCloseOnBackdrop(overlay, () => overlay.classList.add('display-none'));
 
         function switchTab(name) {
             tabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-adm-tab') === name));

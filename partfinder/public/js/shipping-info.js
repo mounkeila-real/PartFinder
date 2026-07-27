@@ -54,7 +54,7 @@
 
         zoneSel.addEventListener('change', load);
         $('shipping-info-close').addEventListener('click', () => overlay.classList.add('display-none'));
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.add('display-none'); });
+        window.pfCloseOnBackdrop(overlay, () => overlay.classList.add('display-none'));
 
         // Délégation : les cartes de résultats sont rendues dynamiquement.
         document.addEventListener('click', (e) => {

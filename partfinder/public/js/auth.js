@@ -122,7 +122,7 @@
             userProfile.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); accountClick(); } });
         }
         if (closeBtn) closeBtn.addEventListener('click', closeModal);
-        if (overlay) overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+        if (overlay) window.pfCloseOnBackdrop(overlay, closeModal);
         tabs.forEach(t => t.addEventListener('click', () => switchTab(t.getAttribute('data-auth-tab'))));
 
         // --- Connexion ---

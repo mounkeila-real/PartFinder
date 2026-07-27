@@ -209,7 +209,7 @@
 
         function close() { overlay.classList.add('display-none'); }
         closeBtn.addEventListener('click', close);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        window.pfCloseOnBackdrop(overlay, close);
 
         async function api(path, options) {
             const res = await fetch(API_BASE_URL + path, Object.assign({
