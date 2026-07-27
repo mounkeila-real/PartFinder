@@ -13,11 +13,23 @@
         PENDING: ['En attente', 'st-pending'],
         CONFIRMED: ['Confirmée', 'st-progress'],
         PROCESSING: ['En traitement', 'st-progress'],
+        RECEIVED_AT_WAREHOUSE: ['Reçue à l\'entrepôt', 'st-progress'],
+        PENDING_WEIGHT_CONFIRMATION: ['Vérification du poids', 'st-progress'],
+        PENDING_ADDITIONAL_PAYMENT: ['Complément à régler', 'st-pending'],
+        READY_TO_SHIP: ['Prête à expédier', 'st-progress'],
         SHIPPED: ['Expédiée', 'st-progress'],
         DELIVERED: ['Livrée', 'st-done'],
         CANCELLED: ['Annulée', 'st-cancel'],
+        ISSUE: ['En cours de traitement', 'st-pending'],
     };
-    const OPEN_STATUSES = ['PENDING_VALIDATION', 'AWAITING_PAYMENT', 'PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED'];
+    // Commandes "en cours" (vs historique). Les statuts du circuit entrepot
+    // manquaient : une commande en attente de complement se retrouvait classee
+    // dans l'historique, donc l'appel de fonds passait inapercu du client.
+    const OPEN_STATUSES = [
+        'PENDING_VALIDATION', 'AWAITING_PAYMENT', 'PENDING', 'CONFIRMED', 'PROCESSING',
+        'RECEIVED_AT_WAREHOUSE', 'PENDING_WEIGHT_CONFIRMATION', 'PENDING_ADDITIONAL_PAYMENT',
+        'READY_TO_SHIP', 'SHIPPED', 'ISSUE',
+    ];
 
     document.addEventListener('DOMContentLoaded', () => {
         const overlay = document.getElementById('account-overlay');

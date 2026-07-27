@@ -23,7 +23,17 @@ const router = express.Router();
 
 router.use(requireAdmin);
 
-const ORDER_STATUSES = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
+// Statuts de commande — DOIT rester aligné sur prisma/schema.prisma (Order.status).
+// L'ancienne liste ne couvrait que 6 statuts generiques : choisir "A valider"
+// ou "Paiement demande" dans l'admin renvoyait "Statut invalide", et tout le
+// circuit entrepot (pesee, appel de fonds, expedition) etait rejete alors que
+// ces statuts sont ecrits en base par warehouse.routes / checkout.routes.
+const ORDER_STATUSES = [
+    'PENDING_VALIDATION', 'AWAITING_PAYMENT', 'PENDING', 'CONFIRMED', 'PROCESSING',
+    'PENDING_WEIGHT_CONFIRMATION', 'PENDING_ADDITIONAL_PAYMENT',
+    'RECEIVED_AT_WAREHOUSE', 'READY_TO_SHIP', 'SHIPPED', 'DELIVERED',
+    'CANCELLED', 'ISSUE',
+];
 
 function publicUser(u: any) {
     return {

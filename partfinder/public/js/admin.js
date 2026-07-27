@@ -8,11 +8,24 @@
         ? 'http://localhost:3000/api'
         : 'https://partfinder-backend-production-c0af.up.railway.app/api';
 
-    const ORDER_STATUSES = ['PENDING_VALIDATION', 'AWAITING_PAYMENT', 'PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
+    // Statuts de commande, dans l'ordre du parcours reel.
+    // DOIT rester aligne sur ORDER_STATUSES (backend admin.routes.ts) et sur
+    // prisma/schema.prisma : les statuts du circuit entrepot manquaient ici,
+    // si bien qu'une commande deja recue a l'entrepot affichait "A valider"
+    // (aucune option ne correspondait -> le navigateur selectionne la 1re).
+    const ORDER_STATUSES = [
+        'PENDING_VALIDATION', 'AWAITING_PAYMENT', 'PENDING', 'CONFIRMED', 'PROCESSING',
+        'RECEIVED_AT_WAREHOUSE', 'PENDING_WEIGHT_CONFIRMATION', 'PENDING_ADDITIONAL_PAYMENT',
+        'READY_TO_SHIP', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'ISSUE',
+    ];
     const STATUS_FR = {
         PENDING_VALIDATION: 'À valider', AWAITING_PAYMENT: 'Paiement demandé',
         PENDING: 'En attente', CONFIRMED: 'Confirmée', PROCESSING: 'En traitement',
-        SHIPPED: 'Expédiée', DELIVERED: 'Livrée', CANCELLED: 'Annulée',
+        RECEIVED_AT_WAREHOUSE: 'Reçue à l\'entrepôt',
+        PENDING_WEIGHT_CONFIRMATION: 'Pesée à confirmer',
+        PENDING_ADDITIONAL_PAYMENT: 'Complément à régler',
+        READY_TO_SHIP: 'Prête à expédier',
+        SHIPPED: 'Expédiée', DELIVERED: 'Livrée', CANCELLED: 'Annulée', ISSUE: 'Litige',
     };
 
     document.addEventListener('DOMContentLoaded', () => {
