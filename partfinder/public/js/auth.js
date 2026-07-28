@@ -117,6 +117,11 @@
         }
 
         if (btnAccount) btnAccount.addEventListener('click', accountClick);
+        // Raccourci « Mes commandes » de la barre laterale : l'espace client
+        // s'ouvre deja sur l'onglet commandes (etat de chaque commande, lien de
+        // paiement). Non connecte, accountClick propose la connexion.
+        const navOrders = document.getElementById('nav-orders');
+        if (navOrders) navOrders.addEventListener('click', (e) => { e.preventDefault(); accountClick(); });
         if (userProfile) {
             userProfile.addEventListener('click', accountClick);
             userProfile.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); accountClick(); } });
